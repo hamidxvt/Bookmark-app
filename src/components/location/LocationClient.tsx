@@ -1,0 +1,197 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { MapPin, Clock, RefreshCw } from "lucide-react";
+import { getGpsStatusColor, timeAgo } from "@/lib/utils";
+
+interface BookerLoc {
+  id: number;
+  name: string;
+  city?: string;
+  latitude: string | null;
+  longitude: string | null;
+  gps_status: string;
+  last_seen_at: string | null;
+}
+
+interface Counts {
+  total: number;
+  active: number;
+  idle: number;
+  offline: number;
+}
+
+const CITIES = ["All", "Karachi", "Lahore", "Multan"];
+
+export default function LocationClient({ defaultCity }: { defaultCity?: string }) {
+  const [bookers, setBookers] = useState<BookerLoc[]>([]);
+  const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, idle: 0, offline: 0 });
+  const [loading, setLoading] = useState(true);
+  const [city, setCity] = useState(defaultCity ? (CITIES.includes(defaultCity) ? defaultCity : "All") : "All");
+  const [selected, setSelected] = useState<number | null>(null);
+
+  async function load() {
+    setLoading(true);
+    try {
+      const cityParam = city !== "All" ? `?city=${city.toLowerCase()}` : "";
+      const res = await fetch(`/api/v1/location${cityParam}`).then(r => r.json());
+      if (res.success) {
+        setBookers(res.data?.bookers ?? []);
+        setCounts(res.data?.counts ?? { total: 0, active: 0, idle: 0, offline: 0 });
+      }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
+  }
+
+  useEffect(() => { load(); }, [city]);
+
+  // Auto-refresh every 30s
+  useEffect(() => {
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, [city]);
+
+  const selectedBooker = bookers.find(b => b.id === selected);
+
+  const statusBar = [
+    { label: "Active", count: counts.active, color: "bg-emerald-500" },
+    { label: "Idle", count: counts.idle, color: "bg-amber-500" },
+    { label: "Offline", count: counts.offline, color: "bg-slate-400" },
+  ];
+
+  return (
+    <div className="flex h-[calc(100vh-64px)]">
+      {/* Map area */}
+      <div className="relative flex-1 bg-slate-200 overflow-hidden">
+        {/* City tabs */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex gap-1 rounded-xl bg-white/90 backdrop-blur-sm p-1 shadow-lg border border-slate-200">
+          {CITIES.map(c => (
+            <button key={c} onClick={() => setCity(c)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${city === c ? "bg-[#0f1e3c] text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+              {c}
+            </button>
+          ))}
+        </div>
+
+        {/* Status counts */}
+        <div className="absolute top-16 left-4 z-10 flex gap-2">
+          {statusBar.map(s => (
+            <div key={s.label} className="flex items-center gap-1.5 rounded-lg bg-white/90 backdrop-blur-sm px-3 py-1.5 shadow border border-slate-200">
+              <span className={`h-2 w-2 rounded-full ${s.color}`} />
+              <span className="text-xs font-semibold text-slate-700">{s.count} {s.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Refresh button */}
+        <button onClick={load} disabled={loading}
+          className="absolute top-4 right-4 z-10 flex items-center gap-1.5 rounded-lg bg-white/90 backdrop-blur-sm px-3 py-1.5 shadow border border-slate-200 text-xs font-medium text-slate-600 hover:bg-white">
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        </button>
+
+        {/* Map placeholder — real Google Maps renders here when NEXT_PUBLIC_GOOGLE_MAPS_KEY is set */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0f1e3c]/10">
+              <MapPin className="h-8 w-8 text-[#0f1e3c]" />
+            </div>
+            <p className="text-sm font-semibold text-slate-600">Google Maps</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Add <code className="bg-slate-200 px-1 rounded">NEXT_PUBLIC_GOOGLE_MAPS_KEY</code> to enable
+            </p>
+            <p className="text-xs text-slate-400 mt-1">{bookers.length} bookers · {city}</p>
+          </div>
+        </div>
+
+        {/* Booker pins (positioned relatively until real map loads) */}
+        {bookers.map((b, i) => {
+          const gps = getGpsStatusColor(b.gps_status ?? "OFFLINE");
+          const top = 25 + (i * 18) % 50;
+          const left = 15 + (i * 22) % 65;
+          return (
+            <button key={b.id} onClick={() => setSelected(b.id === selected ? null : b.id)}
+              style={{ top: `${top}%`, left: `${left}%` }}
+              className="absolute group"
+              title={b.name}>
+              <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 border-white shadow-lg transition-transform group-hover:scale-110 text-white text-xs font-bold`}
+                style={{ backgroundColor: gps.hex }}>
+                {(b.name ?? "?")[0]}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Side panel */}
+      <div className="w-72 shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-y-auto">
+        <div className="p-4 border-b border-slate-100">
+          <p className="text-sm font-semibold text-slate-800">Bookers — {city}</p>
+          <p className="text-xs text-slate-400">{bookers.length} members · Live from staging</p>
+        </div>
+
+        <div className="flex-1 divide-y divide-slate-50">
+          {loading && [...Array(4)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3.5">
+              <div className="h-9 w-9 rounded-full bg-slate-100 animate-pulse shrink-0" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 w-24 rounded bg-slate-100 animate-pulse" />
+                <div className="h-2.5 w-16 rounded bg-slate-100 animate-pulse" />
+              </div>
+            </div>
+          ))}
+
+          {!loading && bookers.map(b => {
+            const gps = getGpsStatusColor(b.gps_status ?? "OFFLINE");
+            const isSelected = selected === b.id;
+            return (
+              <button key={b.id} onClick={() => setSelected(b.id === selected ? null : b.id)}
+                className={`w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 ${isSelected ? "bg-teal-50" : ""}`}>
+                <div className="relative shrink-0">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white"
+                    style={{ backgroundColor: gps.hex }}>
+                    {(b.name ?? "?")[0]}
+                  </div>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold text-slate-800 truncate">{b.name}</p>
+                  <p className="text-xs text-slate-400">{b.city ?? city}</p>
+                  {b.last_seen_at && (
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Clock className="h-3 w-3 text-slate-400" />
+                      <span className="text-[10px] text-slate-400">{timeAgo(b.last_seen_at)}</span>
+                    </div>
+                  )}
+                </div>
+                <span className={`text-xs font-medium shrink-0 ${gps.text}`}>{gps.label}</span>
+              </button>
+            );
+          })}
+
+          {!loading && bookers.length === 0 && (
+            <p className="px-5 py-8 text-center text-sm text-slate-400">No bookers found for {city}</p>
+          )}
+        </div>
+
+        {/* Detail panel for selected booker */}
+        {selectedBooker && (
+          <div className="border-t border-slate-200 p-4 bg-slate-50">
+            <p className="text-xs font-semibold text-slate-700 mb-2">📍 {selectedBooker.name}</p>
+            <div className="space-y-1 text-xs text-slate-600">
+              <p>Status: <span className={`font-medium ${getGpsStatusColor(selectedBooker.gps_status ?? "OFFLINE").text}`}>
+                {getGpsStatusColor(selectedBooker.gps_status ?? "OFFLINE").label}
+              </span></p>
+              {selectedBooker.last_seen_at && (
+                <p>Last seen: <span className="font-medium text-slate-800">{timeAgo(selectedBooker.last_seen_at)}</span></p>
+              )}
+              {selectedBooker.latitude && selectedBooker.longitude && (
+                <p className="text-[10px] font-mono text-slate-400 mt-1">
+                  {selectedBooker.latitude}, {selectedBooker.longitude}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
