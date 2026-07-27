@@ -1,0 +1,25 @@
+package com.google.android.libraries.places.internal;
+
+/* compiled from: com.google.android.libraries.places:places@@2.6.0 */
+/* loaded from: classes16.dex */
+public final class zznj extends zzadh implements zzaes {
+    /* JADX WARN: Illegal instructions before constructor call */
+    /*
+        Code decompiled incorrectly, please refer to instructions dump.
+    */
+    private zznj() {
+        super(r0);
+        zznk zznkVar;
+        zznkVar = zznk.zzb;
+    }
+
+    /* JADX WARN: Illegal instructions before constructor call */
+    /*
+        Code decompiled incorrectly, please refer to instructions dump.
+    */
+    /* synthetic */ zznj(zznf zznfVar) {
+        super(r1);
+        zznk zznkVar;
+        zznkVar = zznk.zzb;
+    }
+}

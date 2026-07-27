@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:tag="layout/bottom_sheet_all_products_cart_fragment_0"
+    android:background="@drawable/all_products_count_selection"
+    android:padding="@dimen/_8sdp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <LinearLayout
+        android:orientation="vertical"
+        android:background="@drawable/product_bg"
+        android:padding="@dimen/_5sdp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginStart="5dp"
+        android:layout_marginEnd="5dp">
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/selected_products_rv"
+            android:padding="@dimen/_5sdp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+        <androidx.appcompat.widget.AppCompatButton
+            android:textSize="16sp"
+            android:textColor="@color/white"
+            android:layout_gravity="center_horizontal"
+            android:id="@+id/addToVisitBtn"
+            android:background="@drawable/edittext_background"
+            android:layout_width="307dp"
+            android:layout_height="53dp"
+            android:layout_marginTop="@dimen/_16sdp"
+            android:text="Add to Visit"
+            android:textAllCaps="false"
+            android:fontFamily="@font/outfit_medium"
+            android:backgroundTint="@color/app_color"/>
+        <ProgressBar
+            android:id="@+id/addingProductsBar"
+            android:visibility="gone"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/_16sdp"/>
+    </LinearLayout>
+    <ImageView
+        android:layout_gravity="center_horizontal"
+        android:id="@+id/cross_btn"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="@dimen/_16sdp"
+        android:src="@drawable/cross_btn"
+        android:scaleType="centerCrop"
+        app:tint="@color/grey"/>
+</LinearLayout>

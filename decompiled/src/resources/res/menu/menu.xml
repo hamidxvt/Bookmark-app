@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:icon="@drawable/menu_home_select"
+        android:id="@+id/homeFragment"
+        android:title="Home"/>
+    <item
+        android:icon="@drawable/menu_inventory_select"
+        android:id="@+id/inventoryFragment"
+        android:title="Inventory"/>
+    <item
+        android:icon="@drawable/menu_customer_select"
+        android:id="@+id/customersFragment"
+        android:title="Customers"/>
+    <item
+        android:icon="@drawable/menu_activity_select"
+        android:id="@+id/recentActivityFragment"
+        android:title="Recent Activity"/>
+    <item
+        android:icon="@drawable/menu_performance_select"
+        android:id="@+id/performanceFragment"
+        android:title="Performance"/>
+</menu>

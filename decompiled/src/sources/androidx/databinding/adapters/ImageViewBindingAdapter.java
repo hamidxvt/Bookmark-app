@@ -1,0 +1,24 @@
+package androidx.databinding.adapters;
+
+import android.graphics.drawable.Drawable;
+import android.net.Uri;
+import android.widget.ImageView;
+
+/* loaded from: classes.dex */
+public class ImageViewBindingAdapter {
+    public static void setImageUri(ImageView view, String imageUri) {
+        if (imageUri == null) {
+            view.setImageURI(null);
+        } else {
+            view.setImageURI(Uri.parse(imageUri));
+        }
+    }
+
+    public static void setImageUri(ImageView view, Uri imageUri) {
+        view.setImageURI(imageUri);
+    }
+
+    public static void setImageDrawable(ImageView view, Drawable drawable) {
+        view.setImageDrawable(drawable);
+    }
+}

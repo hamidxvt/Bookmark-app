@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:tag="layout/item_sample_list_0"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+    <LinearLayout
+        android:orientation="horizontal"
+        android:padding="@dimen/_8sdp"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <ImageView
+            android:tag="binding_1"
+            android:layout_width="@dimen/_40sdp"
+            android:layout_height="@dimen/_60sdp"
+            android:scaleType="centerCrop"/>
+        <LinearLayout
+            android:layout_gravity="center_vertical"
+            android:orientation="vertical"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/_8sdp">
+            <TextView
+                android:textSize="@dimen/_12ssp"
+                android:tag="binding_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:hint="English"
+                android:fontFamily="@font/outfit_bold"/>
+            <TextView
+                android:textSize="@dimen/_11ssp"
+                android:tag="binding_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:hint="Grade 1"
+                android:maxLines="1"
+                android:fontFamily="@font/outfit_semibold"/>
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>

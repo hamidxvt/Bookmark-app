@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:background="@drawable/succ"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+    <LinearLayout
+        android:gravity="center"
+        android:orientation="vertical"
+        android:id="@+id/successContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true">
+        <LinearLayout
+            android:gravity="center"
+            android:orientation="vertical"
+            android:background="@drawable/successful_tick"
+            android:layout_width="140dp"
+            android:layout_height="140dp"/>
+        <TextView
+            android:textSize="24sp"
+            android:textColor="@android:color/white"
+            android:id="@+id/txtSuccessTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="Adoption created successfully."
+            android:fontFamily="@font/outfit_bold"/>
+        <TextView
+            android:textSize="16sp"
+            android:textColor="@android:color/white"
+            android:gravity="center"
+            android:id="@+id/txtSuccessSubtitle"
+            android:paddingTop="10dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="We&apos;ve saved your selections. You can create \10another if needed."
+            android:fontFamily="@font/outfit"/>
+    </LinearLayout>
+    <androidx.appcompat.widget.AppCompatButton
+        android:textSize="16sp"
+        android:textColor="#000000"
+        android:id="@+id/btnCheckAdoptions"
+        android:background="@drawable/edittext_background"
+        android:layout_width="342dp"
+        android:layout_height="50dp"
+        android:layout_marginBottom="55dp"
+        android:text="Check adoptions"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:textAllCaps="false"
+        android:fontFamily="@font/outfit_medium"
+        android:backgroundTint="@color/white"/>
+</RelativeLayout>

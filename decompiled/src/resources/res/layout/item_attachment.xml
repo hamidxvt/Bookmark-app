@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.appcompat.widget.LinearLayoutCompat xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:tag="layout/item_attachment_0"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
+    <io.github.florent37.shapeofview.shapes.RoundRectView
+        android:layout_gravity="center_horizontal"
+        android:id="@+id/imgCircleProfile"
+        android:layout_width="@dimen/_90sdp"
+        android:layout_height="@dimen/_90sdp"
+        android:layout_marginTop="@dimen/_10sdp"
+        android:layout_marginHorizontal="@dimen/_10sdp"
+        app:shape_circle_borderColor="@color/app_color"
+        app:shape_circle_borderWidth="@dimen/_2sdp"
+        app:shape_roundRect_bottomLeftRadius="16dp"
+        app:shape_roundRect_bottomRightRadius="16dp"
+        app:shape_roundRect_topLeftRadius="16dp"
+        app:shape_roundRect_topRightRadius="16dp">
+        <ImageView
+            android:id="@+id/imgProfile"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:contentDescription="@string/no"/>
+        <androidx.appcompat.widget.AppCompatImageView
+            android:layout_gravity="end"
+            android:id="@+id/deleteImageView"
+            android:padding="10dp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/delete"/>
+    </io.github.florent37.shapeofview.shapes.RoundRectView>
+</androidx.appcompat.widget.LinearLayoutCompat>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/app_navigation"
+    app:startDestination="@+id/homeFragment">
+    <fragment
+        android:label="fragment_home"
+        android:name="com.ingenious.androidbookmarksalesupgrade.ui.fragment.HomeFragment"
+        android:id="@+id/homeFragment"/>
+    <fragment
+        android:label="fragment_inventory"
+        android:name="com.ingenious.androidbookmarksalesupgrade.ui.fragment.InventoryFragment"
+        android:id="@+id/inventoryFragment"/>
+    <fragment
+        android:label="fragment_customer"
+        android:name="com.ingenious.androidbookmarksalesupgrade.ui.fragment.CustomerFragment"
+        android:id="@+id/customersFragment"/>
+    <fragment
+        android:label="fragment_recent_activity"
+        android:name="com.ingenious.androidbookmarksalesupgrade.ui.fragment.RecentActivityFragment"
+        android:id="@+id/recentActivityFragment"/>
+    <fragment
+        android:label="fragment_performance"
+        android:name="com.ingenious.androidbookmarksalesupgrade.ui.fragment.PerformanceFragment"
+        android:id="@+id/performanceFragment">
+        <action
+            android:id="@+id/action_performanceFragment_to_homeFragment"
+            app:destination="@+id/homeFragment"/>
+    </fragment>
+</navigation>

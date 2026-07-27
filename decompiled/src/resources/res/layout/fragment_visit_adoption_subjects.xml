@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:tag="layout/fragment_visit_adoption_subjects_0"
+    android:paddingBottom="@dimen/_12sdp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_marginTop="@dimen/_12sdp"
+    android:paddingStart="@dimen/_7sdp"
+    android:paddingEnd="@dimen/_7sdp">
+    <TextView
+        android:textSize="24sp"
+        android:textColor="@color/black"
+        android:id="@+id/select_segment_tv"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/_8sdp"
+        android:text="Select Subjects"
+        android:layout_alignParentTop="true"
+        android:fontFamily="@font/outfit_bold"/>
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/segments_rv"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/_8sdp"
+        android:layout_below="@+id/select_segment_tv"
+        android:layout_alignParentBottom="@+id/btn_continue"/>
+    <Button
+        android:textSize="16sp"
+        android:id="@+id/btn_continue"
+        android:background="@drawable/edittext_background"
+        android:layout_width="343dp"
+        android:layout_height="50dp"
+        android:layout_marginTop="@dimen/_12sdp"
+        android:text="Continue"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:textAllCaps="false"
+        android:fontFamily="@font/outfit_medium"/>
+</RelativeLayout>
