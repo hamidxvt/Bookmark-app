@@ -1,58 +1,37 @@
-# Backend (Laravel)
-backend/.env
-backend/.env.local
-backend/node_modules/
-backend/vendor/
-backend/storage/
-backend/bootstrap/cache/
-backend/.DS_Store
-backend/*.log
-backend/database/database.sqlite
-backend/.vscode/
-backend/.idea/
-
-# Mobile (Android)
-mobile/.gradle/
-mobile/local.properties
-mobile/.DS_Store
-mobile/*.iml
-mobile/.idea/
+# Flutter
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
 mobile/build/
-mobile/.classpath
-mobile/.project
-mobile/.settings/
-mobile/bin/
-mobile/gen/
-mobile/captures/
-mobile/.externalNativeBuild/
-mobile/.cxx/
+mobile/.packages
+mobile/pubspec.lock
 
-# Admin (React)
+# Node.js
+backend/node_modules/
+backend/.env
+backend/logs/
+
+# Prisma
+backend/prisma/dev.db
+
+# Android (inside Flutter)
+mobile/android/.gradle/
+mobile/android/local.properties
+mobile/android/key.properties
+mobile/android/app/debug/
+mobile/android/app/release/
+mobile/android/app/*.jks
+
+# React Admin
 admin/node_modules/
 admin/dist/
-admin/.DS_Store
 admin/.env.local
-admin/.env.*.local
-admin/pnpm-debug.log*
-admin/*.local
-admin/.vscode/
-admin/.idea/
 
-# General
+# OS
 .DS_Store
-.AppleDouble
-.LSOverride
-*.swp
-*.swo
-*~
-.vscode/
-.idea/
-*.iml
-*.log
-.env
-.env.local
-
-# System files
 Thumbs.db
-.cache/
-.npm/
+
+# IDE
+.idea/
+.vscode/settings.json
+*.swp

@@ -1,0 +1,309 @@
+// This file is the Prisma source of truth for the database schema.
+// Run: npx prisma migrate dev --name init
+// Run: npx prisma generate
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                   Int      @id @default(autoincrement())
+  name                 String
+  email                String   @unique
+  password             String
+  role                 Role     @default(sales_officer)
+  cityId               Int?
+  areaId               Int?
+  reportingCityHeadId  Int?
+  basicSalary          Decimal  @db.Decimal(10, 2) @default(0)
+  securityDeposit      Decimal  @db.Decimal(10, 2) @default(0)
+  dailyPerformanceRate Decimal  @db.Decimal(10, 2) @default(3000)
+  annualSampleLimitPkr Decimal  @db.Decimal(10, 2) @default(0)
+  sampleUsedPkr        Decimal  @db.Decimal(10, 2) @default(0)
+  leaveBalanceSick     Int      @default(10)
+  leaveBalanceCasual   Int      @default(18)
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  city           City?           @relation(fields: [cityId], references: [id])
+  area           Area?           @relation(fields: [areaId], references: [id])
+  attendances    Attendance[]
+  visits         Visit[]
+  gpsLogs        GpsLog[]
+  sampleRequests SampleRequest[]
+  leaveRequests  LeaveRequest[]
+  payrollLedgers PayrollLedger[]
+  auditLogs      AuditLog[]
+
+  @@index([cityId])
+  @@index([areaId])
+  @@map("users")
+}
+
+enum Role {
+  super_admin
+  city_head
+  coordinator
+  sales_officer
+}
+
+model City {
+  id    Int    @id @default(autoincrement())
+  name  String
+  users User[]
+  areas Area[]
+
+  @@map("cities")
+}
+
+model Area {
+  id        Int        @id @default(autoincrement())
+  name      String
+  cityId    Int
+  city      City       @relation(fields: [cityId], references: [id])
+  locations Location[]
+  users     User[]
+
+  @@index([cityId])
+  @@map("areas")
+}
+
+model Location {
+  id           Int          @id @default(autoincrement())
+  name         String
+  type         LocationType
+  areaId       Int
+  latitude     Float
+  longitude    Float
+  priority     Priority     @default(medium)
+  contactName  String?
+  contactPhone String?
+  address      String?
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+
+  area   Area    @relation(fields: [areaId], references: [id])
+  visits Visit[]
+
+  @@index([areaId])
+  @@index([latitude, longitude])
+  @@map("locations")
+}
+
+enum LocationType {
+  school
+  bookshop
+}
+
+enum Priority {
+  high
+  medium
+  low
+}
+
+model Attendance {
+  id               Int              @id @default(autoincrement())
+  userId           Int
+  date             DateTime         @db.Date
+  dayStartTime     DateTime?
+  dayStartLat      Float?
+  dayStartLng      Float?
+  dayEndTime       DateTime?
+  dayEndLat        Float?
+  dayEndLng        Float?
+  status           AttendanceStatus @default(absent)
+  cannotWorkReason String?
+  createdAt        DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("attendance")
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  cannot_work
+  leave
+}
+
+model GpsLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  latitude     Float
+  longitude    Float
+  accuracy     Float
+  isMocked     Boolean  @default(false)
+  batteryLevel Int?
+  recordedAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, recordedAt])
+  @@map("gps_logs")
+}
+
+model Visit {
+  id               Int            @id @default(autoincrement())
+  userId           Int
+  locationId       Int
+  scheduledDate    DateTime       @db.Date
+  dailySequence    Int
+  status           VisitStatus    @default(planned)
+  arrivalTime      DateTime?
+  arrivalLat       Float?
+  arrivalLng       Float?
+  completionTime   DateTime?
+  contactPerson    String?
+  designation      String?
+  phone            String?
+  notes            String?        @db.Text
+  visitType        String?
+  sampleDistributed Int?          @default(0)
+  photoUrl         String?
+  missedReason     String?
+  carryForwardCnt  Int            @default(0)
+  approvalStatus   ApprovalStatus?
+  approvedById     Int?
+  isAdHoc          Boolean        @default(false)
+  syncStatus       SyncStatus     @default(synced)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id])
+  location Location @relation(fields: [locationId], references: [id])
+
+  @@index([userId, scheduledDate])
+  @@index([locationId])
+  @@map("visits")
+}
+
+enum VisitStatus {
+  planned
+  in_progress
+  completed
+  missed
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum SyncStatus {
+  pending_sync
+  synced
+}
+
+model Product {
+  id       Int     @id @default(autoincrement())
+  name     String
+  pricePkr Decimal @db.Decimal(10, 2)
+  isActive Boolean @default(true)
+
+  sampleRequests SampleRequest[]
+
+  @@map("products")
+}
+
+model SampleRequest {
+  id             Int          @id @default(autoincrement())
+  userId         Int
+  productId      Int
+  visitId        Int?
+  quantity       Int
+  totalValuePkr  Decimal      @db.Decimal(10, 2)
+  status         SampleStatus @default(pending)
+  approvedById   Int?
+  requestedAt    DateTime     @default(now())
+  recoveredAt    DateTime?
+  reminder10Sent Boolean      @default(false)
+  reminder20Sent Boolean      @default(false)
+
+  user    User    @relation(fields: [userId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("sample_requests")
+}
+
+enum SampleStatus {
+  pending
+  approved
+  dispatched
+  recovered
+  deducted
+}
+
+model LeaveRequest {
+  id           Int            @id @default(autoincrement())
+  userId       Int
+  leaveType    LeaveType
+  startDate    DateTime       @db.Date
+  endDate      DateTime       @db.Date
+  days         Int
+  reason       String?        @db.Text
+  status       ApprovalStatus @default(pending)
+  approvedById Int?
+  createdAt    DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("leave_requests")
+}
+
+enum LeaveType {
+  sick
+  casual
+}
+
+model PayrollLedger {
+  id                  Int      @id @default(autoincrement())
+  userId              Int
+  month               Int
+  year                Int
+  presentDays         Int      @default(0)
+  basicSalary         Decimal  @db.Decimal(10, 2)
+  performanceEarned   Decimal  @db.Decimal(10, 2) @default(0)
+  missedVisitPenalty  Decimal  @db.Decimal(10, 2) @default(0)
+  sampleDeduction     Decimal  @db.Decimal(10, 2) @default(0)
+  securityDepositHeld Decimal  @db.Decimal(10, 2) @default(0)
+  netPayable          Decimal  @db.Decimal(10, 2)
+  isFinalized         Boolean  @default(false)
+  calculatedAt        DateTime?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, month, year])
+  @@index([userId, year, month])
+  @@map("payroll_ledgers")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int
+  action     String
+  targetType String
+  targetId   Int?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

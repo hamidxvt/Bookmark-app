@@ -1,8 +1,7 @@
 # ARCHITECTURE.md
 ## Bookmark Sales Force Automation System
 
-
-Last Updated: July 27, 2026 | Status: Production-Ready | Version: 1.0
+Last Updated: July 27, 2026 | Status: Production-Ready | Version: 2.0 | Stack: Flutter + Node.js
 
 ---
 
@@ -12,17 +11,17 @@ Last Updated: July 27, 2026 | Status: Production-Ready | Version: 1.0
 
 | Layer | Technology | Rationale |
 |-------|-----------|-----------|
-| **Mobile** | Kotlin, MVVM, Retrofit, Room DB, WorkManager, Google Maps, Fused Location | Native performance, offline-first, battery efficiency, GPS spoofing detection |
-| **Backend** | Laravel 11, PHP 8.3, MySQL 8, Sanctum, Redis, Queue Workers | Rapid feature iteration, battle-tested ORM, built-in scheduler, async jobs |
-| **Admin** | React 18, Vite, Tailwind CSS, Google Maps JS API | Fast dev loop, responsive UX, live tracking UX |
+| **Mobile** | Flutter 3.x (Dart), Riverpod, Dio, Drift (SQLite), WorkManager Plugin, Google Maps Flutter | Single codebase, smooth 60/120fps UI, strong offline-first support, hot reload for fast dev |
+| **Backend** | Node.js 20 LTS, Express.js, Prisma ORM, MySQL 8, JWT, BullMQ, node-cron, Redis | Non-blocking I/O for real-time GPS streams, fast JSON throughput, unified JS toolchain |
+| **Admin** | React 19, Vite, Tailwind CSS, Google Maps JS API, React Query, Zustand | Fast dev loop, live tracking UX, responsive dashboards |
 
 ### Core Design Principles
 
-1. **Offline-First**: Mobile writes locally, syncs when connected
-2. **GPS Integrity**: All location data validated server-side against spoofing
-3. **Financial Accuracy**: Immutable salary ledgers, append-only audit logs
-4. **Role-Based Access**: Four tiers (super_admin, city_head, coordinator, sales_officer)
-5. **Same-Day Edit Window**: Visit details editable until 11:59:59 PM on scheduled date
+1. **Offline-First**: Flutter writes to local Drift DB with `PENDING_SYNC` status; WorkManager pushes when connected
+2. **GPS Integrity**: `kIsLocationMocked` check on Flutter side + server-side velocity anomaly detection
+3. **Financial Accuracy**: Immutable Prisma transactions for payroll ledgers; append-only audit logs
+4. **Role-Based Access**: Four tiers — `super_admin`, `city_head`, `coordinator`, `sales_officer`
+5. **Same-Day Edit Window**: Server enforces visit modifications rejected past 11:59:59 PM on scheduled date
 
 ---
 
@@ -35,26 +34,26 @@ Last Updated: July 27, 2026 | Status: Production-Ready | Version: 1.0
 └──────────────┬──────────────────────────────────────┬───────────┘
                │                                      │
         ┌──────▼──────┐                       ┌──────▼──────┐
-        │   Android   │                       │    React    │
-        │    (Kotlin) │                       │   (Vite)    │
-        │             │                       │             │
-        │ • MVVM      │                       │ • Dashboard │
-        │ • Room DB   │◄──────────API────────►│ • Live Map  │
-        │ • WorkMgr   │                       │ • Reports   │
-        │ • Geo-Fence │                       │             │
+        │   Flutter   │                       │    React    │
+        │   App (Dart)│                       │ Admin Panel │
+        │             │                       │   (Vite)    │
+        │ • Riverpod  │                       │ • Dashboard │
+        │ • Drift DB  │◄──────── REST ───────►│ • Live Map  │
+        │ • WorkMgr   │◄──────── JWT ────────►│ • Reports   │
+        │ • Geo-Fence │                       │ • Payroll   │
         └──────┬──────┘                       └─────────────┘
                │
         ┌──────▼────────────────────────────────────┐
         │                                            │
-        │         Laravel 11 REST API                │
-        │      (Port 8000, HTTPS Ready)             │
+        │         Node.js Express REST API           │
+        │      (Port 3000, HTTPS Ready)             │
         │                                            │
-        │  • Controllers (Request Validation)       │
+        │  • Routes → Middleware → Controllers      │
         │  • Services (Business Logic)              │
-        │  • Models (Eloquent ORM)                  │
-        │  • Scheduled Commands (Crons)            │
-        │  • Queue Workers (Async Jobs)            │
-        │  • Redis Cache Layer                      │
+        │  • Prisma ORM (Type-Safe DB Layer)        │
+        │  • BullMQ Workers (Async Jobs)            │
+        │  • node-cron (Scheduled Tasks)            │
+        │  • Redis Cache + BullMQ Broker            │
         │                                            │
         └──────┬────────────────────────────────────┘
                │
@@ -68,45 +67,46 @@ Last Updated: July 27, 2026 | Status: Production-Ready | Version: 1.0
         │ • sample_requests       │
         │ • audit_logs            │
         │                          │
-        └───────────────────────────┘
+        └──────────────────────────┘
 ```
 
-### Data Flow: Offline Sync & Live Tracking
+### Data Flow: Offline Sync (Flutter → Node.js)
 
 ```
 OFFLINE MODE (No Internet)
-┌─────────────────────────┐
-│   Android App           │
-│  • User completes visit │
-│  • Room DB: PENDING_SYNC│
-│  • WorkManager: waiting │
-└─────────────────────────┘
+┌─────────────────────────────┐
+│   Flutter App               │
+│  • User completes visit     │
+│  • Drift DB: PENDING_SYNC   │
+│  • WorkManager: queued      │
+└─────────────────────────────┘
           │
     (Network Restored)
           │
           ▼
-┌─────────────────────────┐
-│   WorkManager           │
-│  • Detects connection   │
-│  • Batches local data   │
-│  • Retries on failure   │
-└─────────────────────────┘
+┌─────────────────────────────┐
+│   WorkManager Plugin        │
+│  • Detects connectivity     │
+│  • Reads all PENDING_SYNC   │
+│  • Sends batch to API       │
+│  • Retries with backoff     │
+└─────────────────────────────┘
           │
           ▼
-┌─────────────────────────┐
-│   Laravel Queue         │
-│  • Validates payload    │
-│  • Applies business     │
-│  • Updates payroll      │
-│  • Responds success     │
-└─────────────────────────┘
+┌─────────────────────────────┐
+│   Node.js BullMQ Worker     │
+│  • Validates JWT + payload  │
+│  • Applies business rules   │
+│  • Writes to MySQL via      │
+│    Prisma transaction       │
+└─────────────────────────────┘
           │
           ▼
-┌─────────────────────────┐
-│   Android Room DB       │
-│  • Mark as SYNCED       │
-│  • Notify UI (success)  │
-└─────────────────────────┘
+┌─────────────────────────────┐
+│   Flutter Drift DB          │
+│  • Row marked SYNCED        │
+│  • Riverpod notifies UI     │
+└─────────────────────────────┘
 ```
 
 ### GPS Spoofing Detection & Live Tracking
@@ -116,2130 +116,1189 @@ Officer In Field
        │
        ▼
 GPS Ping (Every 30 sec)
-├─ Latitude
-├─ Longitude
+├─ Latitude, Longitude
 ├─ Accuracy (meters)
-├─ Android Build: location.isMock
+├─ isMocked (Flutter: position.isMocked)
 └─ Battery Level
 
        │
        ▼
-Server-Side Validation
-├─ Is isMock = true? ──► BLOCK + LOG + ALERT
-├─ Delta from last > 150 km/h? ──► SUSPECT + LOG
+Server-Side Validation (Node.js)
+├─ isMocked = true?  ──► BLOCK + LOG + ALERT admin
+├─ Speed > 150 km/h? ──► SUSPECT + LOG anomaly
 ├─ Accuracy > 5000m? ──► WARN
-└─ VALID ──► STORE in gps_logs
+└─ VALID ──► INSERT gps_logs
 
        │
        ▼
-Real-Time Admin Dashboard
-└─ Google Maps JS API displays live marker + breadcrumb trail
+React Admin Dashboard
+└─ Google Maps JS API: live officer marker + breadcrumb trail
 ```
 
 ---
 
-## 3. Complete Database Schema (MySQL 8 DDL)
+## 3. Complete Database Schema (MySQL 8 DDL via Prisma)
 
-### Foundational Tables
+> Prisma schema (`prisma/schema.prisma`) is the source of truth. Raw DDL equivalents below for reference.
 
-```sql
--- ============================================================
--- USERS (Role-Based Access, Salary Components, Limits)
--- ============================================================
-CREATE TABLE users (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) NOT NULL,
-    phone VARCHAR(20) NOT NULL UNIQUE,
-    email VARCHAR(255) UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    role ENUM('super_admin', 'city_head', 'coordinator', 'sales_officer') NOT NULL,
-    
-    -- Geographic Assignment
-    city_id BIGINT UNSIGNED,
-    area_id BIGINT UNSIGNED,
-    reporting_city_head_id BIGINT UNSIGNED,
-    
-    -- Compensation Structure (PKR)
-    basic_salary DECIMAL(10,2) DEFAULT 0,
-    security_deposit_monthly DECIMAL(10,2) DEFAULT 0,
-    daily_performance_rate DECIMAL(10,2) DEFAULT 3000.00,
-    annual_sample_limit_pkr DECIMAL(12,2) DEFAULT 0,
-    annual_sample_used_pkr DECIMAL(12,2) DEFAULT 0,
-    
-    -- Leave Entitlement (Fixed: 28 days total)
-    leave_sick_balance INT DEFAULT 10,
-    leave_casual_balance INT DEFAULT 18,
-    
-    -- Account Status
-    is_active BOOLEAN DEFAULT TRUE,
-    last_login_at TIMESTAMP NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (city_id) REFERENCES cities(id),
-    FOREIGN KEY (area_id) REFERENCES areas(id),
-    FOREIGN KEY (reporting_city_head_id) REFERENCES users(id),
-    INDEX idx_role (role),
-    INDEX idx_city_id (city_id),
-    INDEX idx_area_id (area_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+### schema.prisma (Prisma Source of Truth)
 
--- ============================================================
--- GEOGRAPHIC HIERARCHY
--- ============================================================
-CREATE TABLE cities (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) NOT NULL UNIQUE,
-    state VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
 
-CREATE TABLE areas (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    city_id BIGINT UNSIGNED NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (city_id) REFERENCES cities(id),
-    UNIQUE KEY unique_area_per_city (city_id, name),
-    INDEX idx_city_id (city_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
 
--- ============================================================
--- LOCATIONS (Schools & Bookshops)
--- ============================================================
-CREATE TABLE locations (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    area_id BIGINT UNSIGNED NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    type ENUM('school', 'bookshop') NOT NULL,
-    priority ENUM('high', 'medium', 'low') DEFAULT 'medium',
-    
-    -- GPS Coordinates
-    latitude DECIMAL(10,8) NOT NULL,
-    longitude DECIMAL(11,8) NOT NULL,
-    address TEXT,
-    
-    -- Contact Info
-    contact_person_name VARCHAR(255),
-    contact_person_designation VARCHAR(255),
-    contact_phone VARCHAR(20),
-    
-    -- Tracking
-    last_visit_date DATE,
-    total_visit_count INT DEFAULT 0,
-    
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (area_id) REFERENCES areas(id),
-    INDEX idx_area_id (area_id),
-    INDEX idx_type_priority (type, priority),
-    SPATIAL INDEX idx_geo (POINT(latitude, longitude))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+model User {
+  id                  Int       @id @default(autoincrement())
+  name                String
+  email               String    @unique
+  password            String
+  role                Role      @default(sales_officer)
+  cityId              Int?
+  areaId              Int?
+  reportingCityHeadId Int?
+  basicSalary         Decimal   @db.Decimal(10, 2) @default(0)
+  securityDeposit     Decimal   @db.Decimal(10, 2) @default(0)
+  dailyPerformanceRate Decimal  @db.Decimal(10, 2) @default(3000)
+  annualSampleLimitPkr Decimal  @db.Decimal(10, 2) @default(0)
+  sampleUsedPkr       Decimal   @db.Decimal(10, 2) @default(0)
+  leaveBalanceSick    Int       @default(10)
+  leaveBalanceCasual  Int       @default(18)
+  isActive            Boolean   @default(true)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
--- ============================================================
--- ATTENDANCE (Day Start/End Tracking)
--- ============================================================
-CREATE TABLE attendance (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT UNSIGNED NOT NULL,
-    date_recorded DATE NOT NULL,
-    
-    -- Day Boundaries
-    day_start_at TIMESTAMP,
-    day_start_lat DECIMAL(10,8),
-    day_start_lng DECIMAL(11,8),
-    
-    day_end_at TIMESTAMP,
-    day_end_lat DECIMAL(10,8),
-    day_end_lng DECIMAL(11,8),
-    
-    -- Status
-    status ENUM('present', 'absent', 'cannot_work') DEFAULT 'absent',
-    cannot_work_reason TEXT,
-    
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    UNIQUE KEY unique_user_day (user_id, date_recorded),
-    INDEX idx_date_recorded (date_recorded)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  city                City?     @relation(fields: [cityId], references: [id])
+  area                Area?     @relation(fields: [areaId], references: [id])
+  attendances         Attendance[]
+  visits              Visit[]
+  gpsLogs             GpsLog[]
+  sampleRequests      SampleRequest[]
+  leaveRequests       LeaveRequest[]
+  payrollLedgers      PayrollLedger[]
+  auditLogs           AuditLog[]
 
--- ============================================================
--- GPS LOGS (Periodic Location Breadcrumbs, Spoofing Flags)
--- ============================================================
-CREATE TABLE gps_logs (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT UNSIGNED NOT NULL,
-    visit_id BIGINT UNSIGNED,
-    
-    latitude DECIMAL(10,8) NOT NULL,
-    longitude DECIMAL(11,8) NOT NULL,
-    accuracy_meters FLOAT,
-    
-    is_mock_location BOOLEAN DEFAULT FALSE,
-    battery_percent INT,
-    
-    recorded_at TIMESTAMP NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (visit_id) REFERENCES visits(id) ON DELETE SET NULL,
-    INDEX idx_user_id_recorded (user_id, recorded_at),
-    INDEX idx_visit_id (visit_id),
-    INDEX idx_is_mock_location (is_mock_location)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  @@index([cityId])
+  @@index([areaId])
+  @@map("users")
+}
 
--- ============================================================
--- VISITS (Daily 7-Visit Queue, Statuses, Feedback)
--- ============================================================
-CREATE TABLE visits (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT UNSIGNED NOT NULL,
-    location_id BIGINT UNSIGNED NOT NULL,
-    scheduled_date DATE NOT NULL,
-    
-    -- Sequencing (1-7)
-    sequence_order INT NOT NULL,
-    
-    -- Status Pipeline
-    status ENUM('planned', 'in_progress', 'completed', 'missed', 'skipped') DEFAULT 'planned',
-    source ENUM('auto_planned', 'coordinator_assigned', 'adhoc', 'presched_followup', 'carryforward') NOT NULL,
-    
-    -- Timing (Locked After Completion)
-    planned_arrival_time TIME,
-    actual_arrival_at TIMESTAMP,
-    actual_completion_at TIMESTAMP,
-    
-    -- GPS Tracking (Locked)
-    arrival_lat DECIMAL(10,8),
-    arrival_lng DECIMAL(11,8),
-    
-    travel_time_minutes INT,
-    onsite_time_minutes INT,
-    
-    -- Outcome Capture (Editable Until EOD)
-    contact_person_name VARCHAR(255),
-    contact_person_designation VARCHAR(255),
-    contact_phone VARCHAR(20),
-    visit_type VARCHAR(100),
-    feedback_notes TEXT,
-    photo_url VARCHAR(2048),
-    
-    -- Follow-Up Scheduling
-    followup_date DATE,
-    
-    -- Missed Visit Handling
-    carry_forward_attempt INT DEFAULT 1,
-    missed_reason TEXT,
-    missed_photo_url VARCHAR(2048),
-    missed_reason_status ENUM('pending_review', 'approved', 'rejected') NULL,
-    missed_reason_reviewed_by BIGINT UNSIGNED,
-    missed_reason_reviewed_at TIMESTAMP,
-    missed_reason_review_comment TEXT,
-    
-    -- Same-Day Edit Window (until 11:59:59 PM on scheduled_date)
-    editable_until TIMESTAMP,
-    
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (location_id) REFERENCES locations(id),
-    FOREIGN KEY (missed_reason_reviewed_by) REFERENCES users(id),
-    INDEX idx_user_date (user_id, scheduled_date),
-    INDEX idx_status (status),
-    INDEX idx_location_id (location_id),
-    INDEX idx_source (source),
-    INDEX idx_missed_reason_status (missed_reason_status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+enum Role {
+  super_admin
+  city_head
+  coordinator
+  sales_officer
+}
 
--- ============================================================
--- PRODUCTS & SAMPLE REQUESTS (Inventory, Cash Tracking)
--- ============================================================
-CREATE TABLE products (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    name VARCHAR(255) NOT NULL,
-    grade_level VARCHAR(50),
-    subject VARCHAR(100),
-    unit_price_pkr DECIMAL(10,2) NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+model City {
+  id    Int    @id @default(autoincrement())
+  name  String
+  users User[]
+  areas Area[]
 
-CREATE TABLE sample_requests (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT UNSIGNED NOT NULL,
-    visit_id BIGINT UNSIGNED,
-    
-    status ENUM('pending', 'approved', 'rejected', 'recovered') DEFAULT 'pending',
-    total_pkr DECIMAL(12,2) NOT NULL,
-    
-    -- Approval Trail
-    approved_by BIGINT UNSIGNED,
-    approved_at TIMESTAMP,
-    
-    -- Recovery Reminders
-    reminder_10_day_sent_at TIMESTAMP,
-    reminder_20_day_sent_at TIMESTAMP,
-    recovery_confirmed_at TIMESTAMP,
-    
-    -- Payroll Integration
-    payroll_deduction_applied BOOLEAN DEFAULT FALSE,
-    payroll_deduction_at TIMESTAMP,
-    
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (visit_id) REFERENCES visits(id) ON DELETE SET NULL,
-    FOREIGN KEY (approved_by) REFERENCES users(id),
-    INDEX idx_user_id (user_id),
-    INDEX idx_status (status),
-    INDEX idx_approved_at (approved_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  @@map("cities")
+}
 
-CREATE TABLE sample_request_items (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    sample_request_id BIGINT UNSIGNED NOT NULL,
-    product_id BIGINT UNSIGNED NOT NULL,
-    quantity INT NOT NULL,
-    unit_price_pkr DECIMAL(10,2) NOT NULL,
-    line_total_pkr DECIMAL(12,2) NOT NULL,
-    
-    FOREIGN KEY (sample_request_id) REFERENCES sample_requests(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+model Area {
+  id        Int        @id @default(autoincrement())
+  name      String
+  cityId    Int
+  city      City       @relation(fields: [cityId], references: [id])
+  locations Location[]
+  users     User[]
 
--- ============================================================
--- LEAVE REQUESTS (28-Day Cap: 10 Sick + 18 Casual)
--- ============================================================
-CREATE TABLE leave_requests (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT UNSIGNED NOT NULL,
-    leave_date DATE NOT NULL,
-    leave_type ENUM('sick', 'casual') NOT NULL,
-    
-    status ENUM('pending', 'approved', 'rejected', 'auto_deducted') DEFAULT 'pending',
-    reason TEXT,
-    
-    -- Approval
-    approved_by BIGINT UNSIGNED,
-    approved_at TIMESTAMP,
-    
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (approved_by) REFERENCES users(id),
-    INDEX idx_user_date (user_id, leave_date),
-    INDEX idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  @@index([cityId])
+  @@map("areas")
+}
 
--- ============================================================
--- PAYROLL LEDGERS (Monthly Snapshots: Base + Deposit + Performance + Deductions)
--- ============================================================
-CREATE TABLE payroll_ledgers (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    user_id BIGINT UNSIGNED NOT NULL,
-    month_year DATE NOT NULL, -- First day of month
-    
-    -- Components
-    base_salary_pkr DECIMAL(12,2) NOT NULL,
-    security_deposit_withheld_pkr DECIMAL(12,2) NOT NULL,
-    daily_performance_earned_pkr DECIMAL(12,2) DEFAULT 0,
-    
-    -- Deductions
-    total_deductions_pkr DECIMAL(12,2) DEFAULT 0,
-    deduction_reasons JSON, -- Array of reason strings
-    
-    -- Net
-    net_payable_pkr DECIMAL(12,2) AS (
-        base_salary_pkr + daily_performance_earned_pkr - total_deductions_pkr
-    ) STORED,
-    
-    -- Audit
-    calculated_by BIGINT UNSIGNED,
-    calculated_at TIMESTAMP,
-    
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (calculated_by) REFERENCES users(id),
-    UNIQUE KEY unique_user_month (user_id, month_year),
-    INDEX idx_month_year (month_year)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+model Location {
+  id           Int      @id @default(autoincrement())
+  name         String
+  type         LocationType
+  areaId       Int
+  latitude     Float
+  longitude    Float
+  priority     Priority @default(medium)
+  contactName  String?
+  contactPhone String?
+  address      String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
 
--- ============================================================
--- AUDIT LOGS (Append-Only, Admin Overrides)
--- ============================================================
-CREATE TABLE audit_logs (
-    id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    admin_user_id BIGINT UNSIGNED NOT NULL,
-    action_type VARCHAR(100) NOT NULL, -- e.g., 'missed_visit_override', 'password_reset'
-    entity_type VARCHAR(100),
-    entity_id BIGINT UNSIGNED,
-    
-    old_values JSON,
-    new_values JSON,
-    
-    ip_address VARCHAR(45),
-    user_agent TEXT,
-    
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    
-    FOREIGN KEY (admin_user_id) REFERENCES users(id),
-    INDEX idx_created_at (created_at),
-    INDEX idx_action_type (action_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  area         Area     @relation(fields: [areaId], references: [id])
+  visits       Visit[]
+
+  @@index([areaId])
+  @@index([latitude, longitude])
+  @@map("locations")
+}
+
+enum LocationType {
+  school
+  bookshop
+}
+
+enum Priority {
+  high
+  medium
+  low
+}
+
+model Attendance {
+  id              Int       @id @default(autoincrement())
+  userId          Int
+  date            DateTime  @db.Date
+  dayStartTime    DateTime?
+  dayStartLat     Float?
+  dayStartLng     Float?
+  dayEndTime      DateTime?
+  dayEndLat       Float?
+  dayEndLng       Float?
+  status          AttendanceStatus @default(absent)
+  cannotWorkReason String?
+  createdAt       DateTime  @default(now())
+
+  user            User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("attendance")
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  cannot_work
+  leave
+}
+
+model GpsLog {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  latitude      Float
+  longitude     Float
+  accuracy      Float
+  isMocked      Boolean  @default(false)
+  batteryLevel  Int?
+  recordedAt    DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, recordedAt])
+  @@map("gps_logs")
+}
+
+model Visit {
+  id               Int          @id @default(autoincrement())
+  userId           Int
+  locationId       Int
+  scheduledDate    DateTime     @db.Date
+  dailySequence    Int
+  status           VisitStatus  @default(planned)
+  arrivalTime      DateTime?
+  arrivalLat       Float?
+  arrivalLng       Float?
+  completionTime   DateTime?
+  contactPerson    String?
+  designation      String?
+  phone            String?
+  notes            String?      @db.Text
+  visitType        String?
+  sampleDistributed Int?        @default(0)
+  photoUrl         String?
+  missedReason     String?
+  carryForwardCnt  Int          @default(0)
+  approvalStatus   ApprovalStatus?
+  approvedById     Int?
+  isAdHoc          Boolean      @default(false)
+  syncStatus       SyncStatus   @default(synced)
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  user             User         @relation(fields: [userId], references: [id])
+  location         Location     @relation(fields: [locationId], references: [id])
+
+  @@index([userId, scheduledDate])
+  @@index([locationId])
+  @@map("visits")
+}
+
+enum VisitStatus {
+  planned
+  in_progress
+  completed
+  missed
+}
+
+enum ApprovalStatus {
+  pending
+  approved
+  rejected
+}
+
+enum SyncStatus {
+  pending_sync
+  synced
+}
+
+model Product {
+  id       Int     @id @default(autoincrement())
+  name     String
+  pricePkr Decimal @db.Decimal(10, 2)
+  isActive Boolean @default(true)
+
+  sampleRequests SampleRequest[]
+
+  @@map("products")
+}
+
+model SampleRequest {
+  id              Int           @id @default(autoincrement())
+  userId          Int
+  productId       Int
+  visitId         Int?
+  quantity        Int
+  totalValuePkr   Decimal       @db.Decimal(10, 2)
+  status          SampleStatus  @default(pending)
+  approvedById    Int?
+  requestedAt     DateTime      @default(now())
+  recoveredAt     DateTime?
+  reminder10Sent  Boolean       @default(false)
+  reminder20Sent  Boolean       @default(false)
+
+  user            User          @relation(fields: [userId], references: [id])
+  product         Product       @relation(fields: [productId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("sample_requests")
+}
+
+enum SampleStatus {
+  pending
+  approved
+  dispatched
+  recovered
+  deducted
+}
+
+model LeaveRequest {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  leaveType   LeaveType
+  startDate   DateTime    @db.Date
+  endDate     DateTime    @db.Date
+  days        Int
+  reason      String?     @db.Text
+  status      ApprovalStatus @default(pending)
+  approvedById Int?
+  createdAt   DateTime    @default(now())
+
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("leave_requests")
+}
+
+enum LeaveType {
+  sick
+  casual
+}
+
+model PayrollLedger {
+  id                    Int      @id @default(autoincrement())
+  userId                Int
+  month                 Int
+  year                  Int
+  presentDays           Int      @default(0)
+  basicSalary           Decimal  @db.Decimal(10, 2)
+  performanceEarned     Decimal  @db.Decimal(10, 2) @default(0)
+  missedVisitPenalty    Decimal  @db.Decimal(10, 2) @default(0)
+  sampleDeduction       Decimal  @db.Decimal(10, 2) @default(0)
+  securityDepositHeld   Decimal  @db.Decimal(10, 2) @default(0)
+  netPayable            Decimal  @db.Decimal(10, 2)
+  isFinalized           Boolean  @default(false)
+  calculatedAt          DateTime?
+
+  user                  User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, month, year])
+  @@index([userId, year, month])
+  @@map("payroll_ledgers")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int
+  action     String
+  targetType String
+  targetId   Int?
+  before     Json?
+  after      Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  actor      User     @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
 ```
 
 ---
 
 ## 4. Complete API Endpoint Specification
 
-### Base URL & Authentication
-
+### Base URL
 ```
-Base: /api/v1
-Protocol: HTTPS (TLS 1.3)
-Auth: Bearer Token (Laravel Sanctum)
-Header: Authorization: Bearer {token}
+Development:  http://localhost:3000/api/v1
+Production:   https://api.bookmark.services/api/v1
 ```
 
 ### Standard Response Envelope
 
 ```json
-{
-  "success": true,
-  "data": { ... },
-  "message": "Operation successful",
-  "timestamp": "2026-07-27T12:00:00Z"
-}
+// Success
+{ "success": true, "data": { ... }, "meta": { ... } }
+
+// Error
+{ "success": false, "error": { "code": "VALIDATION_ERROR", "message": "..." } }
 ```
 
-### Error Responses
+### HTTP Status Codes
+| Code | Meaning |
+|------|---------|
+| 200 | OK — read/update success |
+| 201 | Created — new resource |
+| 400 | Bad Request — validation failed |
+| 401 | Unauthorized — missing/invalid JWT |
+| 403 | Forbidden — insufficient role |
+| 404 | Not Found |
+| 422 | Unprocessable — business rule violation |
+| 500 | Internal Server Error |
 
+---
+
+### 4.1 Auth & Workday
+
+#### `POST /api/v1/auth/login`
 ```json
-{
-  "success": false,
-  "error": "VALIDATION_ERROR",
-  "message": "Field validation failed",
-  "details": {
-    "phone": ["Phone number is invalid"]
-  },
-  "timestamp": "2026-07-27T12:00:00Z"
-}
-```
+// Request
+{ "email": "officer@bookmark.pk", "password": "secret123" }
 
-### 4.1 Authentication Endpoints
-
-#### POST /api/v1/auth/login
-**Public** - No token required
-
-Request:
-```json
-{
-  "phone": "03001234567",
-  "password": "secure_password"
-}
-```
-
-Response (201):
-```json
+// Response 200
 {
   "success": true,
   "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "user": {
-      "id": 123,
-      "name": "Hassan Ahmed",
-      "phone": "03001234567",
+      "id": 12,
+      "name": "Ali Raza",
       "role": "sales_officer",
-      "city": "Karachi",
-      "area": "Gulshan-e-Iqbal",
-      "leave_sick_balance": 10,
-      "leave_casual_balance": 18,
-      "annual_sample_limit_pkr": 300000.00,
-      "annual_sample_used_pkr": 125000.00
-    },
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      "cityId": 3,
+      "areaId": 7,
+      "leaveBalanceSick": 10,
+      "leaveBalanceCasual": 18
+    }
   }
 }
 ```
 
-Errors:
-- `401` - Invalid credentials
-- `403` - Account disabled
-
----
-
-#### POST /api/v1/auth/forgot-password
-**Public** - No token required
-
-Request:
+#### `POST /api/v1/auth/change-password`
+> Requires `Authorization: Bearer <token>`
 ```json
-{
-  "phone": "03001234567"
-}
+// Request
+{ "currentPassword": "old", "newPassword": "new_strong_pass" }
+
+// Response 200
+{ "success": true, "data": { "message": "Password updated" } }
 ```
 
-Response (200):
+#### `POST /api/v1/auth/force-reset` *(admin only)*
 ```json
-{
-  "success": true,
-  "message": "OTP sent to registered phone number"
-}
+// Request
+{ "userId": 12, "newPassword": "temp_pass_123" }
 ```
 
----
-
-#### POST /api/v1/auth/verify-otp
-**Public** - No token required
-
-Request:
+#### `POST /api/v1/workday/day-start`
 ```json
-{
-  "phone": "03001234567",
-  "otp": "123456"
-}
-```
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "reset_token": "abc123xyz456..."
-  }
-}
-```
-
----
-
-#### POST /api/v1/auth/reset-password
-**Public** - No token required
-
-Request:
-```json
-{
-  "reset_token": "abc123xyz456...",
-  "new_password": "new_secure_password"
-}
-```
-
-Response (200):
-```json
-{
-  "success": true,
-  "message": "Password reset successfully"
-}
-```
-
----
-
-### 4.2 Workday Management
-
-#### POST /api/v1/workday/day-start
-**Protected** - Sales Officer
-
-Request:
-```json
+// Request
 {
   "latitude": 24.8607,
-  "longitude": 67.0011
+  "longitude": 67.0011,
+  "isMocked": false,
+  "batteryLevel": 87
 }
-```
 
-Response (201):
-```json
+// Response 201
 {
   "success": true,
   "data": {
-    "day_started_at": "2026-07-27T06:00:00Z",
-    "visits_planned": 7
-  }
-}
-```
-
-Errors:
-- `400` - Invalid GPS coordinates
-- `409` - Day already started
-
----
-
-#### POST /api/v1/workday/day-end
-**Protected** - Sales Officer
-
-Request:
-```json
-{
-  "latitude": 24.8607,
-  "longitude": 67.0011
-}
-```
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "day_ended_at": "2026-07-27T17:00:00Z",
-    "total_time_hours": 11.0,
-    "visits_completed": 6,
-    "visits_missed": 1
-  }
-}
-```
-
----
-
-#### POST /api/v1/workday/cannot-work
-**Protected** - Sales Officer
-
-Request:
-```json
-{
-  "reason": "Heavy rain and flooding in area"
-}
-```
-
-Response (201):
-```json
-{
-  "success": true,
-  "data": {
-    "recorded_at": "2026-07-27T06:30:00Z",
-    "status": "cannot_work"
-  }
-}
-```
-
----
-
-### 4.3 Visit Execution
-
-#### GET /api/v1/visits/today
-**Protected** - Sales Officer
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "day_started": true,
-    "visits": [
-      {
-        "id": 1,
-        "sequence_order": 1,
-        "location": {
-          "id": 101,
-          "name": "Gulshan Public School",
-          "type": "school",
-          "priority": "high",
-          "latitude": 24.8607,
-          "longitude": 67.0011,
-          "address": "Block-13, Gulshan-e-Iqbal"
-        },
-        "status": "planned",
-        "source": "auto_planned",
-        "contact_person_name": null,
-        "carry_forward_attempt": 1
-      },
-      ...6 more
+    "attendanceId": 501,
+    "dayStartTime": "2026-07-27T08:02:14Z",
+    "todayVisits": [
+      { "id": 301, "sequence": 1, "locationName": "City Grammar School", "lat": 24.86, "lng": 67.01 }
     ]
   }
 }
 ```
 
----
-
-#### POST /api/v1/visits/{id}/start-navigation
-**Protected** - Sales Officer
-
-Request:
+#### `POST /api/v1/workday/day-end`
 ```json
-{
-  "latitude": 24.8607,
-  "longitude": 67.0011
-}
+// Request
+{ "latitude": 24.8607, "longitude": 67.0011, "isMocked": false }
+
+// Response 200
+{ "success": true, "data": { "dayEndTime": "2026-07-27T18:45:00Z", "visitsCompleted": 5, "visitsMissed": 2 } }
 ```
 
-Response (200):
+#### `POST /api/v1/workday/cannot-work`
 ```json
+// Request
+{ "reason": "severe_weather", "notes": "Road flooded near hub area" }
+```
+
+---
+
+### 4.2 Visit Execution
+
+#### `GET /api/v1/visits/today`
+```json
+// Response 200
 {
   "success": true,
   "data": {
-    "visit_id": 1,
-    "status": "in_progress",
-    "actual_arrival_at": "2026-07-27T09:15:00Z",
-    "arrival_lat": 24.8607,
-    "arrival_lng": 67.0011,
-    "distance_meters": 450,
-    "navigation_url": "https://maps.google.com/..."
-  }
-}
-```
-
----
-
-#### POST /api/v1/visits/{id}/complete
-**Protected** - Sales Officer
-
-Request:
-```json
-{
-  "contact_person_name": "Ms. Fatima Khan",
-  "contact_person_designation": "Principal",
-  "contact_phone": "03005551234",
-  "visit_type": "fresh_visit",
-  "feedback_notes": "Discussed new O-Level mathematics series. Interested in bulk order.",
-  "photo_url": "https://s3.amazonaws.com/...",
-  "followup_date": "2026-08-10",
-  "samples_distributed": [
-    {
-      "product_id": 5,
-      "quantity": 10
-    }
-  ]
-}
-```
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "visit_id": 1,
-    "status": "completed",
-    "completion_time": "2026-07-27T09:45:00Z",
-    "onsite_duration_minutes": 30,
-    "editable_until": "2026-07-27T23:59:59Z"
-  }
-}
-```
-
----
-
-#### POST /api/v1/visits/{id}/mark-missed
-**Protected** - Sales Officer
-
-Request:
-```json
-{
-  "reason": "School gates locked for assembly",
-  "photo_url": "https://s3.amazonaws.com/..."
-}
-```
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "visit_id": 1,
-    "status": "missed",
-    "reason_submitted_at": "2026-07-27T10:30:00Z",
-    "next_visit_scheduled": "2026-07-28",
-    "carry_forward_attempt": 2
-  }
-}
-```
-
----
-
-#### PUT /api/v1/visits/{id}
-**Protected** - Sales Officer (Same-day only)
-
-Request (editable fields only):
-```json
-{
-  "contact_person_name": "Dr. Ahmed Khan",
-  "feedback_notes": "Updated discussion notes..."
-}
-```
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "visit_id": 1,
-    "updated_fields": ["contact_person_name", "feedback_notes"],
-    "editable_until": "2026-07-27T23:59:59Z"
-  }
-}
-```
-
-Errors:
-- `410` - Edit window closed (past 11:59:59 PM on scheduled_date)
-
----
-
-### 4.4 Real-Time Tracking
-
-#### POST /api/v1/tracking/ping
-**Protected** - Sales Officer (Background ping every 30 seconds)
-
-Request:
-```json
-{
-  "latitude": 24.8607,
-  "longitude": 67.0011,
-  "accuracy_meters": 8.5,
-  "is_mock_location": false,
-  "battery_percent": 72,
-  "active_visit_id": 1
-}
-```
-
-Response (204 No Content)
-
-**Server-Side Actions:**
-- Store in `gps_logs` table
-- If `is_mock_location = true`: Log security alert, reject submission, notify admin
-- Update `users.last_lat`, `last_lng`, `last_location_updated_at`
-- Broadcast to admin dashboard WebSocket for live tracking
-
----
-
-### 4.5 Admin Endpoints
-
-#### GET /api/v1/admin/dashboard/stats
-**Protected** - Admin, City Head
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "total_officers": 45,
-    "officers_online_now": 38,
-    "total_visits_today": 315,
-    "visits_completed": 287,
-    "visits_missed": 18,
-    "visits_in_progress": 10,
-    "pending_missed_approvals": 5,
-    "pending_sample_approvals": 12,
-    "total_samples_value_pending_pkr": 425000.00
-  }
-}
-```
-
----
-
-#### GET /api/v1/admin/visits/{id}/details
-**Protected** - Admin, City Head
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "visit": {
-      "id": 1,
-      "officer_name": "Hassan Ahmed",
-      "location_name": "Gulshan Public School",
-      "scheduled_date": "2026-07-27",
-      "sequence": 1,
-      "status": "completed",
-      "contact_person": "Ms. Fatima Khan",
-      "contact_designation": "Principal",
-      "contact_phone": "03005551234",
-      "visit_type": "fresh_visit",
-      "feedback": "Discussed new series...",
-      "actual_arrival": "2026-07-27T09:15:00Z",
-      "actual_completion": "2026-07-27T09:45:00Z",
-      "travel_time_minutes": 15,
-      "onsite_time_minutes": 30,
-      "arrival_lat": 24.8607,
-      "arrival_lng": 67.0011,
-      "gps_breadcrumb_trail": [
-        { "lat": 24.860, "lng": 67.001, "timestamp": "09:15:00", "is_mock": false },
-        ...
-      ],
-      "photo_url": "https://s3.amazonaws.com/...",
-      "samples_distributed": [
-        { "product_name": "Math O-Level Vol 1", "quantity": 10, "value_pkr": 5000 }
-      ]
-    }
-  }
-}
-```
-
----
-
-#### POST /api/v1/admin/missed-visits/{id}/approve
-**Protected** - City Head, Admin
-
-Request:
-```json
-{
-  "comment": "Approved - weather conditions verified"
-}
-```
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "visit_id": 1,
-    "missed_reason_status": "approved",
-    "approved_at": "2026-07-27T14:00:00Z"
-  }
-}
-```
-
-**Server-Side:**
-- Set `missed_reason_status = 'approved'`
-- NO salary deduction
-- Audit log entry
-
----
-
-#### POST /api/v1/admin/missed-visits/{id}/reject
-**Protected** - City Head, Admin
-
-Request:
-```json
-{
-  "comment": "Insufficient reason - similar weather patterns reported elsewhere"
-}
-```
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "visit_id": 1,
-    "missed_reason_status": "rejected",
-    "rejected_at": "2026-07-27T14:05:00Z",
-    "penalty_applied": {
-      "daily_performance_pkr": -3000.00,
-      "reason": "Missed visit (rejected reason)"
-    }
-  }
-}
-```
-
-**Server-Side:**
-- Set `missed_reason_status = 'rejected'`
-- Deduct PKR 3,000 from monthly payroll ledger
-- Add reason to `deduction_reasons` JSON array
-- Audit log entry
-- Queue notification to officer
-
----
-
-#### POST /api/v1/admin/missed-visits/{id}/override
-**Protected** - Super Admin Only
-
-Request:
-```json
-{
-  "decision": "approved",
-  "comment": "Admin override - extenuating circumstances"
-}
-```
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "visit_id": 1,
-    "missed_reason_status": "approved",
-    "overridden_by": "super_admin",
-    "overridden_at": "2026-07-27T15:00:00Z",
-    "audit_log_id": 789
-  }
-}
-```
-
-**Server-Side:**
-- Append to `audit_logs` table
-- If changing from 'rejected' to 'approved': Remove deduction, update payroll ledger
-- Send notification to City Head
-
----
-
-#### GET /api/v1/admin/sample-requests/pending
-**Protected** - City Head, Admin
-
-Response (200):
-```json
-{
-  "success": true,
-  "data": {
-    "requests": [
+    "date": "2026-07-27",
+    "visits": [
       {
-        "id": 1,
-        "officer_name": "Hassan Ahmed",
-        "total_pkr": 25000.00,
-        "status": "pending",
-        "items": [
-          { "product_name": "Math O-Level Vol 1", "quantity": 5, "unit_price": 5000 }
-        ],
-        "submitted_at": "2026-07-27T11:00:00Z"
+        "id": 301,
+        "sequence": 1,
+        "status": "planned",
+        "location": {
+          "id": 45,
+          "name": "City Grammar School",
+          "type": "school",
+          "priority": "high",
+          "latitude": 24.8607,
+          "longitude": 67.0011,
+          "contactName": "Principal Ahmed",
+          "contactPhone": "0300-1234567"
+        },
+        "carryForwardCnt": 0,
+        "isAdHoc": false
       }
     ]
   }
 }
 ```
 
----
-
-#### POST /api/v1/admin/sample-requests/{id}/approve
-**Protected** - City Head, Admin
-
-Request:
+#### `POST /api/v1/visits/{id}/start`
 ```json
-{
-  "comment": "Approved - within limit"
-}
+// Request
+{ "arrivalLat": 24.8607, "arrivalLng": 67.0011, "isMocked": false }
+
+// Response 200
+{ "success": true, "data": { "status": "in_progress", "arrivalTime": "2026-07-27T10:15:00Z" } }
+
+// Error 422 (geofence)
+{ "success": false, "error": { "code": "OUTSIDE_GEOFENCE", "message": "You must be within 200m of the location" } }
 ```
 
-Response (200):
+#### `POST /api/v1/visits/{id}/complete`
 ```json
+// Request
 {
-  "success": true,
-  "data": {
-    "request_id": 1,
-    "status": "approved",
-    "approved_at": "2026-07-27T12:00:00Z",
-    "officer_balance_remaining_pkr": 275000.00
-  }
+  "contactPerson": "Mr. Ahmed",
+  "designation": "Principal",
+  "phone": "0300-1234567",
+  "notes": "Interested in new stock. Follow up next week.",
+  "visitType": "sales_call",
+  "sampleDistributed": 2,
+  "followUpDate": "2026-08-03"
 }
+
+// Response 200
+{ "success": true, "data": { "status": "completed", "completionTime": "2026-07-27T10:45:00Z" } }
 ```
 
-**Server-Side:**
-- Deduct total_pkr from user's `annual_sample_used_pkr`
-- Set status = 'approved', approved_by, approved_at
-- Initialize reminder timers (10, 20 days)
+#### `POST /api/v1/visits/{id}/edit` *(same-day only)*
+```json
+// Request — only text fields, GPS/timestamps locked
+{ "notes": "Updated: confirmed order for 50 books", "contactPerson": "Ms. Sara" }
+
+// Error 422 (past midnight)
+{ "success": false, "error": { "code": "EDIT_WINDOW_CLOSED", "message": "Visit details cannot be edited after 11:59 PM on the scheduled date" } }
+```
+
+#### `POST /api/v1/visits/{id}/mark-missed`
+```json
+// Request
+{ "reason": "Location closed. Gate locked.", "photoUrl": "https://cdn.bookmark.pk/evidence/12345.jpg" }
+
+// Response 200
+{ "success": true, "data": { "status": "missed", "carryForwardCnt": 2, "approvalStatus": "pending" } }
+```
+
+#### `POST /api/v1/visits/adhoc`
+```json
+// Request
+{ "locationId": 52, "notes": "Passed by, introduced products", "visitType": "cold_call" }
+```
 
 ---
 
-#### GET /api/v1/admin/live-positions
-**Protected** - Admin, City Head (WebSocket or polling)
+### 4.3 Location Tracking
 
-Response (200):
+#### `POST /api/v1/tracking/ping`
 ```json
+// Request
+{
+  "latitude": 24.8615,
+  "longitude": 67.0025,
+  "accuracy": 8.5,
+  "isMocked": false,
+  "batteryLevel": 72,
+  "recordedAt": "2026-07-27T10:20:00Z"
+}
+
+// Response 200 (valid)
+{ "success": true }
+
+// Response 403 (mock detected)
+{ "success": false, "error": { "code": "MOCK_LOCATION_DETECTED", "message": "GPS spoofing detected. Incident logged." } }
+```
+
+---
+
+### 4.4 Sample Management
+
+#### `POST /api/v1/samples/request`
+```json
+// Request
+{ "productId": 3, "quantity": 5, "visitId": 301 }
+
+// Response 201
+{ "success": true, "data": { "id": 88, "totalValuePkr": "2500.00", "remainingLimitPkr": "12500.00" } }
+
+// Error 422 (limit exceeded)
+{ "success": false, "error": { "code": "SAMPLE_LIMIT_EXCEEDED", "message": "Request exceeds your annual sample budget" } }
+```
+
+#### `POST /api/v1/samples/{id}/recover`
+```json
+// Response 200
+{ "success": true, "data": { "status": "recovered", "recoveredAt": "2026-07-27T14:00:00Z" } }
+```
+
+---
+
+### 4.5 Leave Requests
+
+#### `POST /api/v1/leaves/apply`
+```json
+// Request
+{ "leaveType": "casual", "startDate": "2026-08-01", "endDate": "2026-08-02", "reason": "Family function" }
+
+// Response 201
+{ "success": true, "data": { "id": 21, "days": 2, "remainingCasual": 16 } }
+```
+
+---
+
+### 4.6 Admin Endpoints *(city_head / super_admin)*
+
+#### `GET /api/v1/admin/officers`
+Returns paginated list of officers with today's attendance status, visit counts.
+
+#### `GET /api/v1/admin/tracking/live`
+```json
+// Response 200
 {
   "success": true,
   "data": {
     "officers": [
       {
-        "user_id": 123,
-        "name": "Hassan Ahmed",
-        "latitude": 24.8607,
-        "longitude": 67.0011,
-        "accuracy_meters": 8.5,
-        "last_ping_at": "2026-07-27T12:05:30Z",
-        "current_visit_id": 1,
-        "current_visit_location": "Gulshan Public School",
-        "battery_percent": 72,
-        "status": "active_visit"
+        "userId": 12,
+        "name": "Ali Raza",
+        "lastPing": "2026-07-27T10:22:00Z",
+        "lat": 24.8615,
+        "lng": 67.0025,
+        "currentVisitId": 301,
+        "batteryLevel": 72
       }
     ]
   }
 }
 ```
 
----
+#### `GET /api/v1/admin/missed-visits`
+Returns pending missed visit approvals for city head review.
 
-## 5. Automated System Scheduler (Laravel Crons)
-
-### 5.1 Route Planning Engine (12:00 AM Daily)
-
-**Command:** `php artisan schedule:run` (Laravel Scheduler)
-
-**Trigger:** Every day at 00:00 UTC
-
-**Algorithm:**
-
-```plaintext
-FOR EACH active sales_officer:
-  
-  STEP 1: Fetch coordinator-assigned visits for tomorrow
-          Sort by priority, add first
-          count = visits_count
-          
-  STEP 2: Fetch carry-forward missed visits (from yesterday/prior)
-          Sort by attempt_count DESC
-          Increment attempt counter
-          Add up to (7 - count)
-          count = visits_count
-          
-  STEP 3: Fetch pre-scheduled follow-up visits for tomorrow
-          Add up to (7 - count)
-          count = visits_count
-          
-  STEP 4: Pool from locations (schools, bookshops) in officer's area
-          IF count < 7:
-            High-priority schools: Add 2 (sorted by last_visit_date ASC)
-            Medium-priority schools: Add 2 (sorted by last_visit_date ASC)
-            Bookshops: Add 2 (sorted by last_visit_date ASC)
-            
-  STEP 5: Route Optimization (Nearest-Neighbor TSP)
-          Start from officer's home/last known location
-          Build sequence by selecting closest unvisited location
-          Assign sequence_order (1-7)
-          
-  STEP 6: INSERT into visits table
-          status = 'planned'
-          sequence_order = 1..7
-          
-  END
+#### `POST /api/v1/admin/missed-visits/{id}/approve`
+```json
+// Request
+{ "approved": true, "comment": "Verified — location confirmed closed" }
 ```
 
-**Pseudo-Code (Laravel):**
+#### `GET /api/v1/admin/payroll/{month}/{year}`
+Returns full payroll summary for all officers for the given month.
 
-```php
-// app/Console/Commands/GenerateDailyVisitsCommand.php
+#### `POST /api/v1/admin/samples/{id}/approve`
+Approve or reject a sample request.
 
-namespace App\Console\Commands;
+#### `GET /api/v1/admin/locations/{id}/history`
+Full visit history for a location across all officers.
 
-use App\Models\User;
-use App\Models\Visit;
-use App\Models\Location;
-use Carbon\Carbon;
+---
 
-class GenerateDailyVisitsCommand extends Command
-{
-    public function handle()
-    {
-        $tomorrow = Carbon::tomorrow();
-        $officers = User::where('role', 'sales_officer')
-                        ->where('is_active', true)
-                        ->get();
-        
-        foreach ($officers as $officer) {
-            $this->planDailyVisits($officer, $tomorrow);
-        }
-    }
-    
-    protected function planDailyVisits(User $officer, $date)
-    {
-        $queue = collect();
-        
-        // STEP 1: Coordinator visits
-        $coordVisits = Visit::where('user_id', $officer->id)
-                           ->where('scheduled_date', $date)
-                           ->where('source', 'coordinator_assigned')
-                           ->where('status', 'planned')
-                           ->get();
-        $queue = $queue->merge($coordVisits);
-        
-        // STEP 2: Carry-forward
-        $carryForward = Visit::where('user_id', $officer->id)
-                            ->where('status', 'missed')
-                            ->where('scheduled_date', '<', $date)
-                            ->orderBy('carry_forward_attempt', 'desc')
-                            ->limit(7 - $queue->count())
-                            ->get();
-        foreach ($carryForward as $v) {
-            $v->carry_forward_attempt++;
-            $v->scheduled_date = $date;
-            $v->status = 'planned';
-            $v->save();
-            $queue->push($v);
-        }
-        
-        // STEP 3: Pre-scheduled
-        if ($queue->count() < 7) {
-            $preScheduled = Visit::where('user_id', $officer->id)
-                                ->where('scheduled_date', $date)
-                                ->where('source', 'presched_followup')
-                                ->limit(7 - $queue->count())
-                                ->get();
-            $queue = $queue->merge($preScheduled);
-        }
-        
-        // STEP 4: Pool fill
-        if ($queue->count() < 7) {
-            $remaining = 7 - $queue->count();
-            $locations = $this->poolFromArea($officer->area_id, $remaining);
-            foreach ($locations as $loc) {
-                $visit = Visit::create([
-                    'user_id' => $officer->id,
-                    'location_id' => $loc->id,
-                    'scheduled_date' => $date,
-                    'status' => 'planned',
-                    'source' => 'auto_planned',
-                ]);
-                $queue->push($visit);
-            }
-        }
-        
-        // STEP 5: Route optimization
-        $optimizedQueue = $this->optimizeRoute($officer, $queue);
-        
-        // STEP 6: Assign sequence
-        foreach ($optimizedQueue as $seq => $visit) {
-            $visit->update(['sequence_order' => $seq + 1]);
-        }
-    }
-    
-    protected function poolFromArea($areaId, $count)
-    {
-        $result = collect();
-        
-        // High-priority schools (2)
-        $highSchools = Location::where('area_id', $areaId)
-                              ->where('type', 'school')
-                              ->where('priority', 'high')
-                              ->orderBy('last_visit_date', 'asc')
-                              ->limit(2)
-                              ->get();
-        $result = $result->merge($highSchools);
-        
-        // Medium-priority schools (2)
-        if ($result->count() < $count) {
-            $medSchools = Location::where('area_id', $areaId)
-                                 ->where('type', 'school')
-                                 ->where('priority', 'medium')
-                                 ->orderBy('last_visit_date', 'asc')
-                                 ->limit(2)
-                                 ->get();
-            $result = $result->merge($medSchools);
-        }
-        
-        // Bookshops (2)
-        if ($result->count() < $count) {
-            $shops = Location::where('area_id', $areaId)
-                           ->where('type', 'bookshop')
-                           ->orderBy('last_visit_date', 'asc')
-                           ->limit(2)
-                           ->get();
-            $result = $result->merge($shops);
-        }
-        
-        return $result;
-    }
-    
-    protected function optimizeRoute(User $officer, $visits)
-    {
-        // Nearest-neighbor TSP
-        $startLat = $officer->last_lat ?? 24.8607;
-        $startLng = $officer->last_lng ?? 67.0011;
-        
-        $remaining = $visits->toArray();
-        $optimized = [];
-        
-        while (!empty($remaining)) {
-            $nearest = null;
-            $minDist = PHP_INT_MAX;
-            
-            foreach ($remaining as $key => $visit) {
-                $dist = $this->haversine(
-                    $startLat, $startLng,
-                    $visit->location->latitude,
-                    $visit->location->longitude
-                );
-                if ($dist < $minDist) {
-                    $minDist = $dist;
-                    $nearest = $key;
-                }
-            }
-            
-            $optimized[] = $remaining[$nearest];
-            $startLat = $remaining[$nearest]->location->latitude;
-            $startLng = $remaining[$nearest]->location->longitude;
-            unset($remaining[$nearest]);
-        }
-        
-        return $optimized;
-    }
-    
-    protected function haversine($lat1, $lng1, $lat2, $lng2)
-    {
-        $earthRadius = 6371000; // meters
-        
-        $dLat = deg2rad($lat2 - $lat1);
-        $dLng = deg2rad($lng2 - $lng1);
-        
-        $a = sin($dLat / 2) ** 2 +
-            cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
-        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
-        
-        return $earthRadius * $c;
-    }
-}
+## 5. Node.js Project Structure
+
+```
+backend/
+├── prisma/
+│   ├── schema.prisma          ← Single source of truth for DB
+│   └── migrations/            ← Auto-generated by Prisma
+├── src/
+│   ├── index.js               ← App entry point
+│   ├── app.js                 ← Express setup, middleware registration
+│   ├── config/
+│   │   ├── database.js        ← Prisma client singleton
+│   │   ├── redis.js           ← ioredis client
+│   │   └── env.js             ← Validated env vars (zod)
+│   ├── routes/
+│   │   ├── index.js           ← Route aggregator
+│   │   ├── auth.routes.js
+│   │   ├── workday.routes.js
+│   │   ├── visits.routes.js
+│   │   ├── tracking.routes.js
+│   │   ├── samples.routes.js
+│   │   ├── leaves.routes.js
+│   │   └── admin.routes.js
+│   ├── controllers/
+│   │   ├── auth.controller.js
+│   │   ├── workday.controller.js
+│   │   ├── visits.controller.js
+│   │   ├── tracking.controller.js
+│   │   ├── samples.controller.js
+│   │   ├── leaves.controller.js
+│   │   └── admin.controller.js
+│   ├── services/              ← All business logic lives here
+│   │   ├── auth.service.js
+│   │   ├── workday.service.js
+│   │   ├── visits.service.js
+│   │   ├── tracking.service.js
+│   │   ├── samples.service.js
+│   │   ├── payroll.service.js
+│   │   └── planning.service.js
+│   ├── middleware/
+│   │   ├── auth.middleware.js  ← JWT verification
+│   │   ├── role.middleware.js  ← RBAC guard
+│   │   ├── validate.middleware.js ← Zod schema validation
+│   │   └── errorHandler.js
+│   ├── jobs/                  ← BullMQ workers
+│   │   ├── queue.js           ← Queue definitions
+│   │   ├── syncVisit.worker.js
+│   │   └── notification.worker.js
+│   ├── schedulers/            ← node-cron tasks
+│   │   ├── index.js
+│   │   ├── routePlanning.cron.js    ← 12:00 AM
+│   │   ├── attendanceEngine.cron.js ← 11:00 PM
+│   │   ├── sampleReminder.cron.js   ← Daily check
+│   │   └── payrollEngine.cron.js    ← Month-end
+│   └── utils/
+│       ├── geoDistance.js
+│       ├── response.js
+│       └── logger.js
+├── .env.example
+├── package.json
+└── README.md
 ```
 
 ---
 
-### 5.2 Attendance Processing (11:00 PM Daily)
+## 6. Automated System Schedulers (node-cron)
 
-**Command:** `php artisan attendance:process`
+### 6.1 — 12:00 AM Route Planning Engine
 
-**Trigger:** Every day at 23:00 UTC
+**File:** `src/schedulers/routePlanning.cron.js`
 
-**Logic:**
+```
+cron.schedule('0 0 * * *', async () => {
+  FOR each active sales_officer:
+    1. Get tomorrow's date
+    2. Fetch coordinator-assigned priority visits for officer+date (sequence first)
+    3. Fetch approved carry-forward missed visits (carryForwardCnt < 5), increment counter
+    4. Fetch pre-scheduled follow-ups for that date
+    5. Fill remaining slots from area pool:
+       - 2 High-Priority Schools
+       - 2 Medium-Priority Schools
+       - 2 Bookshops
+       (exclude locations visited in last 7 days)
+    6. Cap total at 7 visits
+    7. Order all 7 by geographic proximity using Haversine distance clustering
+    8. INSERT into visits with dailySequence 1–7
+})
+```
 
-```plaintext
-FOR EACH sales_officer WHERE is_active = true:
-  
-  today = TODAY
-  attendance_rec = SELECT FROM attendance WHERE user_id = officer.id AND date = today
-  
-  IF attendance_rec NOT FOUND:
-    # Officer didn't start or end day
-    leave_rec = CREATE leave_request (
-      user_id = officer.id,
-      leave_date = today,
-      leave_type = 'casual',  # Default to casual
-      status = 'auto_deducted',
-      reason = 'No day-start recorded'
-    )
-    
-    IF officer.leave_casual_balance > 0:
-      officer.leave_casual_balance -= 1
-    ELSE IF officer.leave_sick_balance > 0:
-      officer.leave_sick_balance -= 1
-    # If both 0, balance goes negative (tracked but zero'd at next reset)
-    
-    SEND_NOTIFICATION(officer, "1 day auto-deducted from leave balance")
-    
-  ELSE IF attendance_rec.status = 'cannot_work':
-    # Officer declared cannot work; no auto-deduction
-    # Manual leave approval required if they want paid day off
-    CONTINUE
-    
-  ELSE IF attendance_rec.day_start_at IS NULL:
-    # Started day but no end; treat as present with partial day
-    CONTINUE
-    
-  END
-END
+### 6.2 — 11:00 PM Attendance Engine
+
+**File:** `src/schedulers/attendanceEngine.cron.js`
+
+```
+cron.schedule('0 23 * * *', async () => {
+  FOR each active sales_officer where no attendance record for today:
+    1. Create attendance row: status = 'absent'
+    2. Deduct 1 casual leave day (if balance > 0), else mark unpaid
+    3. Log to audit_logs
+    4. Notify city head via notification queue
+})
+```
+
+### 6.3 — Sample Recovery Reminders (Daily 9:00 AM)
+
+**File:** `src/schedulers/sampleReminder.cron.js`
+
+```
+cron.schedule('0 9 * * *', async () => {
+  FOR each sample_request where status = 'dispatched':
+    daysSince = today - requestedAt
+
+    IF daysSince >= 10 AND reminder10Sent = false:
+      SEND push notification to officer: "Sample recovery reminder: 10 days elapsed"
+      SEND email to city_head
+      SET reminder10Sent = true
+
+    IF daysSince >= 20 AND reminder20Sent = false:
+      SEND push notification: "URGENT: Sample recovery overdue — 20 days"
+      SEND email to super_admin
+      SET reminder20Sent = true
+      CREATE payroll deduction entry for next payroll run
+})
+```
+
+### 6.4 — End-of-Month Payroll Engine (Last day of month, 11:30 PM)
+
+**File:** `src/schedulers/payrollEngine.cron.js`
+
+```
+cron.schedule('30 23 28-31 * *', async () => {
+  IF today != last day of current month: RETURN
+
+  FOR each active sales_officer:
+    presentDays    = COUNT(attendance WHERE status='present' AND month=current)
+    performanceEarned = presentDays × dailyPerformanceRate (PKR 3,000 default)
+    missedPenalty  = SUM(deductions from rejected missed visit approvals)
+    sampleDeduction = SUM(unrecovered samples past 20 days)
+    securityHeld   = basicSalary × 0.10 (per contract)
+    netPayable     = basicSalary + performanceEarned
+                     - missedPenalty - sampleDeduction - securityHeld
+
+    INSERT payroll_ledgers (userId, month, year, ..., netPayable, isFinalized=true)
+    within Prisma.$transaction (atomic — no partial writes)
+})
 ```
 
 ---
 
-### 5.3 Sample Recovery Reminders (8:00 AM Daily)
+## 7. Flutter App Architecture
 
-**Command:** `php artisan samples:remind`
-
-**Trigger:** Every day at 08:00 UTC
-
-**Logic:**
-
-```plaintext
-FOR EACH sample_request WHERE status = 'approved' AND recovery_confirmed_at IS NULL:
-  
-  days_since_approval = TODAY - approved_at
-  
-  IF days_since_approval = 10 AND reminder_10_day_sent_at IS NULL:
-    SEND_SMS(officer, "10 days since approval. Please confirm sample recovery or face payroll deduction.")
-    reminder_10_day_sent_at = NOW()
-    
-  ELSE IF days_since_approval = 20 AND reminder_20_day_sent_at IS NULL:
-    SEND_SMS(officer, "URGENT: 20 days. If not recovered by tomorrow, payroll deduction applies.")
-    reminder_20_day_sent_at = NOW()
-    
-  ELSE IF days_since_approval >= 30 AND payroll_deduction_applied = false:
-    # Apply to current month payroll
-    payroll_rec = SELECT payroll_ledgers WHERE user_id = officer.id AND month_year = CURRENT_MONTH
-    payroll_rec.total_deductions_pkr += sample_request.total_pkr
-    payroll_rec.deduction_reasons.push("Unrecovered sample #" + sample_request.id)
-    payroll_rec.save()
-    
-    sample_request.payroll_deduction_applied = true
-    sample_request.payroll_deduction_at = NOW()
-    sample_request.save()
-    
-    SEND_NOTIFICATION(officer, "Sample not recovered. Deducted from payroll: PKR " + total_pkr)
-    
-  END
-END
-```
-
----
-
-### 5.4 End-of-Month Payroll Calculation (1st of Month, 00:30 UTC)
-
-**Command:** `php artisan payroll:calculate`
-
-**Trigger:** 1st day of month at 00:30 UTC
-
-**Logic:**
-
-```plaintext
-prev_month = LAST_MONTH
-prev_month_start = FIRST_DAY(prev_month)
-prev_month_end = LAST_DAY(prev_month)
-
-FOR EACH sales_officer:
-  
-  # Count working days present (exclude weekends/holidays)
-  working_days_present = COUNT(attendance WHERE user_id = officer.id 
-                                            AND status IN ('present', 'on_leave') 
-                                            AND date BETWEEN prev_month_start AND prev_month_end)
-  
-  # Performance component: PKR 3,000 per working day present
-  performance_earned = working_days_present * 3000
-  
-  # Deductions: Collect from rejected missed visits
-  deductions = SUM(payroll_deduction_pkr FROM visit_outcomes 
-                   WHERE officer_id AND missed_reason_status = 'rejected')
-  
-  # Existing deductions (samples, etc.)
-  existing_deductions = SUM(total_deductions FROM payroll_ledgers 
-                           WHERE officer_id AND month_year = prev_month)
-  
-  total_deductions = existing_deductions + deductions
-  
-  net_payable = (basic_salary + performance_earned) - total_deductions
-  
-  payroll_ledger = UPSERT payroll_ledgers (
-    user_id = officer.id,
-    month_year = prev_month,
-    base_salary_pkr = officer.basic_salary,
-    security_deposit_withheld_pkr = officer.security_deposit_monthly,
-    daily_performance_earned_pkr = performance_earned,
-    total_deductions_pkr = total_deductions,
-    deduction_reasons = [collected reasons],
-    calculated_by = SYSTEM_USER_ID,
-    calculated_at = NOW()
-  )
-  
-  # Security deposit: Accumulate until year-end
-  # (Released on Dec 31 or termination)
-  
-END
-```
-
----
-
-## 6. Android (Kotlin) Safeguards & Architecture
-
-### 6.1 Clean Architecture Layers
+### Clean Architecture Layers
 
 ```
-┌─────────────────────────────────────────────────┐
-│           UI LAYER (Jetpack Compose)            │
-│  • Activities, Screens, ViewModels              │
-│  • State management with Flow<UiState>         │
-│  • User interactions -> Events                  │
-└──────────────────┬──────────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────────┐
-│          DOMAIN LAYER (Use Cases)               │
-│  • Business logic (offline rules, rules)        │
-│  • Pure functions (no Android deps)            │
-│  • Repositories interfaces                      │
-└──────────────────┬──────────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────────┐
-│  DATA LAYER (Repositories + Data Sources)       │
-│  • Room DB (Local SQLite)                       │
-│  • Retrofit (Remote API)                        │
-│  • SharedPreferences (Session tokens)           │
-│  • WorkManager (Offline sync queue)             │
-└─────────────────────────────────────────────────┘
-```
-
-### 6.2 Anti-GPS Spoofing Enforcement
-
-**Rule:** Every location ping MUST be validated.
-
-```kotlin
-// data/datasource/LocationDataSource.kt
-
-class LocationDataSource(
-    private val apiService: ApiService,
-    private val fusedLocationClient: FusedLocationProviderClient
-) {
-    suspend fun sendLocationPing(
-        latitude: Double,
-        longitude: Double,
-        accuracy: Float,
-        batteryPercent: Int,
-        activeVisitId: Long?
-    ): Result<Unit> {
-        val location = fusedLocationClient.getCurrentLocation(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            cancellationToken
-        ).await()
-        
-        // CRITICAL CHECK: Detect mock location
-        val isMock = location?.isMock ?: false
-        
-        if (isMock) {
-            // BLOCK immediately
-            logSecurityIncident(
-                userId = getCurrentUserId(),
-                incidentType = "MOCK_LOCATION_DETECTED",
-                latitude = latitude,
-                longitude = longitude
-            )
-            
-            // Notify user
-            emit(UiEvent.Error("GPS spoofing detected. Location submission blocked."))
-            
-            // Notify backend
-            try {
-                apiService.reportSecurityIncident(
-                    incident_type = "MOCK_LOCATION",
-                    user_id = getCurrentUserId(),
-                    timestamp = System.currentTimeMillis()
-                )
-            } catch (e: Exception) {
-                // Retry on next sync
-            }
-            
-            return Result.failure(IllegalStateException("Mock location detected"))
-        }
-        
-        // Submit location
-        return try {
-            apiService.trackingPing(
-                latitude = location.latitude,
-                longitude = location.longitude,
-                accuracy_meters = location.accuracy,
-                is_mock_location = false,
-                battery_percent = batteryPercent,
-                active_visit_id = activeVisitId
-            )
-            Result.success(Unit)
-        } catch (e: IOException) {
-            // Network error; cache for sync later
-            saveLocationPingToQueue(...)
-            Result.success(Unit) // Don't fail UI; sync later
-        }
-    }
-    
-    private fun logSecurityIncident(...) {
-        // Local append-only log
-        db.securityLogDao().insert(
-            SecurityLog(
-                timestamp = System.currentTimeMillis(),
-                incidentType = incidentType,
-                details = "..."
-            )
-        )
-    }
-}
-```
-
-### 6.3 Offline-First Engine
-
-```kotlin
-// data/repository/VisitRepository.kt
-
-class VisitRepository(
-    private val roomDao: VisitDao,
-    private val apiService: ApiService,
-    private val syncQueue: SyncQueueManager
-) : VisitRepositoryInterface {
-    
-    // Complete a visit locally first, sync later
-    suspend fun completeVisit(
-        visitId: Long,
-        outcome: VisitOutcome
-    ): Result<Unit> = withContext(Dispatchers.IO) {
-        
-        try {
-            // Step 1: Try remote API
-            val response = apiService.completeVisit(visitId, outcome)
-            
-            // Step 2: If success, update local
-            roomDao.updateVisit(
-                visitId,
-                status = "completed",
-                ...outcome fields...
-            )
-            
-            Result.success(Unit)
-            
-        } catch (e: IOException) {
-            // Step 1 (Alt): Network unavailable; save locally
-            roomDao.updateVisit(
-                visitId,
-                status = "completed",
-                syncStatus = "PENDING_SYNC", // Local flag
-                ...outcome fields...
-            )
-            
-            // Step 2: Queue for sync
-            syncQueue.enqueue(
-                SyncTask(
-                    type = "COMPLETE_VISIT",
-                    visitId = visitId,
-                    payload = outcome,
-                    createdAt = System.currentTimeMillis()
-                )
-            )
-            
-            // Step 3: WorkManager will retry when connected
-            WorkManager.getInstance().enqueueUniqueWork(
-                "visit_sync",
-                ExistingWorkPolicy.KEEP,
-                OneTimeWorkRequestBuilder<VisitSyncWorker>()
-                    .setConstraints(
-                        Constraints.Builder()
-                            .setRequiredNetworkType(NetworkType.CONNECTED)
-                            .build()
-                    )
-                    .build()
-            )
-            
-            Result.success(Unit) // UI succeeds; sync in background
-        }
-    }
-}
-
-// service/VisitSyncWorker.kt
-
-class VisitSyncWorker(
-    context: Context,
-    params: WorkerParameters
-) : CoroutineWorker(context, params) {
-    
-    override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
-        val syncQueue = SyncQueueManager()
-        val tasks = syncQueue.getAllPending()
-        
-        for (task in tasks) {
-            try {
-                when (task.type) {
-                    "COMPLETE_VISIT" -> {
-                        apiService.completeVisit(task.visitId, task.payload)
-                        syncQueue.markSucceeded(task.id)
-                    }
-                }
-            } catch (e: Exception) {
-                if (runAttemptCount < 3) {
-                    return@withContext Result.retry()
-                } else {
-                    // Mark as failed after 3 retries
-                    syncQueue.markFailed(task.id, e.message)
-                }
-            }
-        }
-        
-        return@withContext Result.success()
-    }
-}
-```
-
-### 6.4 Geofencing Proximity Lock
-
-```kotlin
-// domain/usecase/ValidateVisitProximityUseCase.kt
-
-class ValidateVisitProximityUseCase(
-    private val locationClient: FusedLocationProviderClient,
-    private val visitRepository: VisitRepository
-) {
-    suspend operator fun invoke(visitId: Long): Result<ProximityStatus> {
-        
-        // Fetch visit location
-        val visit = visitRepository.getVisit(visitId).getOrNull()
-            ?: return Result.failure(NotFoundException())
-        
-        val targetLocation = visit.location
-        
-        // Get current location
-        val currentLocation = try {
-            locationClient.getCurrentLocation(
-                Priority.PRIORITY_HIGH_ACCURACY,
-                CancellationTokenSource().token
-            ).await()
-        } catch (e: Exception) {
-            return Result.failure(e)
-        }
-        
-        // Calculate distance (haversine)
-        val distanceMeters = calculateDistance(
-            currentLocation.latitude,
-            currentLocation.longitude,
-            targetLocation.latitude,
-            targetLocation.longitude
-        )
-        
-        // Enforce 200-meter proximity
-        return if (distanceMeters <= 200) {
-            Result.success(ProximityStatus.WITHIN_RANGE)
-        } else {
-            Result.failure(ProximityViolation("$distanceMeters meters away. Come within 200m."))
-        }
-    }
-    
-    private fun calculateDistance(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Float {
-        val earthRadius = 6371000 // meters
-        
-        val dLat = Math.toRadians(lat2 - lat1)
-        val dLng = Math.toRadians(lng2 - lng1)
-        
-        val a = sin(dLat / 2).pow(2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) * sin(dLng / 2).pow(2)
-        
-        val c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        
-        return (earthRadius * c).toFloat()
-    }
-}
-```
-
----
-
-## 7. Edge Cases & Defensive Engineering
-
-### 7.1 Same-Day Edit Lock (Server-Side Enforcement)
-
-```php
-// app/Http/Controllers/VisitController.php
-
-public function updateVisit(Request $request, $visitId)
-{
-    $visit = Visit::findOrFail($visitId);
-    
-    // CRITICAL: Verify edit window
-    $now = Carbon::now();
-    $editableUntil = $visit->scheduled_date
-        ->copy()
-        ->endOfDay(); // 23:59:59
-    
-    if ($now->isAfter($editableUntil)) {
-        return response()->json([
-            'success' => false,
-            'error' => 'EDIT_WINDOW_CLOSED',
-            'message' => 'Visit details can only be edited on the scheduled date.'
-        ], 410); // 410 Gone
-    }
-    
-    // Allow only editable fields
-    $editableFields = ['contact_person_name', 'contact_person_designation', 'contact_phone', 'visit_type', 'feedback_notes'];
-    $data = $request->only($editableFields);
-    
-    $visit->update($data);
-    
-    return response()->json([
-        'success' => true,
-        'data' => $visit
-    ]);
-}
-```
-
-### 7.2 Non-Retrievable Passwords
-
-```php
-// app/Http/Controllers/Admin/AdminController.php
-
-// NEVER implement this:
-public function viewUserPassword($userId) {
-    // FORBIDDEN
-}
-
-// Instead, force password reset:
-public function forcePasswordReset(Request $request, $userId)
-{
-    $user = User::findOrFail($userId);
-    
-    // Generate OTP
-    $otp = random_int(100000, 999999);
-    Cache::put("password_reset_otp:{$user->id}", $otp, now()->addMinutes(15));
-    
-    // Send OTP to user's phone
-    SmsService::send($user->phone, "Your password reset OTP: $otp");
-    
-    // Log action
-    AuditLog::create([
-        'admin_user_id' => Auth::id(),
-        'action_type' => 'force_password_reset',
-        'entity_type' => 'user',
-        'entity_id' => $userId,
-        'new_values' => ['otp_generated' => true]
-    ]);
-    
-    return response()->json([
-        'success' => true,
-        'message' => 'OTP sent to user. They must reset via forgot-password flow.'
-    ]);
-}
-```
-
-### 7.3 Audit Trails (Append-Only Logging)
-
-```php
-// app/Models/AuditLog.php
-
-class AuditLog extends Model
-{
-    public $timestamps = false; // created_at only, immutable
-    protected $fillable = [
-        'admin_user_id', 'action_type', 'entity_type', 'entity_id',
-        'old_values', 'new_values', 'ip_address', 'user_agent'
-    ];
-    
-    protected $casts = [
-        'old_values' => 'json',
-        'new_values' => 'json',
-        'created_at' => 'datetime'
-    ];
-}
-
-// Example: Admin overrides missed visit
-$auditLog = AuditLog::create([
-    'admin_user_id' => Auth::id(),
-    'action_type' => 'missed_visit_override',
-    'entity_type' => 'visit',
-    'entity_id' => $visitId,
-    'old_values' => ['missed_reason_status' => 'rejected'],
-    'new_values' => ['missed_reason_status' => 'approved'],
-    'ip_address' => $request->ip(),
-    'user_agent' => $request->header('User-Agent')
-]);
-
-// Audit logs can NEVER be deleted or modified (foreign key constraints ensure this)
-```
-
----
-
-## 8. Developer Onboarding & Maintainability Guide
-
-### 8.1 15-Minute Setup Rule
-
-#### Backend (Laravel 11)
-
-```bash
-# Clone repo
-git clone https://github.com/bookmark/sfa-backend.git
-cd sfa-backend
-
-# Copy env
-cp .env.example .env
-php artisan key:generate
-
-# Database setup
-mysql -u root -pbookmark_dev -e "CREATE DATABASE bookmark_sfa_dev"
-
-# Install
-composer install
-php artisan migrate --seed
-php artisan storage:link
-
-# Start
-php artisan serve  # localhost:8000
-```
-
-#### Mobile (Android Kotlin)
-
-```bash
-# Clone repo
-git clone https://github.com/bookmark/sfa-mobile.git
-
-# Open Android Studio
-open -a "Android Studio" sfa-mobile/
-
-# Wait for Gradle sync
-# Select Emulator: Pixel 7 API 34
-# Click Run (green play button)
-```
-
-#### Admin (React + Vite)
-
-```bash
-# Clone repo
-git clone https://github.com/bookmark/sfa-admin.git
-cd sfa-admin
-
-# Install
-npm install
-
-# Copy env
-cp .env.example .env.local
-# Edit .env.local: VITE_API_URL=http://localhost:8000
-
-# Start
-npm run dev  # localhost:5173
-```
-
-### 8.2 Standard Folder Structures
-
-#### Backend (Laravel Service-Repository Pattern)
-
-```
-app/
-├── Http/
-│   ├── Controllers/
-│   │   ├── AuthController.php
-│   │   ├── VisitController.php
-│   │   └── Admin/
-│   │       └── AdminVisitController.php
-│   └── Middleware/
-│       └── RoleMiddleware.php
-├── Services/
-│   ├── VisitService.php           # Business logic
-│   ├── PayrollService.php
-│   └── SyncService.php
-├── Repositories/
-│   ├── VisitRepository.php        # Data access
-│   └── UserRepository.php
-├── Models/
-│   ├── User.php
-│   ├── Visit.php
-│   └── ...
-└── Console/
-    └── Commands/
-        ├── GenerateDailyVisitsCommand.php
-        └── CalculatePayrollCommand.php
-```
-
-#### Mobile (Kotlin Clean Architecture)
-
-```
-com/bookmark/sfa/
-├── ui/
-│   ├── auth/
-│   │   ├── LoginScreen.kt
-│   │   ├── LoginViewModel.kt
-│   │   └── LoginEvent.kt
-│   ├── visits/
-│   │   ├── VisitListScreen.kt
-│   │   ├── VisitListViewModel.kt
-│   │   └── ...
-│   └── MainActivity.kt
-├── domain/
-│   ├── usecase/
-│   │   ├── LoginUseCase.kt
-│   │   ├── FetchVisitsUseCase.kt
-│   │   └── ...
-│   └── repository/ (interfaces)
-│       ├── AuthRepository.kt
-│       └── VisitRepository.kt
+lib/
+├── main.dart
+├── app.dart                        ← MaterialApp, GoRouter, ProviderScope
+├── core/
+│   ├── constants/
+│   │   ├── api_constants.dart      ← BASE_URL, endpoints
+│   │   └── app_constants.dart
+│   ├── network/
+│   │   ├── dio_client.dart         ← Dio instance + JWT interceptor
+│   │   └── api_exception.dart
+│   ├── storage/
+│   │   └── secure_storage.dart     ← flutter_secure_storage for JWT
+│   └── utils/
+│       ├── geo_utils.dart          ← Haversine distance calc
+│       └── mock_location_guard.dart ← isMocked detection
 ├── data/
-│   ├── datasource/
-│   │   ├── local/
-│   │   │   └── VisitLocalDataSource.kt
-│   │   └── remote/
-│   │       └── VisitRemoteDataSource.kt
-│   ├── repository/ (implementations)
-│   │   ├── AuthRepositoryImpl.kt
-│   │   └── VisitRepositoryImpl.kt
-│   ├── db/
-│   │   ├── AppDatabase.kt
-│   │   └── dao/
-│   │       ├── VisitDao.kt
-│   │       └── ...
-│   ├── api/
-│   │   └── ApiService.kt
-│   └── models/
-│       ├── VisitDTO.kt
-│       └── ...
-└── di/
-    └── AppModule.kt
+│   ├── local/                      ← Drift (SQLite) tables + DAOs
+│   │   ├── app_database.dart
+│   │   ├── tables/
+│   │   │   ├── visits_table.dart
+│   │   │   ├── gps_logs_table.dart
+│   │   │   └── attendance_table.dart
+│   │   └── daos/
+│   │       ├── visits_dao.dart
+│   │       └── attendance_dao.dart
+│   ├── remote/                     ← Dio API data sources
+│   │   ├── auth_remote.dart
+│   │   ├── visits_remote.dart
+│   │   └── tracking_remote.dart
+│   └── repositories/               ← Implements domain interfaces
+│       ├── auth_repository_impl.dart
+│       ├── visits_repository_impl.dart
+│       └── tracking_repository_impl.dart
+├── domain/
+│   ├── entities/
+│   │   ├── visit.dart
+│   │   ├── user.dart
+│   │   └── attendance.dart
+│   ├── repositories/               ← Abstract interfaces
+│   │   ├── auth_repository.dart
+│   │   └── visits_repository.dart
+│   └── usecases/
+│       ├── login_usecase.dart
+│       ├── get_today_visits_usecase.dart
+│       ├── complete_visit_usecase.dart
+│       ├── mark_missed_usecase.dart
+│       ├── day_start_usecase.dart
+│       └── sync_pending_usecase.dart
+├── presentation/
+│   ├── providers/                  ← Riverpod providers
+│   │   ├── auth_provider.dart
+│   │   ├── visits_provider.dart
+│   │   └── tracking_provider.dart
+│   ├── screens/
+│   │   ├── splash/
+│   │   ├── auth/
+│   │   │   └── login_screen.dart
+│   │   ├── dashboard/
+│   │   │   └── dashboard_screen.dart
+│   │   ├── workday/
+│   │   │   ├── day_start_screen.dart
+│   │   │   └── day_end_screen.dart
+│   │   ├── visits/
+│   │   │   ├── visit_list_screen.dart
+│   │   │   ├── visit_detail_screen.dart
+│   │   │   ├── complete_visit_screen.dart
+│   │   │   └── missed_visit_screen.dart
+│   │   ├── samples/
+│   │   ├── leaves/
+│   │   └── profile/
+│   └── widgets/
+│       ├── visit_card.dart
+│       ├── gps_status_badge.dart
+│       └── sync_indicator.dart
+└── background/
+    └── sync_worker.dart            ← WorkManager task: push PENDING_SYNC rows
 ```
 
-#### Admin (React + Vite)
+### Key Flutter Rules
 
+- **Riverpod providers call UseCases, never Repositories directly**
+- **Drift DAOs are injected only into Repository implementations**
+- **No hardcoded strings** — all API URLs in `api_constants.dart`, all copy in `app_constants.dart`
+- **Every GPS action checks `position.isMocked` before proceeding**
+- **WorkManager task runs on `NetworkType.connected` constraint only**
+
+### Anti-GPS Spoofing (Flutter)
+
+```dart
+// core/utils/mock_location_guard.dart
+Future<bool> isMockLocationActive(Position position) async {
+  if (position.isMocked) return true;
+
+  // Additional check on Android
+  if (Platform.isAndroid) {
+    final isDevMode = await _checkDeveloperOptions();
+    if (isDevMode && await _isMockProviderActive()) return true;
+  }
+  return false;
+}
+
+// Usage in DayStartUseCase
+final isMocked = await mockLocationGuard.isMockLocationActive(pos);
+if (isMocked) {
+  await trackingRemote.reportMockAttempt(userId, pos);
+  throw MockLocationException('GPS spoofing detected. Action blocked.');
+}
 ```
-src/
-├── components/
-│   ├── Layout.tsx
-│   ├── LoadingSpinner.tsx
-│   └── ...
-├── pages/
-│   ├── auth/
-│   │   └── LoginPage.tsx
-│   ├── visits/
-│   │   ├── VisitListPage.tsx
-│   │   └── VisitDetailPage.tsx
-│   └── admin/
-│       ├── DashboardPage.tsx
-│       └── ...
-├── api/
-│   └── client.ts              # Axios instance + endpoints
-├── hooks/
-│   ├── useAuth.ts
-│   └── ...
-├── types/
-│   └── index.ts               # TypeScript interfaces
-├── App.tsx
-├── main.tsx
-└── index.css
+
+### Offline-First Sync Worker
+
+```dart
+// background/sync_worker.dart
+class SyncWorker extends BackgroundWorker {
+  @override
+  Future<bool> performWork() async {
+    final db = await AppDatabase.getInstance();
+    final pending = await db.visitsDao.getPendingSync();
+
+    for (final visit in pending) {
+      try {
+        await visitsRemote.syncVisit(visit);
+        await db.visitsDao.markSynced(visit.id);
+      } catch (e) {
+        return false; // WorkManager will retry
+      }
+    }
+    return true;
+  }
+}
 ```
 
-### 8.3 Golden Coding Rules
+### Geofencing (200m Lock)
 
-1. **ViewModels NEVER call Repositories directly**
-   ```kotlin
-   // BAD
-   class MyViewModel {
-       fun loadVisits() {
-           val visits = visitRepository.fetchVisits()
-       }
-   }
-   
-   // GOOD
-   class MyViewModel(
-       private val fetchVisitsUseCase: FetchVisitsUseCase
-   ) {
-       fun loadVisits() {
-           val visits = fetchVisitsUseCase()
-       }
-   }
-   ```
+```dart
+// In CompleteVisitUseCase
+final distance = GeoUtils.haversine(
+  current.latitude, current.longitude,
+  location.latitude, location.longitude
+);
 
-2. **Controllers only validate & return JSON; business logic belongs in Services**
-   ```php
-   // BAD
-   public function completeVisit(Request $request, $visitId) {
-       $visit = Visit::find($visitId);
-       $visit->status = 'completed';
-       $visit->completed_at = now();
-       // ... 50 lines of logic ...
-   }
-   
-   // GOOD
-   public function completeVisit(Request $request, $visitId) {
-       $this->authorize('completeVisit', $visitId);
-       $result = $this->visitService->completeVisit($visitId, $request->validated());
-       return response()->json($result);
-   }
-   ```
+if (distance > 200) {
+  throw GeofenceException('Move within 200m of the location to check in.');
+}
+```
 
-3. **No hardcoded keys or API URLs**
-   ```kotlin
-   // BAD
-   val apiUrl = "http://10.0.2.2:8000/api"
-   
-   // GOOD
-   val apiUrl = BuildConfig.API_BASE_URL
-   // In build.gradle.kts or local.properties
-   ```
+---
 
-4. **All public endpoints require tests**
-   ```php
-   // routes/api.php defines endpoint
-   // tests/Feature/VisitControllerTest.php tests it
-   
-   public function testCompleteVisit() {
-       $officer = User::factory()->create(['role' => 'sales_officer']);
-       $response = $this->actingAs($officer)
-           ->postJson('/api/v1/visits/1/complete', [...]);
-       $response->assertStatus(200);
-   }
-   ```
+## 8. pubspec.yaml (Flutter Dependencies)
 
-### 8.4 How to Add a Feature (4-Step Sequence)
+```yaml
+name: bookmark_sfa
+description: Bookmark Field Force Automation
+version: 1.0.0+1
 
-**Example: Add "Mark As Revisit" button to visit**
+environment:
+  sdk: ">=3.3.0 <4.0.0"
 
-**Step 1: Database**
-```php
-// database/migrations/xxxx_add_is_revisit_to_visits.php
-Schema::table('visits', function (Blueprint $table) {
-    $table->boolean('is_revisit')->default(false);
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # State Management
+  flutter_riverpod: ^2.5.1
+  riverpod_annotation: ^2.3.5
+
+  # Navigation
+  go_router: ^14.2.0
+
+  # Network
+  dio: ^5.4.3
+  pretty_dio_logger: ^1.4.0
+
+  # Local DB (Drift / SQLite)
+  drift: ^2.18.0
+  sqlite3_flutter_libs: ^0.5.25
+  path_provider: ^2.1.3
+  path: ^1.9.0
+
+  # Secure Storage (JWT)
+  flutter_secure_storage: ^9.2.2
+
+  # Maps & Location
+  google_maps_flutter: ^2.7.0
+  geolocator: ^12.0.0
+  permission_handler: ^11.3.1
+
+  # Background Sync
+  workmanager: ^0.5.2
+
+  # Image Picker (missed visit evidence)
+  image_picker: ^1.1.2
+
+  # UI
+  cached_network_image: ^3.3.1
+  lottie: ^3.1.2
+  shimmer: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+  build_runner: ^2.4.11
+  drift_dev: ^2.18.0
+  riverpod_generator: ^2.4.3
+```
+
+---
+
+## 9. package.json (Node.js Backend)
+
+```json
+{
+  "name": "bookmark-sfa-api",
+  "version": "1.0.0",
+  "description": "Bookmark Field Force Automation — Node.js REST API",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "db:migrate": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:seed": "node prisma/seed.js",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.16.0",
+    "bcryptjs": "^2.4.3",
+    "bullmq": "^5.10.0",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.4.0",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.4.1",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
+    "winston": "^3.13.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4",
+    "prisma": "^5.16.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+```
+
+---
+
+## 10. Developer Onboarding — 15-Minute Setup
+
+### Prerequisites
+- Node.js 20 LTS (`brew install node`)
+- Flutter 3.x (`brew install flutter` or via official installer)
+- MySQL 8 (`brew install mysql && brew services start mysql`)
+- Redis (`brew install redis && brew services start redis`)
+- Android Studio with Flutter plugin installed
+
+### Backend Setup (Node.js)
+
+```bash
+cd backend
+cp .env.example .env
+# Edit .env: set DATABASE_URL, JWT_SECRET, REDIS_URL
+
+npm install
+npx prisma migrate dev --name init
+npx prisma db seed           # Seeds cities, areas, admin user
+npm run dev                  # Starts on http://localhost:3000
+```
+
+`.env.example`:
+```env
+DATABASE_URL="mysql://root:password@localhost:3306/bookmark_sfa"
+JWT_SECRET="change_this_to_a_64_char_random_string"
+JWT_EXPIRES_IN="30d"
+REDIS_URL="redis://localhost:6379"
+PORT=3000
+NODE_ENV=development
+```
+
+### Flutter App Setup
+
+```bash
+cd mobile
+flutter pub get
+# Open in Android Studio or VS Code
+# Select emulator or physical device
+flutter run
+```
+
+For emulator, `BASE_URL` in `lib/core/constants/api_constants.dart`:
+```dart
+// Android emulator → host machine localhost
+const String baseUrl = 'http://10.0.2.2:3000/api/v1';
+```
+
+### Admin Panel Setup (React)
+
+```bash
+cd admin
+cp .env.example .env.local
+# Set VITE_API_URL=http://localhost:3000/api/v1
+
+npm install
+npm run dev                  # Starts on http://localhost:5173
+```
+
+---
+
+## 11. Edge Cases & Defensive Engineering
+
+### Same-Day Edit Lock
+```js
+// visits.service.js
+const scheduledDate = dayjs(visit.scheduledDate).endOf('day');
+if (dayjs().isAfter(scheduledDate)) {
+  throw new AppError('EDIT_WINDOW_CLOSED', 422,
+    'Visit details cannot be edited after 11:59 PM on the scheduled date');
+}
+```
+
+### Non-Retrievable Passwords
+- Passwords hashed with `bcrypt` (rounds: 12) on create and force-reset
+- No endpoint returns or logs raw passwords
+- Admin force-reset sets a temporary password; officer must change on first login
+
+### Append-Only Audit Logs
+```js
+// All admin override actions write to audit_logs
+// No UPDATE or DELETE is ever issued on audit_logs table
+// Prisma schema has no `update` or `delete` operations defined for AuditLog
+await prisma.auditLog.create({
+  data: { actorId, action, targetType, targetId, before, after, ipAddress }
 });
 ```
 
-**Step 2: API Spec**
-```
-POST /api/v1/visits/{id}/mark-revisit
-Request: { }
-Response: { success: true, data: { visit_id, is_revisit: true } }
-```
-
-**Step 3: Backend Implementation**
-```php
-// app/Services/VisitService.php
-public function markAsRevisit($visitId) {
-    $visit = Visit::findOrFail($visitId);
-    $visit->is_revisit = true;
-    $visit->save();
-    return $visit;
-}
-
-// app/Http/Controllers/VisitController.php
-public function markAsRevisit($visitId) {
-    $visit = $this->visitService->markAsRevisit($visitId);
-    return response()->json(['success' => true, 'data' => $visit]);
-}
-
-// routes/api.php
-Route::post('/visits/{id}/mark-revisit', [VisitController::class, 'markAsRevisit']);
-```
-
-**Step 4: Mobile UI**
-```kotlin
-// ui/visits/VisitDetailScreen.kt
-Button(onClick = { viewModel.markAsRevisit() }) {
-    Text("Mark As Revisit")
-}
-
-// viewmodel/VisitDetailViewModel.kt
-fun markAsRevisit() = viewModelScope.launch {
-    val result = markVisitAsRevisitUseCase(visitId)
-    // Update UI state
-}
-```
+### Mock Location — Incident Escalation Chain
+1. Flutter blocks action + shows user warning
+2. Flutter calls `POST /api/v1/tracking/ping` with `isMocked: true`
+3. Node.js logs to `gps_logs` with `isMocked: true`
+4. BullMQ notification job fires → alert sent to city_head
+5. `audit_logs` entry created for review
 
 ---
 
-## 9. AI Code Generation Rules (For Cursor / Claude)
+## 12. Golden Coding Rules
 
-When modifying this codebase, ALL AI agents (Cursor, Claude, Copilot) MUST follow:
+### Node.js (Express + Prisma)
+- **Controllers only validate the request and return JSON. Zero business logic.**
+- **All business logic lives in `services/`. Services call Prisma, never raw SQL.**
+- **Never execute unparameterized queries. Use Prisma exclusively.**
+- **All endpoints require `authMiddleware` unless explicitly public.**
+- **Financial operations use `prisma.$transaction([...])` — never partial writes.**
 
-### 9.1 Kotlin Rules
-- Use immutable `StateFlow<UiState>` patterns; NO mutable state in ViewModels
-- Use `@HiltViewModel` + constructor injection; NO manual DI
-- Use sealed classes for `UiState` and `UiEvent`
-- All network calls wrapped in `try-catch` with local fallback
-- NEVER hardcode API URLs or BuildConfig values; use dependency injection
+### Flutter (Dart + Riverpod)
+- **Riverpod providers call UseCases. UseCases call Repository interfaces. Never skip layers.**
+- **Always use immutable state — `@freezed` or `copyWith` patterns only.**
+- **All GPS actions guard with `mock_location_guard.dart` before proceeding.**
+- **Offline data writes to Drift with `syncStatus: SyncStatus.pendingSync` immediately.**
+- **No hardcoded API URLs or keys — always read from `api_constants.dart`.**
 
-### 9.2 PHP/Laravel Rules
-- NEVER execute unparameterized SQL queries; use Eloquent ORM or parameterized `DB::prepared()`
-- ALL Controller methods must validate input via `Request::validate()`
-- Use Service layer for business logic; Controllers are thin
-- NEVER retrieve passwords; use `Hash::check()` for validation only
-- ALWAYS log sensitive actions to `AuditLog` table
-- NEVER modify audit logs; table has immutable constraints
-
-### 9.3 React Rules
-- Use `react-query` for all server state; NO useState for API data
-- Component props must be typed with TypeScript interfaces
-- NEVER call API directly from components; use custom hooks
-- ALWAYS handle loading/error states
-- Memoize expensive computations with `useMemo`
-
-### 9.4 Cross-Platform Rules
-- Preserve existing API contracts; NEVER rename JSON field names
-- ALL timestamps in UTC ISO-8601 format
-- Financial values as `DECIMAL(12,2)` or JS `number` (never `string`)
-- GPS coordinates always 8 decimal places (lat) + 9 (lng)
-- NEVER bypass auth middleware
-- ALWAYS validate GPS `isMock` flag before storing
+### Database (Prisma / MySQL)
+- **Never DROP or TRUNCATE in migrations — use soft deletes (`isActive: false`).**
+- **All financial fields use `@db.Decimal(10, 2)` — never Float for money.**
+- **Audit logs are write-only from the application. No update/delete allowed.**
 
 ---
 
-## Glossary
+## 13. AI Code Generation Rules (For Cursor / Claude / Copilot)
 
-- **MVVM:** Model-View-ViewModel architectural pattern
-- **Clean Architecture:** Separation of UI, Domain, and Data layers
-- **Sanctum:** Laravel's lightweight API token authentication
-- **Room DB:** Android's local SQLite ORM
-- **WorkManager:** Android background task scheduler
-- **Haversine:** Formula for calculating distance between GPS coordinates
-- **TSP:** Traveling Salesman Problem (route optimization)
-- **isMock:** Android flag indicating GPS spoofing detection
-- **Geofencing:** GPS-based proximity validation
-- **Payroll Ledger:** Monthly immutable salary snapshot
-- **Carry-Forward:** Missed visit scheduled for following day with attempt counter
+When modifying this codebase, AI tools must adhere to the following constraints:
 
----
-
-## Quick Links
-
-- **Backend Repo:** `https://github.com/bookmark/sfa-backend`
-- **Mobile Repo:** `https://github.com/bookmark/sfa-mobile`
-- **Admin Repo:** `https://github.com/bookmark/sfa-admin`
-- **BRD:** `Bookmark_BRD.md` (Requirements)
-- **Setup Guide:** Follow Section 8.1 for 15-min setup
+1. **Strictly preserve existing Prisma field names and JSON API contracts.** Renaming a field breaks the Flutter app without a coordinated release.
+2. **Never add raw SQL to Node.js code.** All queries must go through Prisma client.
+3. **Never bypass the UseCase layer in Flutter.** If a screen needs data, add a UseCase.
+4. **Never store JWT in SharedPreferences.** Use `flutter_secure_storage` only.
+5. **All new API endpoints must be added to this document before implementation.**
+6. **New schedulers must log their start, completion, and any errors via `winston` logger.**
+7. **Do not use `var` in Dart. Use explicit types or `final`/`const`.**
+8. **Do not use `any` type in Node.js — use Zod schemas for all input validation.**
 
 ---
 
-**Last Updated:** July 27, 2026 | **Status:** Production-Ready v1.0
+*This document is the canonical reference for the Bookmark SFA system. All implementation decisions must align with the architecture defined here.*
