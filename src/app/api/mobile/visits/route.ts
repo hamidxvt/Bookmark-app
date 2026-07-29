@@ -22,7 +22,7 @@ type Visit = {
     address: string | null;
     latitude: any;
     longitude: any;
-    workingPriority: string | null;
+    workingPriority: number;
   };
 };
 
