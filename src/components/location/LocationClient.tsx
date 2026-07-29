@@ -40,13 +40,14 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
     finally { setLoading(false); }
   }
 
-  useEffect(() => { load(); }, [city]);
+  useEffect(() => { load(); }, []);
 
-  // Auto-refresh every 10s for live GPS feel
+  // Auto-refresh every 10s
   useEffect(() => {
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
-  }, [city]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedBooker = bookers.find(b => b.id === selected);
 

@@ -11,8 +11,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Field Force Manager — Bookmark Publishing",
+  title: "Bookmark SFA — Field Force Manager",
   description: "Sales force automation for Bookmark Publishing",
+  icons: { icon: "/favicon.png" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
