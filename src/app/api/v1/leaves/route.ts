@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { notifyBooker } from "@/lib/scheduler";
 
 export async function GET(req: Request) {
   try {
@@ -34,6 +35,15 @@ export async function PATCH(req: Request) {
       where: { id },
       data: { status, adminNotes: adminNotes ?? null, reviewedAt: new Date() },
     });
+
+    // Push notification to officer
+    const emoji = status === "approved" ? "✅" : "❌";
+    await notifyBooker(
+      leave.bookerId,
+      `Leave ${status === "approved" ? "Approved" : "Rejected"}`,
+      `${emoji} Your leave request (${leave.leaveType}) has been ${status}.${adminNotes ? ` Note: ${adminNotes}` : ""}`,
+      { type: "leave_update", leaveId: String(leave.id), status }
+    ).catch(() => {});
 
     return NextResponse.json({ success: true, data: leave });
   } catch (err) {

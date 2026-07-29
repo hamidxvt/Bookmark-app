@@ -181,14 +181,21 @@ export async function POST() {
 
       const city = cityName ? await prisma.city.findFirst({ where: { name: cityName } }) : null;
 
+      // Map staging type string to CustomerType enum
+      const typeMap: Record<string, "SCHOOL" | "COLLEGE" | "SELF" | "RETAILER" | "OTHER"> = {
+        school: "SCHOOL", college: "COLLEGE", self: "SELF", retailer: "RETAILER",
+      };
+      const customerType = typeMap[type.toLowerCase()] ?? "OTHER";
+
       try {
         await prisma.customer.create({
           data: {
             name,
-            type: type as any,
+            customerType,
             address: address || undefined,
-            cityId: city?.id,
+            cityId: city?.id ?? 0,
             approvalStatus: "APPROVED",
+            ownerPhone: "",
           },
         });
         custCount++;

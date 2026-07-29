@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { notifyBooker } from "@/lib/scheduler";
 
 export async function GET(req: Request) {
   try {
@@ -40,6 +41,14 @@ export async function PATCH(req: Request) {
       where: { id },
       data: { status, adminNote: adminNote ?? null },
     });
+
+    const emoji = status === "approved" ? "✅" : "❌";
+    await notifyBooker(
+      reason.bookerId,
+      `Missed Visit ${status === "approved" ? "Approved" : "Rejected"}`,
+      `${emoji} Your missed visit reason has been ${status}.${adminNote ? ` Note: ${adminNote}` : ""}`,
+      { type: "missed_visit_update", reasonId: String(reason.id), status }
+    ).catch(() => {});
 
     return NextResponse.json({ success: true, data: reason });
   } catch (err) {

@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Navigation, UserCheck, ClipboardList, Users,
   Globe, Package, BookOpen, MessageSquare, Bell, ChevronDown,
   LogOut, PanelLeftClose, PanelLeftOpen, X,
-  Calendar, Clock, AlertTriangle, Banknote, Database,
+  Calendar, Clock, AlertTriangle, Banknote, Database, Download, Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
@@ -101,8 +101,25 @@ const NAV = [
     ],
   },
   {
+    section: "REPORTS",
+    items: [
+      {
+        icon: Download,
+        label: "Export Data",
+        children: [
+          { label: "Export Visits", href: "/reports/visits" },
+          { label: "Export Officers", href: "/reports/bookers" },
+          { label: "Export Customers", href: "/reports/customers" },
+          { label: "Export Attendance", href: "/reports/attendance" },
+          { label: "Export Leaves", href: "/reports/leaves" },
+        ],
+      },
+    ],
+  },
+  {
     section: "ADMIN",
     items: [
+      { icon: Zap, label: "Run Schedulers", href: "/scheduler" },
       { icon: Database, label: "Migrate Data", href: "/migrate" },
     ],
   },

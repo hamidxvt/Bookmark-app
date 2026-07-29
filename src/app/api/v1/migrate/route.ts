@@ -120,7 +120,9 @@ export async function POST() {
         const city = cityName ? await prisma.city.findFirst({ where: { name: cityName } }) : null;
         const existing = await prisma.customer.findFirst({ where: { name, cityId: city?.id ?? undefined } });
         if (!existing) {
-          await prisma.customer.create({ data: { name, type: type as any, address: address || undefined, cityId: city?.id, approvalStatus: "APPROVED" } });
+          const typeMap: Record<string, "SCHOOL"|"COLLEGE"|"SELF"|"RETAILER"|"OTHER"> = { school:"SCHOOL", college:"COLLEGE", self:"SELF", retailer:"RETAILER" };
+          const customerType = typeMap[type.toLowerCase()] ?? "OTHER";
+          await prisma.customer.create({ data: { name, customerType, address: address || undefined, cityId: city?.id ?? 0, approvalStatus: "APPROVED", ownerPhone: "" } });
           custOk++;
         }
       } catch {}
