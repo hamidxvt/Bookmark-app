@@ -87,15 +87,36 @@ export async function POST() {
 
     log.push(`   Bookers: ${bookerRows.length} | Customers: ${customerRows.length} | Visits: ${visitRows.length} | Subjects: ${subjectRows.length} | Series: ${seriesRows.length}`);
 
-    // Clear old data
+    // Clear old data — delete in reverse dependency order to respect foreign keys
     log.push("🗑️  Clearing old data...");
-    await prisma.visit.deleteMany({});
-    await prisma.booker.deleteMany({});
-    await prisma.customer.deleteMany({});
-    await prisma.city.deleteMany({});
-    await prisma.subject.deleteMany({});
-    await prisma.series.deleteMany({});
-    log.push("✅ Cleared");
+    try {
+      // Delete dependent records first
+      await prisma.message.deleteMany({});
+      await prisma.missedVisitReason.deleteMany({});
+      await prisma.orderItem.deleteMany({});
+      await prisma.order.deleteMany({});
+      await prisma.gpsPing.deleteMany({});
+      await prisma.attendance.deleteMany({});
+      await prisma.leaveRequest.deleteMany({});
+      await prisma.request.deleteMany({});
+      await prisma.visit.deleteMany({});
+      
+      // Then parent records
+      await prisma.booker.deleteMany({});
+      await prisma.customer.deleteMany({});
+      await prisma.area.deleteMany({});
+      await prisma.region.deleteMany({});
+      await prisma.city.deleteMany({});
+      await prisma.subject.deleteMany({});
+      await prisma.series.deleteMany({});
+      await prisma.brand.deleteMany({});
+      await prisma.product.deleteMany({});
+      
+      log.push("✅ Cleared");
+    } catch (e: any) {
+      log.push(`⚠️  Partial clear: ${e.message}`);
+      // Continue anyway — may have already cleared some tables
+    }
 
     // Insert cities
     log.push("📍 Inserting cities...");
