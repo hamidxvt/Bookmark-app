@@ -5,12 +5,17 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../data/leaves_provider.dart';
+import '../data/leaves_repository.dart';
 
 class LeavesScreen extends ConsumerWidget {
   const LeavesScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final balancesAsync = ref.watch(leaveBalancesProvider);
+    final historyAsync = ref.watch(leaveHistoryProvider);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -23,88 +28,113 @@ class LeavesScreen extends ConsumerWidget {
           FilledButton.tonalIcon(
             icon: const Icon(Icons.add_rounded, size: 18),
             label: const Text('Apply'),
-            onPressed: () => _showApplySheet(context),
+            onPressed: () => _showApplySheet(context, ref),
           ),
           const SizedBox(width: 8),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
-        children: [
-          // Balance cards
-          Row(
+      body: balancesAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (err, st) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Expanded(
-                child: _BalanceTile(
-                  type: 'Sick Leave',
-                  used: 0,
-                  total: 10,
-                  color: AppColors.error,
-                  icon: Icons.sick_outlined,
-                ).animate(delay: 50.ms).slideX(begin: -0.2).fadeIn(),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _BalanceTile(
-                  type: 'Casual Leave',
-                  used: 2,
-                  total: 18,
-                  color: AppColors.info,
-                  icon: Icons.beach_access_outlined,
-                ).animate(delay: 100.ms).slideX(begin: 0.2).fadeIn(),
-              ),
+              Icon(Icons.error_outline, size: 48, color: AppColors.error),
+              const SizedBox(height: 12),
+              Text('Failed to load leave data', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              Text(err.toString(), style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
             ],
           ),
-          const SizedBox(height: 12),
-          _TotalBalanceBanner()
-              .animate(delay: 150.ms)
-              .slideY(begin: 0.1)
-              .fadeIn(),
-          const SizedBox(height: 20),
-          Text('Leave History',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 12),
-          _LeaveHistoryTile(
-            type: 'Casual Leave',
-            from: DateTime.now().subtract(const Duration(days: 30)),
-            to: DateTime.now().subtract(const Duration(days: 29)),
-            status: 'approved',
-            reason: 'Family event',
-          ).animate(delay: 200.ms).slideX(begin: 0.1).fadeIn(),
-          const SizedBox(height: AppSpacing.lg),
-        ],
+        ),
+        data: (balances) => ListView(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          children: [
+            // Balance cards
+            Row(
+              children: [
+                Expanded(
+                  child: _BalanceTile(
+                    balance: balances['sick'] ?? LeaveBalance(totalDays: 0, usedDays: 0, type: 'Sick'),
+                    color: AppColors.error,
+                    icon: Icons.sick_outlined,
+                  ).animate(delay: 50.ms).slideX(begin: -0.2).fadeIn(),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _BalanceTile(
+                    balance: balances['casual'] ?? LeaveBalance(totalDays: 0, usedDays: 0, type: 'Casual'),
+                    color: AppColors.info,
+                    icon: Icons.beach_access_outlined,
+                  ).animate(delay: 100.ms).slideX(begin: 0.2).fadeIn(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _TotalBalanceBanner(balances: balances)
+                .animate(delay: 150.ms)
+                .slideY(begin: 0.1)
+                .fadeIn(),
+            const SizedBox(height: 20),
+            Text('Leave History',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            historyAsync.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: CircularProgressIndicator(),
+              ),
+              error: (err, st) => Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Text('Failed to load history: $err'),
+              ),
+              data: (history) => history.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text('No leave requests yet',
+                          style: Theme.of(context).textTheme.bodySmall),
+                    )
+                  : Column(
+                      children: history
+                          .asMap()
+                          .entries
+                          .map((e) => _LeaveHistoryTile(request: e.value)
+                              .animate(delay: (200 + e.key * 50).ms)
+                              .slideX(begin: 0.1)
+                              .fadeIn())
+                          .toList(),
+                    ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+        ),
       ),
     );
   }
 
-  void _showApplySheet(BuildContext context) {
+  void _showApplySheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => const _ApplyLeaveSheet(),
+      builder: (_) => _ApplyLeaveSheet(ref: ref),
     );
   }
 }
 
 class _BalanceTile extends StatelessWidget {
-  final String type;
-  final int used;
-  final int total;
+  final LeaveBalance balance;
   final Color color;
   final IconData icon;
 
   const _BalanceTile({
-    required this.type,
-    required this.used,
-    required this.total,
+    required this.balance,
     required this.color,
     required this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
-    final remaining = total - used;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -118,18 +148,18 @@ class _BalanceTile extends StatelessWidget {
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 10),
           Text(
-            '$remaining',
+            '${balance.remainingDays}',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                   color: color,
                   fontWeight: FontWeight.w800,
                 ),
           ),
-          Text(type, style: Theme.of(context).textTheme.labelSmall),
+          Text('${balance.type} Leave', style: Theme.of(context).textTheme.labelSmall),
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
-              value: used / total,
+              value: balance.totalDays > 0 ? balance.usedDays / balance.totalDays : 0,
               backgroundColor: color.withOpacity(0.1),
               color: color,
               minHeight: 4,
@@ -137,7 +167,7 @@ class _BalanceTile extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '$used used of $total',
+            '${balance.usedDays} used of ${balance.totalDays}',
             style: Theme.of(context)
                 .textTheme
                 .labelSmall
@@ -150,8 +180,15 @@ class _BalanceTile extends StatelessWidget {
 }
 
 class _TotalBalanceBanner extends StatelessWidget {
+  final Map<String, LeaveBalance> balances;
+
+  const _TotalBalanceBanner({required this.balances});
+
   @override
   Widget build(BuildContext context) {
+    final totalRemaining = balances.values.fold<int>(0, (sum, b) => sum + b.remainingDays);
+    final totalDays = balances.values.fold<int>(0, (sum, b) => sum + b.totalDays);
+    
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -166,7 +203,7 @@ class _TotalBalanceBanner extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '26 days remaining of 28 total · Leaves reset on Jan 1',
+              '$totalRemaining days remaining of $totalDays total · Leaves reset on Jan 1',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppColors.primary,
                     fontWeight: FontWeight.w500,
@@ -180,26 +217,15 @@ class _TotalBalanceBanner extends StatelessWidget {
 }
 
 class _LeaveHistoryTile extends StatelessWidget {
-  final String type;
-  final DateTime from;
-  final DateTime to;
-  final String status;
-  final String reason;
+  final LeaveRequest request;
 
-  const _LeaveHistoryTile({
-    required this.type,
-    required this.from,
-    required this.to,
-    required this.status,
-    required this.reason,
-  });
+  const _LeaveHistoryTile({required this.request});
 
   @override
   Widget build(BuildContext context) {
     final fmt = DateFormat('dd MMM yyyy');
-    final days = to.difference(from).inDays + 1;
 
-    final (color, label) = switch (status) {
+    final (color, label) = switch (request.status.toLowerCase()) {
       'approved' => (AppColors.success, 'Approved'),
       'rejected' => (AppColors.error, 'Rejected'),
       _ => (AppColors.warning, 'Pending'),
@@ -227,20 +253,20 @@ class _LeaveHistoryTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(type, style: Theme.of(context).textTheme.titleSmall),
+                Text('${request.type} Leave', style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 2),
                 Text(
-                  '${fmt.format(from)} → ${fmt.format(to)} · $days day${days > 1 ? 's' : ''}',
+                  '${fmt.format(request.from)} → ${fmt.format(request.to)} · ${request.days} day${request.days > 1 ? 's' : ''}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 2),
-                Text(reason, style: Theme.of(context).textTheme.bodySmall),
+                Text(request.reason, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),
-          StatusBadge(status: status == 'approved'
+          StatusBadge(status: request.status.toLowerCase() == 'approved'
               ? 'completed'
-              : status == 'rejected'
+              : request.status.toLowerCase() == 'rejected'
                   ? 'missed'
                   : 'planned'),
         ],
@@ -250,7 +276,8 @@ class _LeaveHistoryTile extends StatelessWidget {
 }
 
 class _ApplyLeaveSheet extends StatefulWidget {
-  const _ApplyLeaveSheet();
+  final WidgetRef ref;
+  const _ApplyLeaveSheet({required this.ref});
 
   @override
   State<_ApplyLeaveSheet> createState() => _ApplyLeaveSheetState();
@@ -261,6 +288,7 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
   DateTime? _from;
   DateTime? _to;
   final _reasonCtrl = TextEditingController();
+  bool _loading = false;
 
   @override
   void dispose() {
@@ -280,6 +308,48 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
         if (isFrom) _from = d;
         else _to = d;
       });
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_from == null || _to == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select both dates')),
+      );
+      return;
+    }
+    if (_reasonCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a reason')),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      await widget.ref.read(submitLeaveProvider(
+        (
+          type: _leaveType,
+          from: _from!,
+          to: _to!,
+          reason: _reasonCtrl.text,
+        ),
+      ).future);
+      
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Leave request submitted')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
@@ -338,7 +408,7 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.calendar_month_outlined, size: 18),
                   label: Text(_from != null ? fmt.format(_from!) : 'From Date'),
-                  onPressed: () => _pickDate(true),
+                  onPressed: _loading ? null : () => _pickDate(true),
                 ),
               ),
               const SizedBox(width: 10),
@@ -346,7 +416,7 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.calendar_month_outlined, size: 18),
                   label: Text(_to != null ? fmt.format(_to!) : 'To Date'),
-                  onPressed: () => _pickDate(false),
+                  onPressed: _loading ? null : () => _pickDate(false),
                 ),
               ),
             ],
@@ -355,6 +425,7 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
           TextFormField(
             controller: _reasonCtrl,
             maxLines: 2,
+            enabled: !_loading,
             textCapitalization: TextCapitalization.sentences,
             decoration: const InputDecoration(
               labelText: 'Reason',
@@ -363,8 +434,14 @@ class _ApplyLeaveSheetState extends State<_ApplyLeaveSheet> {
           ),
           const SizedBox(height: 20),
           FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Submit Leave Request'),
+            onPressed: _loading ? null : _submit,
+            child: _loading
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Submit Leave Request'),
           ),
         ],
       ),
