@@ -27,10 +27,7 @@ const NAV = [
       {
         icon: UserCheck,
         label: "Sales Team",
-        children: [
-          { label: "Team List", href: "/bookers" },
-          { label: "Add Member", href: "/bookers/add" },
-        ],
+        href: "/bookers",
       },
       {
         icon: ClipboardList,
