@@ -9,7 +9,7 @@ export async function DELETE(
     const { id } = await params;
     await prisma.booker.update({
       where: { id: parseInt(id) },
-      data: { deletedAt: new Date(), jobStatus: "NOT_ACTIVE", adminApproved: "REJECTED" },
+      data: { deletedAt: new Date(), jobStatus: "NOT_ACTIVE" },
     });
     return NextResponse.json({ success: true });
   } catch (err) {
