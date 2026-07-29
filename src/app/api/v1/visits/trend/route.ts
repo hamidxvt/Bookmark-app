@@ -46,18 +46,19 @@ export async function GET() {
       _count: { id: true },
     });
 
+    type CityGroup = typeof cityBreakdown[number];
     const cities = await prisma.city.findMany({
-      where: { id: { in: cityBreakdown.map(c => c.cityId) } },
+      where: { id: { in: cityBreakdown.map((c: CityGroup) => c.cityId) } },
       select: { id: true, name: true },
     });
 
-    const cityMap = Object.fromEntries(cities.map(c => [c.id, c.name]));
+    const cityMap = Object.fromEntries(cities.map((c: typeof cities[number]) => [c.id, c.name]));
     const COLORS = ["#14b8a6", "#6366f1", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899"];
 
     const cityData = cityBreakdown
-      .sort((a, b) => b._count.id - a._count.id)
+      .sort((a: CityGroup, b: CityGroup) => b._count.id - a._count.id)
       .slice(0, 6)
-      .map((c, i) => ({
+      .map((c: CityGroup, i: number) => ({
         name: cityMap[c.cityId] ?? `City ${c.cityId}`,
         value: c._count.id,
         color: COLORS[i % COLORS.length],
