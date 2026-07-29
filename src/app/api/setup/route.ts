@@ -4,9 +4,12 @@ import bcrypt from "bcryptjs";
 
 // Seeds admin user + test booker. Safe to call multiple times.
 export async function GET() {
+  const log: string[] = [];
   try {
+    log.push("start");
     const adminHash = await bcrypt.hash("Admin@123", 12);
     const officerHash = await bcrypt.hash("Officer@123", 12);
+    log.push("hashed");
 
     // Admin user
     await prisma.user.upsert({
@@ -19,20 +22,19 @@ export async function GET() {
         role: "SUPER_ADMIN",
       },
     });
+    log.push("admin upserted");
 
     // Find or create city
     let city = await prisma.city.findFirst({ where: { name: "Karachi" } });
     if (!city) {
       city = await prisma.city.create({ data: { name: "Karachi" } });
     }
+    log.push(`city: ${city?.id}`);
 
-    // Test booker (sales officer)
+    // Test booker
     await prisma.booker.upsert({
       where: { email: "officer@bookmark.pk" },
-      update: {
-        jobStatus: "ACTIVE",
-        adminApproved: "APPROVED",
-      },
+      update: { jobStatus: "ACTIVE", adminApproved: "APPROVED" },
       create: {
         name: "Test Officer",
         email: "officer@bookmark.pk",
@@ -42,16 +44,18 @@ export async function GET() {
         jobStatus: "ACTIVE",
         adminApproved: "APPROVED",
         visitTargets: 7,
-        ratesPerVisit: 3000,
       },
     });
+    log.push("booker upserted");
 
     return NextResponse.json({
       success: true,
       message: "Seeded: admin@bookmark.pk / Admin@123  +  officer@bookmark.pk / Officer@123",
+      log,
     });
-  } catch (err) {
-    console.error("[setup]", err);
-    return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[setup]", msg, "\nLog so far:", log);
+    return NextResponse.json({ success: false, error: msg, log }, { status: 500 });
   }
 }
