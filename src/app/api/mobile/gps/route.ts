@@ -28,17 +28,6 @@ export async function POST(req: Request) {
       },
     });
 
-    // Log GPS ping for audit trail
-    await prisma.gpsLog.create({
-      data: {
-        bookerId: user.id,
-        latitude: lat,
-        longitude: lng,
-        accuracy: accuracy ?? 0,
-        isMocked: isMock ?? false,
-      },
-    });
-
     return NextResponse.json({ success: true, message: "GPS ping recorded" });
   } catch (err) {
     console.error("[gps]", err);
