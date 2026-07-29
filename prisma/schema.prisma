@@ -292,6 +292,7 @@ model Visit {
 
 enum VisitStatus {
   PENDING
+  IN_PROGRESS
   COMPLETED
   CANCELLED
 
