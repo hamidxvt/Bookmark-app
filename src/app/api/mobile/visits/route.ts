@@ -35,7 +35,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
-      data: visits.map((v: Visit, i) => ({
+      data: visits.map((v: Visit, i: number) => ({
         id: v.id,
         sequence: i + 1,
         customerId: v.customerId,
