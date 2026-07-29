@@ -3,7 +3,7 @@ import '../../../core/network/dio_client.dart';
 import 'leaves_repository.dart';
 
 final leavesRepositoryProvider = Provider((ref) {
-  final dio = ref.watch(dioProvider);
+  final dio = ref.watch(dioClientProvider);
   return LeavesRepository(dio);
 });
 
