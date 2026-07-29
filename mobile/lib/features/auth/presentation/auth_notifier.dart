@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_models.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/services/background_gps_service.dart';
 
 class AuthNotifier extends Notifier<AuthState> {
   @override
@@ -23,6 +24,10 @@ class AuthNotifier extends Notifier<AuthState> {
       }
       
       final user = await _repo.restoreSession();
+      if (user != null) {
+        // Start background GPS if user is logged in
+        await BackgroundGpsService.start();
+      }
       state = state.copyWith(user: user, isRestoring: false);
     } catch (_) {
       state = state.copyWith(isRestoring: false);
@@ -33,6 +38,8 @@ class AuthNotifier extends Notifier<AuthState> {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       final user = await _repo.login(email, password);
+      // Start background GPS tracking when logged in
+      await BackgroundGpsService.start();
       state = state.copyWith(user: user, isLoading: false);
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
@@ -45,6 +52,8 @@ class AuthNotifier extends Notifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // Stop background GPS when logging out
+    await BackgroundGpsService.stop();
     if (!kIsWeb) {
       await _repo.logout();
     }
