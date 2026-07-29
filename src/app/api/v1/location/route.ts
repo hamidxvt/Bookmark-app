@@ -30,11 +30,12 @@ export async function GET(req: Request) {
       orderBy: { lastSeenAt: "desc" },
     });
 
+    type Booker = typeof bookers[number];
     const counts = {
       total: bookers.length,
-      active: bookers.filter(b => b.gpsStatus === "ACTIVE").length,
-      idle: bookers.filter(b => b.gpsStatus === "IDLE").length,
-      offline: bookers.filter(b => b.gpsStatus === "OFFLINE").length,
+      active: bookers.filter((b: Booker) => b.gpsStatus === "ACTIVE").length,
+      idle: bookers.filter((b: Booker) => b.gpsStatus === "IDLE").length,
+      offline: bookers.filter((b: Booker) => b.gpsStatus === "OFFLINE").length,
     };
 
     return NextResponse.json({
