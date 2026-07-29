@@ -20,17 +20,24 @@ class LeavesScreen extends ConsumerWidget {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Leave Management'),
+        centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => context.go('/dashboard'),
         ),
         actions: [
-          FilledButton.tonalIcon(
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('Apply'),
-            onPressed: () => _showApplySheet(context, ref),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: FilledButton.icon(
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Apply Leave'),
+              onPressed: () => _showApplySheet(context, ref),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.secondary,
+                foregroundColor: Colors.white,
+              ),
+            ),
           ),
-          const SizedBox(width: 8),
         ],
       ),
       body: balancesAsync.when(
