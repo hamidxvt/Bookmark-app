@@ -14,10 +14,10 @@ class GpsService {
 
   GpsService(this._dio);
 
-  /// Start periodic GPS pings every 60 seconds
+  /// Start periodic GPS pings every 30 seconds
   void startTracking() {
     stopTracking();
-    _pingTimer = Timer.periodic(const Duration(seconds: 60), (_) => _ping());
+    _pingTimer = Timer.periodic(const Duration(seconds: 30), (_) => _ping());
     _ping(); // immediate first ping
   }
 

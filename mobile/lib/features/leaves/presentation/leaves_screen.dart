@@ -40,6 +40,12 @@ class LeavesScreen extends ConsumerWidget {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showApplySheet(context, ref),
+        icon: const Icon(Icons.calendar_today_rounded),
+        label: const Text('Apply for Leave'),
+        backgroundColor: AppColors.secondary,
+      ),
       body: balancesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (err, st) => Center(
