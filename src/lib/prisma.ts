@@ -1,21 +1,16 @@
-// Prisma client – lazy-loaded so the app boots even without a running DB.
-// Once PostgreSQL is connected, run `npx prisma generate` to get the full client.
+import { PrismaClient } from "@prisma/client";
 
-let _prisma: any;
-
-export function getPrisma() {
-  if (!_prisma) {
-    try {
-      const { PrismaClient } = require("@prisma/client");
-      _prisma = new PrismaClient({
-        log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-      });
-    } catch {
-      console.warn("Prisma client not generated yet — run `npx prisma generate`");
-      _prisma = null;
-    }
-  }
-  return _prisma;
+declare global {
+  // eslint-disable-next-line no-var
+  var __prisma: PrismaClient | undefined;
 }
 
-export const prisma = getPrisma();
+export const prisma =
+  global.__prisma ??
+  new PrismaClient({
+    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  global.__prisma = prisma;
+}

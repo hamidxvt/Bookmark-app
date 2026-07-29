@@ -5,7 +5,10 @@ nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]
 cmds = ["npm install"]
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = [
+  "npx prisma generate",
+  "npm run build"
+]
 
 [start]
-cmd = "npx prisma generate && npx prisma db push --accept-data-loss && npm run start"
+cmd = "npx prisma db push --accept-data-loss && npm run start"
