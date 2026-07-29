@@ -44,9 +44,9 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
 
   useEffect(() => { load(); }, [city]);
 
-  // Auto-refresh every 30s
+  // Auto-refresh every 10s for live GPS feel
   useEffect(() => {
-    const t = setInterval(load, 30000);
+    const t = setInterval(load, 10000);
     return () => clearInterval(t);
   }, [city]);
 
