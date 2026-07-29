@@ -109,6 +109,9 @@ model Booker {
   gps_pings     GpsPing[]
   requests      Request[]
   messages      Message[]
+  attendance    Attendance[]
+  leaveRequests LeaveRequest[]
+  missedReasons MissedVisitReason[]
 
   @@index([cityId])
   @@index([gpsStatus])
@@ -277,6 +280,7 @@ model Visit {
   booker       Booker      @relation(fields: [bookerId], references: [id])
   customer     Customer    @relation(fields: [customerId], references: [id])
   orders       Order[]
+  missedReason MissedVisitReason?
 
   @@index([bookerId])
   @@index([customerId])
@@ -406,4 +410,68 @@ model GpsPing {
   @@index([bookerId])
   @@index([createdAt])
   @@map("gps_pings")
+}
+
+// ─── SFA EXTENSIONS (added for mobile app) ───────────────────────────────────
+
+model Attendance {
+  id           Int       @id @default(autoincrement())
+  bookerId     Int       @map("booker_id")
+  date         DateTime  @db.Date
+  startAt      DateTime? @map("start_at")
+  endAt        DateTime? @map("end_at")
+  startLat     Decimal?  @map("start_lat") @db.Decimal(10, 8)
+  startLng     Decimal?  @map("start_lng") @db.Decimal(11, 8)
+  endLat       Decimal?  @map("end_lat") @db.Decimal(10, 8)
+  endLng       Decimal?  @map("end_lng") @db.Decimal(11, 8)
+  status       String    @default("present") // present, absent, cannot_work
+  cannotReason String?   @map("cannot_reason") @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  booker       Booker    @relation(fields: [bookerId], references: [id])
+
+  @@unique([bookerId, date])
+  @@index([bookerId])
+  @@index([date])
+  @@map("attendance")
+}
+
+model LeaveRequest {
+  id          Int      @id @default(autoincrement())
+  bookerId    Int      @map("booker_id")
+  leaveType   String   @map("leave_type") // sick, casual
+  fromDate    DateTime @map("from_date") @db.Date
+  toDate      DateTime @map("to_date") @db.Date
+  reason      String   @db.Text
+  status      String   @default("pending") // pending, approved, rejected
+  adminNotes  String?  @map("admin_notes") @db.Text
+  reviewedBy  Int?     @map("reviewed_by")
+  reviewedAt  DateTime? @map("reviewed_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  booker      Booker   @relation(fields: [bookerId], references: [id])
+
+  @@index([bookerId])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+model MissedVisitReason {
+  id        Int      @id @default(autoincrement())
+  visitId   Int      @unique @map("visit_id")
+  bookerId  Int      @map("booker_id")
+  reason    String   @db.Text
+  status    String   @default("pending") // pending, approved, rejected
+  adminNote String?  @map("admin_note") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  visit     Visit    @relation(fields: [visitId], references: [id])
+  booker    Booker   @relation(fields: [bookerId], references: [id])
+
+  @@index([bookerId])
+  @@index([status])
+  @@map("missed_visit_reasons")
 }
