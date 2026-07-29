@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/constants/api_constants.dart';
 import '../data/visit_models.dart';
 import '../data/visit_repository.dart';
 
@@ -28,12 +30,14 @@ class VisitListScreen extends ConsumerWidget {
             icon: const Icon(Icons.refresh_rounded),
             onPressed: () => ref.read(visitListProvider.notifier).refresh(),
           ),
-          IconButton(
-            icon: const Icon(Icons.add_location_alt_outlined),
-            tooltip: 'Ad-hoc Visit',
-            onPressed: () {},
-          ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAdhocSheet(context, ref),
+        icon: const Icon(Icons.add_location_alt_rounded),
+        label: const Text('Ad-hoc Visit'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
       ),
       body: visitsAsync.when(
         loading: () => _VisitShimmer(),
@@ -42,11 +46,12 @@ class VisitListScreen extends ConsumerWidget {
           onRetry: () => ref.read(visitListProvider.notifier).refresh(),
         ),
         data: (visits) => visits.isEmpty
-            ? _EmptyState()
+            ? _EmptyState(onAdhoc: () => _showAdhocSheet(context, ref))
             : RefreshIndicator(
                 onRefresh: () => ref.read(visitListProvider.notifier).refresh(),
                 child: ListView.separated(
-                  padding: const EdgeInsets.all(AppSpacing.md),
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.md, AppSpacing.md, AppSpacing.md, 100),
                   itemCount: visits.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (ctx, i) => _VisitTile(
@@ -58,22 +63,70 @@ class VisitListScreen extends ConsumerWidget {
       ),
     );
   }
+
+  void _showAdhocSheet(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AdhocVisitSheet(onCreated: () {
+        ref.read(visitListProvider.notifier).refresh();
+      }),
+    );
+  }
 }
 
-class _VisitTile extends StatelessWidget {
+class _VisitTile extends ConsumerWidget {
   final Visit visit;
   final int index;
 
   const _VisitTile({required this.visit, required this.index});
 
+  Future<void> _onTap(BuildContext context, WidgetRef ref) async {
+    final repo = ref.read(visitRepositoryProvider);
+    final geofence = await repo.checkGeofence(visit);
+
+    if (!context.mounted) return;
+
+    if (!geofence.allowed && geofence.distanceMeters > 0) {
+      final dist = geofence.distanceMeters.toStringAsFixed(0);
+      await showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Too Far from Location'),
+          content: Text(
+            'You are ${dist}m away from this visit location.\n\n'
+            'You must be within 200m to start this visit.\n\n'
+            'Please travel to the location and try again.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Allow override if geofence is not critical (no GPS)
+                context.go('/visits/${visit.id}/complete');
+              },
+              child: const Text('Override (Supervisor)'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    context.go('/visits/${visit.id}/complete');
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isActionable = visit.isPlanned || visit.isInProgress;
 
     return GestureDetector(
-      onTap: isActionable
-          ? () => context.go('/visits/${visit.id}/complete')
-          : null,
+      onTap: isActionable ? () => _onTap(context, ref) : null,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -228,6 +281,9 @@ class _VisitShimmer extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
+  final VoidCallback? onAdhoc;
+  const _EmptyState({this.onAdhoc});
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -242,10 +298,288 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'The route planning engine will populate\ntomorrow\'s visits at midnight.',
+            'You can add an ad-hoc visit below,\nor ask your admin to run the scheduler.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium,
           ),
+          const SizedBox(height: 24),
+          if (onAdhoc != null)
+            FilledButton.icon(
+              icon: const Icon(Icons.add_location_alt_rounded),
+              label: const Text('Start Ad-hoc Visit'),
+              onPressed: onAdhoc,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Ad-hoc Visit Bottom Sheet ────────────────────────────────────────────────
+
+class _AdhocVisitSheet extends ConsumerStatefulWidget {
+  final VoidCallback onCreated;
+  const _AdhocVisitSheet({required this.onCreated});
+
+  @override
+  ConsumerState<_AdhocVisitSheet> createState() => _AdhocVisitSheetState();
+}
+
+class _AdhocVisitSheetState extends ConsumerState<_AdhocVisitSheet> {
+  final _searchCtrl = TextEditingController();
+  List<Map<String, dynamic>> _results = [];
+  Map<String, dynamic>? _selected;
+  bool _searching = false;
+  bool _creating = false;
+  String _error = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _search(String q) async {
+    if (q.trim().isEmpty) {
+      setState(() => _results = []);
+      return;
+    }
+    setState(() => _searching = true);
+    try {
+      final dio = ref.read(dioClientProvider);
+      final res = await dio.get(ApiConstants.customersSearch, params: {'q': q, 'limit': '20'});
+      final data = res.data as Map<String, dynamic>;
+      setState(() {
+        _results = List<Map<String, dynamic>>.from(data['data'] ?? []);
+        _searching = false;
+      });
+    } catch (_) {
+      setState(() => _searching = false);
+    }
+  }
+
+  Future<void> _createVisit() async {
+    if (_selected == null) return;
+    setState(() { _creating = true; _error = ''; });
+    try {
+      final dio = ref.read(dioClientProvider);
+      final res = await dio.post(ApiConstants.adhocVisit, data: {
+        'customerId': _selected!['id'],
+        'notes': 'Ad-hoc visit',
+      });
+      final data = res.data as Map<String, dynamic>;
+      if (data['success'] == true) {
+        if (mounted) Navigator.pop(context);
+        widget.onCreated();
+      } else {
+        setState(() => _error = data['error'] ?? 'Failed to create visit');
+      }
+    } on DioException catch (e) {
+      setState(() => _error = ApiException.fromDio(e).message);
+    } catch (e) {
+      setState(() => _error = e.toString());
+    } finally {
+      setState(() => _creating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.8,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      builder: (_, scrollCtrl) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.outline,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Ad-hoc Visit',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          )),
+                  const SizedBox(height: 4),
+                  Text('Search for a customer to visit outside your scheduled route.',
+                      style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 16),
+
+                  // Search bar
+                  TextField(
+                    controller: _searchCtrl,
+                    autofocus: true,
+                    decoration: InputDecoration(
+                      hintText: 'Search customer name…',
+                      prefixIcon: _searching
+                          ? const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2)),
+                            )
+                          : const Icon(Icons.search_rounded),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      fillColor: AppColors.background,
+                    ),
+                    onChanged: (v) => _search(v),
+                  ),
+
+                  if (_error.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(_error,
+                        style: const TextStyle(color: Colors.red, fontSize: 13)),
+                  ],
+                ],
+              ),
+            ),
+
+            // Results
+            Expanded(
+              child: _selected != null
+                  ? _SelectedCustomerCard(
+                      customer: _selected!,
+                      creating: _creating,
+                      onConfirm: _createVisit,
+                      onClear: () => setState(() => _selected = null),
+                    )
+                  : ListView.builder(
+                      controller: scrollCtrl,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      itemCount: _results.length,
+                      itemBuilder: (_, i) {
+                        final c = _results[i];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.primary.withOpacity(0.1),
+                            child: Text(
+                              (c['name'] ?? '?')[0].toUpperCase(),
+                              style: TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          title: Text(c['name'] ?? '',
+                              style: const TextStyle(fontSize: 14)),
+                          subtitle: Text(
+                            [c['city'], c['type']].where((v) => v != null && v.toString().isNotEmpty).join(' · '),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                          onTap: () => setState(() => _selected = c),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectedCustomerCard extends StatelessWidget {
+  final Map<String, dynamic> customer;
+  final bool creating;
+  final VoidCallback onConfirm;
+  final VoidCallback onClear;
+
+  const _SelectedCustomerCard({
+    required this.customer,
+    required this.creating,
+    required this.onConfirm,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.05),
+              border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 26,
+                  backgroundColor: AppColors.primary.withOpacity(0.1),
+                  child: Text(
+                    (customer['name'] ?? '?')[0].toUpperCase(),
+                    style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(customer['name'] ?? '',
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15)),
+                      const SizedBox(height: 2),
+                      if ((customer['city'] ?? '').toString().isNotEmpty)
+                        Text(customer['city'],
+                            style: TextStyle(
+                                color: AppColors.onBackground, fontSize: 13)),
+                      if ((customer['phone'] ?? '').toString().isNotEmpty)
+                        Text(customer['phone'],
+                            style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+                IconButton(
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: onClear),
+              ],
+            ),
+          ),
+          const Spacer(),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              icon: creating
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.check_circle_outline_rounded),
+              label: Text(creating ? 'Starting Visit…' : 'Start Ad-hoc Visit'),
+              onPressed: creating ? null : onConfirm,
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: AppColors.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
         ],
       ),
     );

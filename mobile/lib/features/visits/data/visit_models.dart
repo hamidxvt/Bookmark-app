@@ -6,6 +6,9 @@ class Visit {
   final int dailySequence;
   final double? latitude;
   final double? longitude;
+  /// Customer's stored GPS coordinates for geofencing
+  final double? customerLat;
+  final double? customerLng;
   final String? contactPerson;
   final String? contactPhone;
   final String? notes;
@@ -21,6 +24,8 @@ class Visit {
     required this.dailySequence,
     this.latitude,
     this.longitude,
+    this.customerLat,
+    this.customerLng,
     this.contactPerson,
     this.contactPhone,
     this.notes,
@@ -39,6 +44,8 @@ class Visit {
       dailySequence: json['dailySequence'] as int? ?? 1,
       latitude: (loc['latitude'] as num?)?.toDouble(),
       longitude: (loc['longitude'] as num?)?.toDouble(),
+      customerLat: (loc['latitude'] as num?)?.toDouble(),
+      customerLng: (loc['longitude'] as num?)?.toDouble(),
       contactPerson: json['contactPerson'] as String?,
       contactPhone: json['contactPhone'] as String?,
       notes: json['notes'] as String?,

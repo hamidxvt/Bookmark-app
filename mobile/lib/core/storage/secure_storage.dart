@@ -1,12 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final secureStorageProvider = Provider<SecureStorage>((ref) => SecureStorage());
 
 /// Persists auth data using:
 /// - flutter_secure_storage on Android/iOS (survives app close)
 /// - In-memory map on web (tab session only)
+/// Also mirrors the token to SharedPreferences for background isolate access.
 class SecureStorage {
   static const _tokenKey    = 'auth_token';
   static const _userIdKey   = 'user_id';
@@ -44,9 +46,24 @@ class SecureStorage {
   }
 
   // ── Token ────────────────────────────────────────────────────────────────
-  Future<void> saveToken(String token)  => _write(_tokenKey, token);
-  Future<String?> getToken()            => _read(_tokenKey);
-  Future<void> clearToken()             => _delete(_tokenKey);
+  Future<void> saveToken(String token) async {
+    await _write(_tokenKey, token);
+    // Also mirror to SharedPreferences so background isolate can read it
+    if (!kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tokenKey, token);
+    }
+  }
+
+  Future<String?> getToken()  => _read(_tokenKey);
+
+  Future<void> clearToken() async {
+    await _delete(_tokenKey);
+    if (!kIsWeb) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_tokenKey);
+    }
+  }
 
   // ── User fields ──────────────────────────────────────────────────────────
   Future<void> saveUserId(int id)       => _write(_userIdKey, id.toString());
@@ -70,6 +87,8 @@ class SecureStorage {
       _mem.clear();
     } else {
       await _secure.deleteAll();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_tokenKey);
     }
   }
 }

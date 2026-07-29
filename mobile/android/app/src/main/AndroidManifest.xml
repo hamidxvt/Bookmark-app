@@ -39,5 +39,11 @@
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyDEMO_REPLACE_WITH_REAL_KEY"/>
+
+        <!-- Background GPS Foreground Service -->
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:foregroundServiceType="location"
+            android:exported="false"/>
     </application>
 </manifest>

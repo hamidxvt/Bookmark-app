@@ -1,30 +1,141 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../../core/network/dio_client.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/services/gps_service.dart';
+import '../../../core/services/offline_queue_service.dart';
 import 'visit_models.dart';
+
+/// Result of geofence check
+class GeofenceResult {
+  final bool allowed;
+  final double distanceMeters;
+  final String? error;
+
+  const GeofenceResult({
+    required this.allowed,
+    required this.distanceMeters,
+    this.error,
+  });
+}
 
 class VisitRepository {
   final DioClient _dio;
-  VisitRepository(this._dio);
+  final GpsService _gps;
+  final OfflineQueueService _queue;
+
+  VisitRepository(this._dio, this._gps, this._queue);
 
   Future<List<Visit>> getTodayVisits() async {
-    final res = await _dio.get(ApiConstants.todayVisits);
-    final list = res.data['data'] as List;
-    return list.map((e) => Visit.fromJson(e as Map<String, dynamic>)).toList();
+    try {
+      final res = await _dio.get(ApiConstants.todayVisits);
+      final list = res.data['data'] as List;
+      return list.map((e) => Visit.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError) {
+        // Return empty list when offline — cached data would be shown
+        return [];
+      }
+      rethrow;
+    }
+  }
+
+  /// Check if current GPS position is within 200m of the visit customer location.
+  /// If customer has no coordinates, we allow the visit (no geofence configured).
+  Future<GeofenceResult> checkGeofence(Visit visit) async {
+    final customerLat = visit.customerLat;
+    final customerLng = visit.customerLng;
+
+    // No coordinates stored for this customer — skip enforcement
+    if (customerLat == null || customerLng == null) {
+      return const GeofenceResult(allowed: true, distanceMeters: 0);
+    }
+
+    final position = await _gps.getCurrentPosition();
+    if (position == null) {
+      // Can't get GPS — allow with warning (don't block officer)
+      return const GeofenceResult(allowed: true, distanceMeters: -1, error: 'GPS unavailable');
+    }
+
+    final distance = Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      customerLat,
+      customerLng,
+    );
+
+    return GeofenceResult(
+      allowed: distance <= 200,
+      distanceMeters: distance,
+    );
+  }
+
+  Future<void> startVisit(int id) async {
+    final position = await _gps.getCurrentPosition();
+    final data = {
+      if (position != null) 'lat': position.latitude,
+      if (position != null) 'lng': position.longitude,
+    };
+    try {
+      await _dio.post(ApiConstants.visitStart(id), data: data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError) {
+        await _queue.enqueue(QueuedRequest(
+          method: 'POST',
+          path: ApiConstants.visitStart(id),
+          data: data,
+          queuedAt: DateTime.now(),
+        ));
+      } else {
+        rethrow;
+      }
+    }
   }
 
   Future<void> completeVisit(int id, Map<String, dynamic> payload) async {
-    await _dio.post(ApiConstants.visitComplete(id), data: payload);
+    try {
+      await _dio.post(ApiConstants.visitComplete(id), data: payload);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError) {
+        await _queue.enqueue(QueuedRequest(
+          method: 'POST',
+          path: ApiConstants.visitComplete(id),
+          data: payload,
+          queuedAt: DateTime.now(),
+        ));
+      } else {
+        rethrow;
+      }
+    }
   }
 
   Future<void> markMissed(int id, String reason) async {
-    await _dio.post(ApiConstants.visitMiss(id), data: {'reason': reason});
+    final data = {'reason': reason};
+    try {
+      await _dio.post(ApiConstants.visitMiss(id), data: data);
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionError) {
+        await _queue.enqueue(QueuedRequest(
+          method: 'POST',
+          path: ApiConstants.visitMiss(id),
+          data: data,
+          queuedAt: DateTime.now(),
+        ));
+      } else {
+        rethrow;
+      }
+    }
   }
 }
 
 final visitRepositoryProvider = Provider<VisitRepository>((ref) {
-  return VisitRepository(ref.read(dioClientProvider));
+  return VisitRepository(
+    ref.read(dioClientProvider),
+    ref.read(gpsServiceProvider),
+    ref.read(offlineQueueProvider),
+  );
 });
 
 // ── Visit List Notifier ───────────────────────────────────────────────────────

@@ -21,9 +21,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Start background GPS tracking
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(gpsServiceProvider).startTracking();
+    // Start GPS tracking (background service + foreground timer)
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await ref.read(gpsServiceProvider).startTracking();
     });
   }
 

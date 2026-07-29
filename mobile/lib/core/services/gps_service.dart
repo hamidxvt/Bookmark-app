@@ -2,10 +2,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../constants/api_constants.dart';
 import '../network/dio_client.dart';
+import 'background_service.dart';
 
 class GpsService {
   final DioClient _dio;
@@ -14,9 +15,22 @@ class GpsService {
 
   GpsService(this._dio);
 
-  /// Start periodic GPS pings every 30 seconds
-  void startTracking() {
+  /// Start periodic GPS pings every 30 seconds + background service
+  Future<void> startTracking({String? jwtToken}) async {
     stopTracking();
+
+    // Save token for background isolate
+    if (jwtToken != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', jwtToken);
+    }
+
+    // Start foreground service for background GPS
+    if (!kIsWeb) {
+      await startBackgroundGps();
+    }
+
+    // Also run foreground timer for immediate updates
     _pingTimer = Timer.periodic(const Duration(seconds: 30), (_) => _ping());
     _ping(); // immediate first ping
   }
@@ -24,6 +38,9 @@ class GpsService {
   void stopTracking() {
     _pingTimer?.cancel();
     _pingTimer = null;
+    if (!kIsWeb) {
+      stopBackgroundGps();
+    }
   }
 
   /// Returns current position or null if unavailable / mocked

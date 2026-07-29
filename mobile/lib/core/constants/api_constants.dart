@@ -24,7 +24,8 @@ class ApiConstants {
 
   // ── Visits ──────────────────────────────────────────────────────────────
   static const String todayVisits = '/visits';
-  static const String adhocVisit = '/visits/adhoc';
+  static const String adhocVisit = '/visits'; // POST with customerId
+  static const String customersSearch = '/customers'; // GET ?q=search
   static String visitStart(int id) => '/visits/$id/start';
   static String visitComplete(int id) => '/visits/$id/complete';
   static String visitMiss(int id) => '/visits/$id/miss';
@@ -46,6 +47,9 @@ class ApiConstants {
 
   // ── Payroll ─────────────────────────────────────────────────────────────
   static const String myPayroll = '/payroll';
+
+  // ── FCM / Push Notifications ─────────────────────────────────────────────
+  static const String registerFcm = '/fcm';
 
   // ── Admin ────────────────────────────────────────────────────────────────
   static const String adminStats = '/admin/stats';
