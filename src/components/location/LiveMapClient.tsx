@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { MapPin, RefreshCw, Users, Clock } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
 
 interface Officer {
   id: number;
@@ -94,7 +93,7 @@ export default function LiveMapClient() {
           <p className="text-xs text-slate-400">Last update</p>
           <p className="text-sm font-semibold text-slate-700 mt-1 flex items-center gap-1">
             <Clock className="h-3.5 w-3.5 text-slate-400" />
-            {lastUpdate ? formatDistanceToNow(lastUpdate, { addSuffix: true }) : "Waiting..."}
+            {lastUpdate ? lastUpdate.toLocaleTimeString() : "Waiting..."}
           </p>
         </div>
       </div>
@@ -168,7 +167,7 @@ export default function LiveMapClient() {
                 </div>
                 <div className="text-right space-y-1">
                   <p className="text-xs text-slate-400">
-                    {o.lastSeenAt ? formatDistanceToNow(new Date(o.lastSeenAt), { addSuffix: true }) : "Never"}
+                    {o.lastSeenAt ? new Date(o.lastSeenAt).toLocaleTimeString() : "Never"}
                   </p>
                   {o.lastLatitude && o.lastLongitude && (
                     <a href={`https://maps.google.com/?q=${o.lastLatitude},${o.lastLongitude}`}
