@@ -118,16 +118,20 @@ export async function POST() {
       // Continue anyway — may have already cleared some tables
     }
 
-    // Insert cities
+    // Insert cities — normalize names
     log.push("📍 Inserting cities...");
-    const cityNames = [...new Set((bookerRows as any[]).map((b: any) => b[5] || b.city).filter(Boolean))];
+    const rawCityNames = [
+      ...(bookerRows as any[]).map((b: any) => b[5] || b.city).filter(Boolean),
+      ...(customerRows as any[]).map((c: any) => c[1] || c.city).filter(Boolean),
+    ];
+    const cityNames = [...new Set(rawCityNames.map((c: any) => String(c).trim().toUpperCase()))];
+    
     for (const name of cityNames) {
-      const cityName = String(name).trim();
-      if (cityName) {
+      if (name) {
         await prisma.city.upsert({
-          where: { name: cityName },
+          where: { name },
           update: {},
-          create: { name: cityName },
+          create: { name },
         }).catch(() => {});
       }
     }
@@ -138,11 +142,21 @@ export async function POST() {
     let bookerCount = 0;
     for (const row of bookerRows as any[]) {
       const name = String(row[1] ?? row.name ?? "Unknown").trim();
-      const email = String(row[2] ?? row.email ?? `b${row[0]}@bookmark.pk`).trim();
+      const email = String(row[2] ?? row.email ?? `b${row[0]}@bookmark.pk`).trim().toLowerCase();
       const phone = String(row[3] ?? row.phone ?? "").trim();
-      const cityName = String(row[5] ?? row.city ?? "").trim();
+      const cityName = String(row[5] ?? row.city ?? "").trim().toUpperCase();
 
-      const city = cityName ? await prisma.city.findFirst({ where: { name: cityName } }) : null;
+      let cityId = null;
+      if (cityName) {
+        const city = await prisma.city.findFirst({ where: { name: cityName } });
+        cityId = city?.id;
+      }
+
+      // Fallback to first available city if none found
+      if (!cityId) {
+        const anyCity = await prisma.city.findFirst();
+        cityId = anyCity?.id;
+      }
 
       try {
         await prisma.booker.create({
@@ -153,15 +167,15 @@ export async function POST() {
             password: "$2b$12$placeholder_needs_reset",
             jobStatus: "ACTIVE",
             adminApproved: "APPROVED",
-            cityId: city?.id,
+            cityId,
           },
         });
         bookerCount++;
       } catch (e) {
-        // Duplicate email, skip
+        // Duplicate email or other constraint, skip
       }
     }
-    log.push(`✅ ${bookerCount} bookers`);
+    log.push(`✅ ${bookerCount}/${bookerRows.length} bookers`);
 
     // Insert subjects
     log.push("📚 Inserting subjects...");
@@ -196,35 +210,46 @@ export async function POST() {
     let custCount = 0;
     for (const row of customerRows as any[]) {
       const name = String(row[0] ?? row.name ?? "").trim();
-      const cityName = String(row[1] ?? row.city ?? "").trim();
+      const cityName = String(row[1] ?? row.city ?? "").trim().toUpperCase();
       const type = String(row[2] ?? row.customer_type ?? "School").trim();
       const address = String(row[3] ?? row.address ?? "").trim();
 
-      const city = cityName ? await prisma.city.findFirst({ where: { name: cityName } }) : null;
+      let cityId = null;
+      if (cityName) {
+        const city = await prisma.city.findFirst({ where: { name: cityName } });
+        cityId = city?.id;
+      }
 
-      // Map staging type string to CustomerType enum
+      // Fallback to first available city
+      if (!cityId) {
+        const anyCity = await prisma.city.findFirst();
+        cityId = anyCity?.id;
+      }
+
       const typeMap: Record<string, "SCHOOL" | "COLLEGE" | "SELF" | "RETAILER" | "OTHER"> = {
         school: "SCHOOL", college: "COLLEGE", self: "SELF", retailer: "RETAILER",
       };
       const customerType = typeMap[type.toLowerCase()] ?? "OTHER";
 
       try {
-        await prisma.customer.create({
-          data: {
-            name,
-            customerType,
-            address: address || undefined,
-            cityId: city?.id ?? 0,
-            approvalStatus: "APPROVED",
-            ownerPhone: "",
-          },
-        });
-        custCount++;
+        if (name && cityId) {
+          await prisma.customer.create({
+            data: {
+              name,
+              customerType,
+              address: address || undefined,
+              cityId,
+              approvalStatus: "APPROVED",
+              ownerPhone: "",
+            },
+          });
+          custCount++;
+        }
       } catch (e) {
-        // Duplicate, skip
+        // Duplicate or constraint, skip silently
       }
     }
-    log.push(`✅ ${custCount} customers`);
+    log.push(`✅ ${custCount}/${customerRows.length} customers`);
 
     // Insert visits
     log.push("📋 Inserting visits...");
