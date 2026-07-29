@@ -144,6 +144,7 @@ enum GpsStatus {
   ACTIVE
   IDLE
   OFFLINE
+  MOCK
 
   @@map("gps_status")
 }
