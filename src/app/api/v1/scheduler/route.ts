@@ -25,8 +25,9 @@ export async function POST(req: NextRequest) {
     const results: string[] = [];
 
     if (job === "plan_visits" || job === "all") {
-      await planNextDayVisits();
-      results.push("plan_visits: done");
+      // When triggered manually, plan for TODAY if no visits exist
+      const result = await planNextDayVisits(true);
+      results.push(`plan_visits: ${JSON.stringify(result)}`);
     }
     if (job === "mark_absent" || job === "all") {
       await autoMarkAbsent();

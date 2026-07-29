@@ -31,11 +31,14 @@ function isWeekend(d: Date): boolean {
 }
 
 // ─── 1. Nightly Visit Planning — 12:00 AM ────────────────────────────────────
-export async function planNextDayVisits() {
-  const target = tomorrow();
+export async function planNextDayVisits(forToday = false) {
+  // When manually triggered (forToday=true), plan for today if no visits exist yet
+  // When auto-scheduled at midnight, plan for tomorrow
+  const target = forToday ? today() : tomorrow();
+
   if (isWeekend(target)) {
     console.log("[scheduler] Weekend — skipping visit planning");
-    return;
+    return { planned: 0, skipped: "weekend" };
   }
 
   console.log(`[scheduler] Planning visits for ${target.toDateString()}`);
@@ -47,13 +50,11 @@ export async function planNextDayVisits() {
 
   let planned = 0;
   for (const booker of activeBookers) {
-    // Check if already planned
     const existing = await prisma.visit.count({
       where: { bookerId: booker.id, visitDate: target },
     });
     if (existing >= 7) continue;
 
-    // Find customers with no recent visit (last 7 days), prioritize by workingPriority
     const recentlyVisited = await prisma.visit.findMany({
       where: {
         bookerId: booker.id,
@@ -68,7 +69,7 @@ export async function planNextDayVisits() {
         cityId: booker.cityId ?? 0,
         approvalStatus: "APPROVED",
         deletedAt: null,
-        id: { notIn: recentIds.length > 0 ? recentIds : undefined },
+        id: recentIds.length > 0 ? { notIn: recentIds } : undefined,
       },
       orderBy: [{ workingPriority: "asc" }],
       take: 7 - existing,
@@ -88,6 +89,7 @@ export async function planNextDayVisits() {
   }
 
   console.log(`[scheduler] Planned ${planned} visits for ${target.toDateString()}`);
+  return { planned, date: target.toDateString() };
 }
 
 // ─── 2. Auto Mark Absent — 11:00 PM ──────────────────────────────────────────

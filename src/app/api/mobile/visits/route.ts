@@ -82,3 +82,72 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }
+
+// POST /api/mobile/visits — create an ad-hoc visit
+export async function POST(req: Request) {
+  const user = getMobileUser(req);
+  if (!user) return unauthorized();
+
+  try {
+    const body = await req.json();
+    const { customerId, notes } = body;
+
+    if (!customerId) {
+      return NextResponse.json({ success: false, error: "customerId is required" }, { status: 400 });
+    }
+
+    // Verify customer exists
+    const customer = await prisma.customer.findFirst({
+      where: { id: Number(customerId), deletedAt: null },
+      select: { id: true, name: true, customerType: true, ownerName: true, ownerPhone: true, address: true, latitude: true, longitude: true, workingPriority: true },
+    });
+    if (!customer) {
+      return NextResponse.json({ success: false, error: "Customer not found" }, { status: 404 });
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Prevent duplicate ad-hoc visit for same customer today
+    const existing = await prisma.visit.findFirst({
+      where: { bookerId: user.id, customerId: Number(customerId), visitDate: today },
+    });
+    if (existing) {
+      return NextResponse.json({ success: false, error: "Visit already planned for this customer today" }, { status: 409 });
+    }
+
+    const visit = await prisma.visit.create({
+      data: {
+        bookerId: user.id,
+        customerId: Number(customerId),
+        visitDate: today,
+        status: "IN_PROGRESS",
+        checkInAt: new Date(),
+        notes: notes ?? "",
+        priority: "normal",
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        id: visit.id,
+        customerId: customer.id,
+        customerName: customer.name,
+        customerType: customer.customerType,
+        contact: customer.ownerName ?? "",
+        phone: customer.ownerPhone ?? "",
+        address: customer.address ?? "",
+        latitude: customer.latitude ? Number(customer.latitude) : null,
+        longitude: customer.longitude ? Number(customer.longitude) : null,
+        status: "in_progress",
+        checkInAt: visit.checkInAt,
+        notes: visit.notes ?? "",
+        visitDate: visit.visitDate,
+      },
+    });
+  } catch (err) {
+    console.error("[mobile/visits POST]", err);
+    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+  }
+}
