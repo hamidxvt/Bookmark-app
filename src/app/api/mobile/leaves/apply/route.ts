@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getMobileUser } from "@/lib/auth-mobile";
-import { unauthorized } from "@/lib/responses";
+import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
 
 export async function POST(req: Request) {
   const user = getMobileUser(req);
