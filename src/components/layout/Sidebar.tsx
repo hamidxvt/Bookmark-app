@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Navigation, UserCheck, ClipboardList, Users,
   Globe, Package, BookOpen, MessageSquare, Bell, ChevronDown,
   LogOut, PanelLeftClose, PanelLeftOpen, X,
-  Calendar, Clock, AlertTriangle, Banknote,
+  Calendar, Clock, AlertTriangle, Banknote, Database,
 } from "lucide-react";
 import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
@@ -98,6 +98,12 @@ const NAV = [
     items: [
       { icon: Bell, label: "Requests", href: "/requests" },
       { icon: MessageSquare, label: "Inbox", href: "/inbox" },
+    ],
+  },
+  {
+    section: "ADMIN",
+    items: [
+      { icon: Database, label: "Migrate Data", href: "/migrate" },
     ],
   },
 ];
