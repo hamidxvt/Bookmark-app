@@ -103,8 +103,25 @@ async function login() {
 }
 
 async function fetchDT(path: string): Promise<unknown[]> {
-  const res = await http.get(path, { params: { draw: 1, start: 0, length: 5000 }, headers: { Cookie: jarToHeader(), Accept: "application/json" } });
-  return (res.data?.data as unknown[]) ?? [];
+  try {
+    const res = await http.get(path, { params: { draw: 1, start: 0, length: 5000 }, headers: { Cookie: jarToHeader(), Accept: "application/json" } });
+    
+    // Check if response is actually JSON
+    if (typeof res.data === "string") {
+      console.error(`[fetchDT] Response is string, not JSON:`, res.data.substring(0, 200));
+      return [];
+    }
+    
+    if (res.data?.error) {
+      console.error(`[fetchDT] API error:`, res.data.error);
+      return [];
+    }
+    
+    return (res.data?.data as unknown[]) ?? [];
+  } catch (e: any) {
+    console.error(`[fetchDT] Exception fetching ${path}:`, e.message);
+    return [];
+  }
 }
 
 export async function POST() {
@@ -116,8 +133,13 @@ export async function POST() {
 
   try {
     log.push("🔐 Logging into staging.bookmark.services...");
-    await login();
-    log.push("✅ Login successful");
+    try {
+      await login();
+      log.push("✅ Login successful");
+    } catch (e: any) {
+      log.push(`❌ Login failed: ${e.message}`);
+      return NextResponse.json({ success: false, error: `Login failed: ${e.message}`, log }, { status: 500 });
+    }
 
     log.push("📥 Fetching data from staging...");
     const [bookerRows, customerRows, visitRows, subjectRows, seriesRows] = await Promise.all([
@@ -127,6 +149,11 @@ export async function POST() {
       fetchDT("/subject-list/datatable"),
       fetchDT("/Series-list/datatable"),
     ]);
+
+    if (bookerRows.length === 0) {
+      log.push("⚠️  No data fetched from staging — API may be down or login failed");
+      return NextResponse.json({ success: false, error: "No data fetched from staging API", log }, { status: 500 });
+    }
 
     log.push(`   Bookers: ${bookerRows.length} | Customers: ${customerRows.length} | Visits: ${visitRows.length} | Subjects: ${subjectRows.length} | Series: ${seriesRows.length}`);
 
