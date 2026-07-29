@@ -16,6 +16,35 @@ import https from "https";
 const BASE = "https://staging.bookmark.services";
 let cookieStore: Record<string, string> = {};
 
+// ─── HTML parsing helpers ─────────────────────────────────────────────────────
+
+/** Strip all HTML tags and decode entities, return plain text */
+function stripHtml(raw: string): string {
+  if (!raw || !raw.includes("<")) return raw.trim();
+  // Extract text from font-weight-bold span (the actual name in staging DataTable)
+  const boldMatch = raw.match(/font-weight-bold[^>]*>([^<]+)</i);
+  if (boldMatch) return boldMatch[1].trim();
+  // Fallback: strip all tags
+  return raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** Extract phone from staging HTML — looks for <span class="small">...</span> */
+function extractPhone(raw: string): string {
+  if (!raw || !raw.includes("<")) return raw.trim();
+  const smallMatch = raw.match(/<span[^>]*class="small"[^>]*>([^<]+)<\/span>/i);
+  if (smallMatch) {
+    const phone = smallMatch[1].trim();
+    return phone.toLowerCase() === "not provided" ? "" : phone;
+  }
+  return "";
+}
+
+/** Extract city from name like "SCHOOL NAME-KHI" → "KHI" portion won't be a city key
+ *  Staging customer names often have "-CityCode" suffix — we ignore that and use the city column */
+function cleanName(raw: string): string {
+  return stripHtml(raw).replace(/\s+/g, " ").trim();
+}
+
 function jarToHeader() {
   return Object.entries(cookieStore).map(([k, v]) => `${k}=${v}`).join("; ");
 }
@@ -141,10 +170,16 @@ export async function POST() {
     log.push("👤 Inserting bookers...");
     let bookerCount = 0;
     for (const row of bookerRows as any[]) {
-      const name = String(row[1] ?? row.name ?? "Unknown").trim();
-      const email = String(row[2] ?? row.email ?? `b${row[0]}@bookmark.pk`).trim().toLowerCase();
-      const phone = String(row[3] ?? row.phone ?? "").trim();
-      const cityName = String(row[5] ?? row.city ?? "").trim().toUpperCase();
+      // Staging DataTable: row[1] = HTML name block, row[2] = action HTML (not email)
+      // Need to detect actual email — it may not be in the standard columns
+      const rawNameCol = String(row[1] ?? row.name ?? "Unknown");
+      const name = cleanName(rawNameCol);
+      const phoneFromHtml = extractPhone(rawNameCol);
+      const phone = phoneFromHtml || String(row[3] ?? row.phone ?? "").replace(/<[^>]*>/g, "").trim();
+      // Email: generate from name since staging may not expose it in datatable
+      const rawEmail = String(row[2] ?? row.email ?? "").replace(/<[^>]*>/g, "").trim().toLowerCase();
+      const email = rawEmail.includes("@") ? rawEmail : `${name.toLowerCase().replace(/\s+/g, ".")}@bookmark.pk`;
+      const cityName = stripHtml(String(row[5] ?? row.city ?? "")).trim().toUpperCase();
 
       let cityId = null;
       if (cityName) {
@@ -209,10 +244,18 @@ export async function POST() {
     log.push("🏪 Inserting customers...");
     let custCount = 0;
     for (const row of customerRows as any[]) {
-      const name = String(row[0] ?? row.name ?? "").trim();
-      const cityName = String(row[1] ?? row.city ?? "").trim().toUpperCase();
-      const type = String(row[2] ?? row.customer_type ?? "School").trim();
-      const address = String(row[3] ?? row.address ?? "").trim();
+      // Staging DataTable customer row:
+      // row[0] = checkbox HTML + type badge + name HTML block
+      // row[1] = actions HTML (not city)
+      // The name is embedded in the HTML of row[0]
+      const rawCol0 = String(row[0] ?? row.name ?? "");
+      const name = cleanName(rawCol0);
+      const ownerPhone = extractPhone(rawCol0);
+      // City: staging puts city name in another column — try row[1] or row[2] after stripping
+      const rawCity = String(row[1] ?? row.city ?? "");
+      const cityName = stripHtml(rawCity).trim().toUpperCase() || "OTHER";
+      const type = stripHtml(String(row[2] ?? row.customer_type ?? "School")).trim();
+      const address = stripHtml(String(row[3] ?? row.address ?? "")).trim();
 
       let cityId = null;
       if (cityName) {
@@ -240,7 +283,7 @@ export async function POST() {
               address: address || undefined,
               cityId,
               approvalStatus: "APPROVED",
-              ownerPhone: "",
+              ownerPhone: ownerPhone || "",
             },
           });
           custCount++;
