@@ -18,16 +18,7 @@ const NAV = [
     section: "GENERAL",
     items: [
       { icon: LayoutDashboard, label: "Home", href: "/dashboard" },
-      {
-        icon: Navigation,
-        label: "Live Location",
-        children: [
-          { label: "All Cities", href: "/location" },
-          { label: "Karachi", href: "/location/karachi" },
-          { label: "Lahore", href: "/location/lahore" },
-          { label: "Multan", href: "/location/multan" },
-        ],
-      },
+      { icon: Navigation, label: "Live Location", href: "/location" },
     ],
   },
   {

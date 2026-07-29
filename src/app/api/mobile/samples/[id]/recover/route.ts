@@ -4,26 +4,24 @@ import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
 
 export async function PATCH(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const user = getMobileUser(req);
   if (!user) return unauthorized();
 
   try {
-    const id = parseInt(params.id);
+    const { id } = await params;
+    const rid = parseInt(id);
     const existing = await prisma.request.findFirst({
-      where: { id, bookerId: user.id },
+      where: { id: rid, bookerId: user.id },
     });
-
     if (!existing) {
       return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
     }
-
     const updated = await prisma.request.update({
-      where: { id },
+      where: { id: rid },
       data: { status: "RESOLVED" },
     });
-
     return NextResponse.json({ success: true, data: updated });
   } catch (err) {
     console.error("[mobile/samples/recover]", err);

@@ -21,14 +21,12 @@ interface Counts {
   offline: number;
 }
 
-const CITIES = ["All", "Karachi", "Lahore", "Multan"];
-
 export default function LocationClient({ defaultCity }: { defaultCity?: string }) {
   const [bookers, setBookers] = useState<BookerLoc[]>([]);
   const [counts, setCounts] = useState<Counts>({ total: 0, active: 0, idle: 0, offline: 0 });
   const [loading, setLoading] = useState(true);
-  const [city, setCity] = useState(defaultCity ? (CITIES.includes(defaultCity) ? defaultCity : "All") : "All");
   const [selected, setSelected] = useState<number | null>(null);
+  void defaultCity; // not using city filter — show all
 
   async function load() {
     setLoading(true);
@@ -62,14 +60,11 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
     <div className="flex h-[calc(100vh-64px)]">
       {/* Map area */}
       <div className="relative flex-1 bg-slate-200 overflow-hidden">
-        {/* City tabs */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex gap-1 rounded-xl bg-white/90 backdrop-blur-sm p-1 shadow-lg border border-slate-200">
-          {CITIES.map(c => (
-            <button key={c} onClick={() => setCity(c)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${city === c ? "bg-[#0f1e3c] text-white" : "text-slate-600 hover:bg-slate-100"}`}>
-              {c}
-            </button>
-          ))}
+        {/* Live indicator */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 rounded-xl bg-white/90 backdrop-blur-sm px-4 py-2 shadow-lg border border-slate-200">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="text-xs font-semibold text-slate-700">Live Officer Tracking — All Regions</span>
+          <span className="text-xs text-slate-400">Updates every 10s</span>
         </div>
 
         {/* Status counts */}
@@ -88,10 +83,10 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
         </button>
 
-        {/* OpenStreetMap — no API key needed */}
+        {/* OpenStreetMap — Pakistan-wide view, no API key */}
         <iframe
           className="absolute inset-0 w-full h-full border-0"
-          src={`https://www.openstreetmap.org/export/embed.html?bbox=66.5,24.5,67.5,25.5&layer=mapnik`}
+          src="https://www.openstreetmap.org/export/embed.html?bbox=60.8,23.5,77.8,37.1&layer=mapnik"
           loading="lazy"
           title="Officer Locations"
         />
