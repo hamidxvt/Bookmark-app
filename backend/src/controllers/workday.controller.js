@@ -1,89 +1,128 @@
 import prisma from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
 
+// POST /api/v1/workday/day-start
 export const dayStart = async (req, res, next) => {
   try {
-    const { latitude, longitude, isMocked } = req.body;
-    const userId = req.user.id;
+    const bookerId = req.user.id;
+    const { lat, latitude, lng, longitude, cannotReason } = req.body;
+    const finalLat = lat ?? latitude;
+    const finalLng = lng ?? longitude;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (isMocked) {
-      await prisma.gpsLog.create({
-        data: { userId, latitude, longitude, accuracy: 0, isMocked: true },
-      });
-      throw new AppError('MOCK_LOCATION', 403, 'Mock GPS detected. Action blocked and logged.');
-    }
-
     const existing = await prisma.attendance.findUnique({
-      where: { userId_date: { userId, date: today } },
+      where: { bookerId_date: { bookerId, date: today } },
     });
-    if (existing?.dayStartTime) {
-      throw new AppError('ALREADY_STARTED', 409, 'You have already started your day');
+
+    if (existing?.startAt) {
+      throw new AppError('ALREADY_STARTED', 409, 'Day already started');
     }
 
     const attendance = await prisma.attendance.upsert({
-      where: { userId_date: { userId, date: today } },
-      create: { userId, date: today, dayStartTime: new Date(), dayStartLat: latitude, dayStartLng: longitude, status: 'present' },
-      update: { dayStartTime: new Date(), dayStartLat: latitude, dayStartLng: longitude, status: 'present' },
+      where: { bookerId_date: { bookerId, date: today } },
+      create: { bookerId, date: today, startAt: new Date(), startLat: finalLat, startLng: finalLng, status: 'present' },
+      update: { startAt: new Date(), startLat: finalLat, startLng: finalLng, status: 'present' },
     });
 
-    const todayVisits = await prisma.visit.findMany({
-      where: { userId, scheduledDate: today },
-      include: { location: true },
-      orderBy: { dailySequence: 'asc' },
+    await prisma.booker.update({
+      where: { id: bookerId },
+      data: { gpsStatus: 'ACTIVE', lastLatitude: finalLat, lastLongitude: finalLng, lastSeenAt: new Date() },
     });
 
-    res.status(201).json({
-      success: true,
-      data: {
-        attendanceId: attendance.id,
-        dayStartTime: attendance.dayStartTime,
-        todayVisits: todayVisits.map((v) => ({
-          id: v.id, sequence: v.dailySequence, status: v.status,
-          locationName: v.location.name,
-          lat: v.location.latitude, lng: v.location.longitude,
-          carryForwardCnt: v.carryForwardCnt,
-        })),
-      },
-    });
+    res.json({ success: true, data: attendance, message: 'Day started. Your visit queue is ready.' });
   } catch (err) { next(err); }
 };
 
+// POST /api/v1/workday/day-end
 export const dayEnd = async (req, res, next) => {
   try {
-    const { latitude, longitude } = req.body;
-    const userId = req.user.id;
+    const bookerId = req.user.id;
+    const { lat, latitude, lng, longitude } = req.body;
+    const finalLat = lat ?? latitude;
+    const finalLng = lng ?? longitude;
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    await prisma.attendance.update({
-      where: { userId_date: { userId, date: today } },
-      data: { dayEndTime: new Date(), dayEndLat: latitude, dayEndLng: longitude },
+    const attendance = await prisma.attendance.findUnique({
+      where: { bookerId_date: { bookerId, date: today } },
     });
 
-    const [completed, missed] = await Promise.all([
-      prisma.visit.count({ where: { userId, scheduledDate: today, status: 'completed' } }),
-      prisma.visit.count({ where: { userId, scheduledDate: today, status: 'missed' } }),
-    ]);
+    if (!attendance?.startAt) {
+      throw new AppError('NOT_STARTED', 400, 'You have not started your day yet');
+    }
 
-    res.json({ success: true, data: { dayEndTime: new Date(), visitsCompleted: completed, visitsMissed: missed } });
+    const updated = await prisma.attendance.update({
+      where: { bookerId_date: { bookerId, date: today } },
+      data: { endAt: new Date(), endLat: finalLat, endLng: finalLng },
+    });
+
+    await prisma.booker.update({
+      where: { id: bookerId },
+      data: { gpsStatus: 'OFFLINE', lastLatitude: finalLat, lastLongitude: finalLng, lastSeenAt: new Date() },
+    });
+
+    // Summary of today's work
+    const visitsToday = await prisma.visit.groupBy({
+      by: ['status'],
+      where: { bookerId, visitDate: today },
+      _count: { id: true },
+    });
+
+    const summary = Object.fromEntries(visitsToday.map(v => [v.status.toLowerCase(), v._count.id]));
+
+    res.json({
+      success: true,
+      data: { attendance: updated, summary },
+      message: 'Day ended. Great work today!',
+    });
   } catch (err) { next(err); }
 };
 
+// POST /api/v1/workday/cannot-work
 export const cannotWork = async (req, res, next) => {
   try {
-    const { reason, notes } = req.body;
-    const userId = req.user.id;
+    const bookerId = req.user.id;
+    const { reason } = req.body;
+
+    if (!reason?.trim()) {
+      throw new AppError('MISSING_REASON', 400, 'A reason is required');
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    await prisma.attendance.upsert({
-      where: { userId_date: { userId, date: today } },
-      create: { userId, date: today, status: 'cannot_work', cannotWorkReason: `${reason}: ${notes || ''}` },
-      update: { status: 'cannot_work', cannotWorkReason: `${reason}: ${notes || ''}` },
+    const attendance = await prisma.attendance.upsert({
+      where: { bookerId_date: { bookerId, date: today } },
+      create: { bookerId, date: today, status: 'cannot_work', cannotReason: reason.trim() },
+      update: { status: 'cannot_work', cannotReason: reason.trim() },
     });
 
-    res.json({ success: true, data: { message: 'Cannot-work declaration submitted' } });
+    res.json({ success: true, data: attendance, message: 'Declaration submitted. Stay safe.' });
+  } catch (err) { next(err); }
+};
+
+// GET /api/v1/workday/status — today's attendance status
+export const getStatus = async (req, res, next) => {
+  try {
+    const bookerId = req.user.id;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const attendance = await prisma.attendance.findUnique({
+      where: { bookerId_date: { bookerId, date: today } },
+    });
+
+    const visitsToday = await prisma.visit.groupBy({
+      by: ['status'],
+      where: { bookerId, visitDate: today },
+      _count: { id: true },
+    });
+
+    const visitSummary = Object.fromEntries(visitsToday.map(v => [v.status.toLowerCase(), v._count.id]));
+
+    res.json({ success: true, data: { attendance, visitSummary } });
   } catch (err) { next(err); }
 };

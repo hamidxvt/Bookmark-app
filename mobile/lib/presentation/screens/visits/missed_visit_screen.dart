@@ -37,9 +37,8 @@ class _MissedVisitScreenState extends ConsumerState<MissedVisitScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       final dio = ref.read(dioClientProvider);
-      await dio.post(ApiConstants.visitMissed(widget.visitId), data: {
+      await dio.post(ApiConstants.visitMiss(widget.visitId), data: {
         'reason': _reasonCtrl.text.trim(),
-        'photoUrl': _photoPath, // In production: upload to CDN first
       });
       if (mounted) Navigator.of(context).pop(true);
     } catch (e) {

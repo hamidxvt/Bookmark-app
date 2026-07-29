@@ -14,6 +14,7 @@ import 'features/workday/presentation/day_start_screen.dart';
 import 'features/workday/presentation/day_end_screen.dart';
 import 'features/samples/presentation/samples_screen.dart';
 import 'features/leaves/presentation/leaves_screen.dart';
+import 'features/payroll/presentation/payroll_screen.dart';
 
 // Stable router — only rebuilt once, uses refreshListenable for auth changes
 final _routerProvider = Provider<GoRouter>((ref) {
@@ -48,6 +49,7 @@ final _routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(path: '/samples', builder: (_, __) => const SamplesScreen()),
       GoRoute(path: '/leaves',  builder: (_, __) => const LeavesScreen()),
+      GoRoute(path: '/payroll', builder: (_, __) => const PayrollScreen()),
     ],
   );
 });

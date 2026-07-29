@@ -1,17 +1,21 @@
 import { Router } from 'express';
-import { requestSample, recoverSample } from '../controllers/samples.controller.js';
-import { auth } from '../middleware/auth.middleware.js';
-import { validate } from '../middleware/validate.middleware.js';
-import { z } from 'zod';
+import {
+  getMySamples, requestSamples, markRecovered,
+  adminGetSamples, adminApproveSample,
+} from '../controllers/samples.controller.js';
+import { authMiddleware } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-router.post('/request', auth, validate(z.object({
-  productId: z.number().int().positive(),
-  quantity: z.number().int().positive(),
-  visitId: z.number().int().optional(),
-})), requestSample);
+router.use(authMiddleware);
 
-router.post('/:id/recover', auth, recoverSample);
+// Booker routes
+router.get('/my', getMySamples);
+router.post('/request', requestSamples);
+router.post('/:id/recover', markRecovered);
+
+// Admin routes
+router.get('/admin', adminGetSamples);
+router.patch('/:id/approve', adminApproveSample);
 
 export default router;

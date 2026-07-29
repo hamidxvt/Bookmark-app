@@ -1,5 +1,5 @@
-// This file is the Prisma source of truth for the database schema.
-// Run: npx prisma migrate dev --name init
+// Bookmark SFA — Node.js Backend Prisma Schema
+// Database: PostgreSQL (shared with Next.js admin on Railway)
 // Run: npx prisma generate
 
 generator client {
@@ -7,303 +7,419 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// ─── ADMIN USERS ─────────────────────────────────────────────────────────────
 model User {
-  id                   Int      @id @default(autoincrement())
-  name                 String
-  email                String   @unique
-  password             String
-  role                 Role     @default(sales_officer)
-  cityId               Int?
-  areaId               Int?
-  reportingCityHeadId  Int?
-  basicSalary          Decimal  @db.Decimal(10, 2) @default(0)
-  securityDeposit      Decimal  @db.Decimal(10, 2) @default(0)
-  dailyPerformanceRate Decimal  @db.Decimal(10, 2) @default(3000)
-  annualSampleLimitPkr Decimal  @db.Decimal(10, 2) @default(0)
-  sampleUsedPkr        Decimal  @db.Decimal(10, 2) @default(0)
-  leaveBalanceSick     Int      @default(10)
-  leaveBalanceCasual   Int      @default(18)
-  isActive             Boolean  @default(true)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id           Int       @id @default(autoincrement())
+  name         String
+  email        String    @unique
+  password     String
+  phone        String?
+  profilePhoto String?   @map("profile_photo")
+  role         UserRole  @default(ADMIN)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  city           City?           @relation(fields: [cityId], references: [id])
-  area           Area?           @relation(fields: [areaId], references: [id])
-  attendances    Attendance[]
-  visits         Visit[]
-  gpsLogs        GpsLog[]
-  sampleRequests SampleRequest[]
-  leaveRequests  LeaveRequest[]
-  payrollLedgers PayrollLedger[]
-  auditLogs      AuditLog[]
-
-  @@index([cityId])
-  @@index([areaId])
   @@map("users")
 }
 
-enum Role {
-  super_admin
-  city_head
-  coordinator
-  sales_officer
+enum UserRole {
+  ADMIN
+  SUPER_ADMIN
 }
 
+// ─── GEOGRAPHY ───────────────────────────────────────────────────────────────
 model City {
-  id    Int    @id @default(autoincrement())
-  name  String
-  users User[]
-  areas Area[]
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  regions   Region[]
+  areas     Area[]
+  bookers   Booker[]
+  customers Customer[]
 
   @@map("cities")
 }
 
-model Area {
-  id        Int        @id @default(autoincrement())
+model Region {
+  id        Int       @id @default(autoincrement())
+  cityId    Int       @map("city_id")
   name      String
-  cityId    Int
-  city      City       @relation(fields: [cityId], references: [id])
-  locations Location[]
-  users     User[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
-  @@index([cityId])
+  city      City      @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  areas     Area[]
+  bookers   Booker[]
+  customers Customer[]
+
+  @@map("regions")
+}
+
+model Area {
+  id        Int       @id @default(autoincrement())
+  regionId  Int       @map("region_id")
+  cityId    Int       @map("city_id")
+  name      String
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  region    Region    @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  city      City      @relation(fields: [cityId], references: [id])
+  customers Customer[]
+
   @@map("areas")
 }
 
-model Location {
-  id           Int          @id @default(autoincrement())
-  name         String
-  type         LocationType
-  areaId       Int
-  latitude     Float
-  longitude    Float
-  priority     Priority     @default(medium)
-  contactName  String?
-  contactPhone String?
-  address      String?
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
+// ─── BOOKERS (FIELD SALES OFFICERS) ──────────────────────────────────────────
+model Booker {
+  id              Int            @id @default(autoincrement())
+  name            String
+  fatherName      String?        @map("father_name")
+  address         String?        @db.Text
+  cnic            String?        @unique @db.VarChar(20)
+  gender          String         @default("MALE")
+  dob             DateTime?      @db.Date
+  cityId          Int?           @map("city_id")
+  regionId        Int?           @map("region_id")
+  phone           String
+  email           String         @unique
+  password        String
+  profilePhoto    String?        @map("profile_photo")
+  jobStatus       String         @default("NOT_ACTIVE") @map("job_status")
+  adminApproved   String         @default("PENDING") @map("admin_approved")
+  visitTargets    Int?           @map("visit_targets")
+  ratesPerVisit   Decimal?       @map("rates_per_visit") @db.Decimal(10, 2)
+  basicSalary     Decimal        @default(0) @map("basic_salary") @db.Decimal(10, 2)
+  securityDeposit Decimal        @default(0) @map("security_deposit") @db.Decimal(10, 2)
+  annualSampleLimit Decimal      @default(0) @map("annual_sample_limit") @db.Decimal(10, 2)
+  sampleUsed      Decimal        @default(0) @map("sample_used") @db.Decimal(10, 2)
+  leaveBalanceSick   Int         @default(10) @map("leave_balance_sick")
+  leaveBalanceCasual Int         @default(18) @map("leave_balance_casual")
+  lastLatitude    Decimal?       @map("last_latitude") @db.Decimal(10, 8)
+  lastLongitude   Decimal?       @map("last_longitude") @db.Decimal(11, 8)
+  lastSeenAt      DateTime?      @map("last_seen_at")
+  gpsStatus       String         @default("OFFLINE") @map("gps_status")
+  fcmToken        String?        @map("fcm_token") @db.VarChar(500)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+  deletedAt       DateTime?      @map("deleted_at")
 
-  area   Area    @relation(fields: [areaId], references: [id])
-  visits Visit[]
+  city            City?          @relation(fields: [cityId], references: [id])
+  region          Region?        @relation(fields: [regionId], references: [id])
+  customers       Customer[]     @relation("BookerCustomers")
+  visits          Visit[]
+  orders          Order[]
+  gpsPings        GpsPing[]
+  requests        Request[]
+  messages        Message[]
+  attendance      Attendance[]
+  leaveRequests   LeaveRequest[]
+  missedReasons   MissedVisitReason[]
+  payrollLedgers  PayrollLedger[]
 
-  @@index([areaId])
-  @@index([latitude, longitude])
-  @@map("locations")
+  @@index([cityId])
+  @@index([gpsStatus])
+  @@map("bookers")
 }
 
-enum LocationType {
-  school
-  bookshop
+// ─── CUSTOMERS ────────────────────────────────────────────────────────────────
+model Customer {
+  id              Int      @id @default(autoincrement())
+  name            String
+  customerType    String   @default("OTHER") @map("customer_type")
+  category        String?
+  ownerName       String?  @map("owner_name")
+  ownerPhone      String   @map("owner_phone")
+  email           String?
+  address         String?  @db.Text
+  cityId          Int      @map("city_id")
+  regionId        Int?     @map("region_id")
+  areaId          Int?     @map("area_id")
+  workingPriority Int      @default(3) @map("working_priority")
+  approvalStatus  String   @default("NOT_APPROVED") @map("approval_status")
+  assignedBookerId Int?    @map("assigned_booker_id")
+  latitude        Decimal? @db.Decimal(10, 8)
+  longitude       Decimal? @db.Decimal(11, 8)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  city            City     @relation(fields: [cityId], references: [id])
+  region          Region?  @relation(fields: [regionId], references: [id])
+  area            Area?    @relation(fields: [areaId], references: [id])
+  assignedBooker  Booker?  @relation("BookerCustomers", fields: [assignedBookerId], references: [id])
+  visits          Visit[]
+  orders          Order[]
+
+  @@index([cityId])
+  @@map("customers")
 }
 
-enum Priority {
-  high
-  medium
-  low
-}
-
-model Attendance {
-  id               Int              @id @default(autoincrement())
-  userId           Int
-  date             DateTime         @db.Date
-  dayStartTime     DateTime?
-  dayStartLat      Float?
-  dayStartLng      Float?
-  dayEndTime       DateTime?
-  dayEndLat        Float?
-  dayEndLng        Float?
-  status           AttendanceStatus @default(absent)
-  cannotWorkReason String?
-  createdAt        DateTime         @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@unique([userId, date])
-  @@index([userId, date])
-  @@map("attendance")
-}
-
-enum AttendanceStatus {
-  present
-  absent
-  cannot_work
-  leave
-}
-
-model GpsLog {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  latitude     Float
-  longitude    Float
-  accuracy     Float
-  isMocked     Boolean  @default(false)
-  batteryLevel Int?
-  recordedAt   DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@index([userId, recordedAt])
-  @@map("gps_logs")
-}
-
+// ─── VISITS ──────────────────────────────────────────────────────────────────
 model Visit {
-  id               Int            @id @default(autoincrement())
-  userId           Int
-  locationId       Int
-  scheduledDate    DateTime       @db.Date
-  dailySequence    Int
-  status           VisitStatus    @default(planned)
-  arrivalTime      DateTime?
-  arrivalLat       Float?
-  arrivalLng       Float?
-  completionTime   DateTime?
-  contactPerson    String?
-  designation      String?
-  phone            String?
-  notes            String?        @db.Text
-  visitType        String?
-  sampleDistributed Int?          @default(0)
-  photoUrl         String?
-  missedReason     String?
-  carryForwardCnt  Int            @default(0)
-  approvalStatus   ApprovalStatus?
-  approvedById     Int?
-  isAdHoc          Boolean        @default(false)
-  syncStatus       SyncStatus     @default(synced)
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  id            Int      @id @default(autoincrement())
+  bookerId      Int      @map("booker_id")
+  customerId    Int      @map("customer_id")
+  visitDate     DateTime @map("visit_date") @db.Date
+  dailySequence Int      @default(0) @map("daily_sequence")
+  checkInAt     DateTime? @map("check_in_at")
+  checkOutAt    DateTime? @map("check_out_at")
+  checkInLat    Decimal? @map("check_in_lat") @db.Decimal(10, 8)
+  checkInLng    Decimal? @map("check_in_lng") @db.Decimal(11, 8)
+  status        String   @default("PENDING")
+  priority      String?
+  notes         String?  @db.Text
+  visitReport   String?  @map("visit_report") @db.Text
+  contactPerson String?  @map("contact_person")
+  contactPhone  String?  @map("contact_phone")
+  visitType     String?  @map("visit_type")
+  carryForwardCnt Int    @default(0) @map("carry_forward_cnt")
+  isAdHoc       Boolean  @default(false) @map("is_adhoc")
+  followUpDate  DateTime? @map("follow_up_date") @db.Date
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  user     User     @relation(fields: [userId], references: [id])
-  location Location @relation(fields: [locationId], references: [id])
+  booker        Booker   @relation(fields: [bookerId], references: [id])
+  customer      Customer @relation(fields: [customerId], references: [id])
+  orders        Order[]
+  missedReason  MissedVisitReason?
 
-  @@index([userId, scheduledDate])
-  @@index([locationId])
+  @@index([bookerId])
+  @@index([customerId])
+  @@index([visitDate])
+  @@index([status])
   @@map("visits")
 }
 
-enum VisitStatus {
-  planned
-  in_progress
-  completed
-  missed
+// ─── GPS PINGS ────────────────────────────────────────────────────────────────
+model GpsPing {
+  id           Int      @id @default(autoincrement())
+  bookerId     Int      @map("booker_id")
+  latitude     Decimal  @db.Decimal(10, 8)
+  longitude    Decimal  @db.Decimal(11, 8)
+  accuracy     Float?
+  batteryLevel Int?     @map("battery_level") @db.SmallInt
+  isMocked     Boolean  @default(false) @map("is_mocked")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  booker       Booker   @relation(fields: [bookerId], references: [id])
+
+  @@index([bookerId])
+  @@index([createdAt])
+  @@map("gps_pings")
 }
 
-enum ApprovalStatus {
-  pending
-  approved
-  rejected
+// ─── ATTENDANCE ───────────────────────────────────────────────────────────────
+model Attendance {
+  id           Int       @id @default(autoincrement())
+  bookerId     Int       @map("booker_id")
+  date         DateTime  @db.Date
+  startAt      DateTime? @map("start_at")
+  endAt        DateTime? @map("end_at")
+  startLat     Decimal?  @map("start_lat") @db.Decimal(10, 8)
+  startLng     Decimal?  @map("start_lng") @db.Decimal(11, 8)
+  endLat       Decimal?  @map("end_lat") @db.Decimal(10, 8)
+  endLng       Decimal?  @map("end_lng") @db.Decimal(11, 8)
+  status       String    @default("present")
+  cannotReason String?   @map("cannot_reason") @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  booker       Booker    @relation(fields: [bookerId], references: [id])
+
+  @@unique([bookerId, date])
+  @@index([bookerId])
+  @@index([date])
+  @@map("attendance")
 }
 
-enum SyncStatus {
-  pending_sync
-  synced
+// ─── LEAVE REQUESTS ───────────────────────────────────────────────────────────
+model LeaveRequest {
+  id          Int       @id @default(autoincrement())
+  bookerId    Int       @map("booker_id")
+  leaveType   String    @map("leave_type")
+  fromDate    DateTime  @map("from_date") @db.Date
+  toDate      DateTime  @map("to_date") @db.Date
+  days        Int       @default(1)
+  reason      String    @db.Text
+  status      String    @default("pending")
+  adminNotes  String?   @map("admin_notes") @db.Text
+  reviewedBy  Int?      @map("reviewed_by")
+  reviewedAt  DateTime? @map("reviewed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  booker      Booker    @relation(fields: [bookerId], references: [id])
+
+  @@index([bookerId])
+  @@index([status])
+  @@map("leave_requests")
 }
 
+// ─── MISSED VISIT REASONS ─────────────────────────────────────────────────────
+model MissedVisitReason {
+  id        Int      @id @default(autoincrement())
+  visitId   Int      @unique @map("visit_id")
+  bookerId  Int      @map("booker_id")
+  reason    String   @db.Text
+  status    String   @default("pending")
+  adminNote String?  @map("admin_note") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  visit     Visit    @relation(fields: [visitId], references: [id])
+  booker    Booker   @relation(fields: [bookerId], references: [id])
+
+  @@index([bookerId])
+  @@index([status])
+  @@map("missed_visit_reasons")
+}
+
+// ─── PAYROLL LEDGER ───────────────────────────────────────────────────────────
+model PayrollLedger {
+  id                  Int      @id @default(autoincrement())
+  bookerId            Int      @map("booker_id")
+  month               Int
+  year                Int
+  presentDays         Int      @default(0) @map("present_days")
+  basicSalary         Decimal  @map("basic_salary") @db.Decimal(10, 2)
+  performanceEarned   Decimal  @default(0) @map("performance_earned") @db.Decimal(10, 2)
+  missedVisitPenalty  Decimal  @default(0) @map("missed_visit_penalty") @db.Decimal(10, 2)
+  sampleDeduction     Decimal  @default(0) @map("sample_deduction") @db.Decimal(10, 2)
+  securityDepositHeld Decimal  @default(0) @map("security_deposit_held") @db.Decimal(10, 2)
+  netPayable          Decimal  @default(0) @map("net_payable") @db.Decimal(10, 2)
+  isFinalized         Boolean  @default(false) @map("is_finalized")
+  calculatedAt        DateTime? @map("calculated_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  booker              Booker   @relation(fields: [bookerId], references: [id])
+
+  @@unique([bookerId, month, year])
+  @@index([bookerId])
+  @@map("payroll_ledgers")
+}
+
+// ─── PRODUCTS ─────────────────────────────────────────────────────────────────
 model Product {
-  id       Int     @id @default(autoincrement())
-  name     String
-  pricePkr Decimal @db.Decimal(10, 2)
-  isActive Boolean @default(true)
+  id          Int      @id @default(autoincrement())
+  name        String
+  isbn        String?  @unique @db.VarChar(20)
+  retailPrice Decimal  @default(0) @map("retail_price") @db.Decimal(10, 2)
+  isFeatured  Boolean  @default(false) @map("is_featured")
+  image       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  sampleRequests SampleRequest[]
+  sampleItems SampleItem[]
 
   @@map("products")
 }
 
+// ─── SAMPLE REQUESTS ─────────────────────────────────────────────────────────
 model SampleRequest {
-  id             Int          @id @default(autoincrement())
-  userId         Int
-  productId      Int
-  visitId        Int?
-  quantity       Int
-  totalValuePkr  Decimal      @db.Decimal(10, 2)
-  status         SampleStatus @default(pending)
-  approvedById   Int?
-  requestedAt    DateTime     @default(now())
-  recoveredAt    DateTime?
-  reminder10Sent Boolean      @default(false)
-  reminder20Sent Boolean      @default(false)
+  id              Int       @id @default(autoincrement())
+  bookerId        Int       @map("booker_id")
+  status          String    @default("pending")
+  totalValuePkr   Decimal   @default(0) @map("total_value_pkr") @db.Decimal(10, 2)
+  reminder10Sent  Boolean   @default(false) @map("reminder_10_sent")
+  reminder20Sent  Boolean   @default(false) @map("reminder_20_sent")
+  dispatchedAt    DateTime? @map("dispatched_at")
+  recoveredAt     DateTime? @map("recovered_at")
+  adminNote       String?   @map("admin_note") @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
-  user    User    @relation(fields: [userId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  items           SampleItem[]
 
-  @@index([userId])
-  @@index([status])
+  @@index([bookerId])
   @@map("sample_requests")
 }
 
-enum SampleStatus {
-  pending
-  approved
-  dispatched
-  recovered
-  deducted
+model SampleItem {
+  id              Int     @id @default(autoincrement())
+  sampleRequestId Int     @map("sample_request_id")
+  productId       Int     @map("product_id")
+  quantity        Int     @default(1)
+  unitPrice       Decimal @map("unit_price") @db.Decimal(10, 2)
+  subtotal        Decimal @db.Decimal(10, 2)
+
+  sampleRequest   SampleRequest @relation(fields: [sampleRequestId], references: [id], onDelete: Cascade)
+  product         Product       @relation(fields: [productId], references: [id])
+
+  @@map("sample_items")
 }
 
-model LeaveRequest {
-  id           Int            @id @default(autoincrement())
-  userId       Int
-  leaveType    LeaveType
-  startDate    DateTime       @db.Date
-  endDate      DateTime       @db.Date
-  days         Int
-  reason       String?        @db.Text
-  status       ApprovalStatus @default(pending)
-  approvedById Int?
-  createdAt    DateTime       @default(now())
+// ─── ORDERS ──────────────────────────────────────────────────────────────────
+model Order {
+  id          Int      @id @default(autoincrement())
+  bookerId    Int      @map("booker_id")
+  customerId  Int      @map("customer_id")
+  visitId     Int?     @map("visit_id")
+  orderDate   DateTime @map("order_date") @db.Date
+  status      String   @default("PENDING")
+  totalAmount Decimal  @default(0) @map("total_amount") @db.Decimal(12, 2)
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id])
+  booker      Booker   @relation(fields: [bookerId], references: [id])
+  customer    Customer @relation(fields: [customerId], references: [id])
+  visit       Visit?   @relation(fields: [visitId], references: [id])
+  items       OrderItem[]
 
-  @@index([userId])
-  @@map("leave_requests")
+  @@index([bookerId])
+  @@map("orders")
 }
 
-enum LeaveType {
-  sick
-  casual
+model OrderItem {
+  id        Int     @id @default(autoincrement())
+  orderId   Int     @map("order_id")
+  productId Int     @map("product_id")
+  quantity  Int     @default(1)
+  unitPrice Decimal @map("unit_price") @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(12, 2)
+
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_items")
 }
 
-model PayrollLedger {
-  id                  Int      @id @default(autoincrement())
-  userId              Int
-  month               Int
-  year                Int
-  presentDays         Int      @default(0)
-  basicSalary         Decimal  @db.Decimal(10, 2)
-  performanceEarned   Decimal  @db.Decimal(10, 2) @default(0)
-  missedVisitPenalty  Decimal  @db.Decimal(10, 2) @default(0)
-  sampleDeduction     Decimal  @db.Decimal(10, 2) @default(0)
-  securityDepositHeld Decimal  @db.Decimal(10, 2) @default(0)
-  netPayable          Decimal  @db.Decimal(10, 2)
-  isFinalized         Boolean  @default(false)
-  calculatedAt        DateTime?
-
-  user User @relation(fields: [userId], references: [id])
-
-  @@unique([userId, month, year])
-  @@index([userId, year, month])
-  @@map("payroll_ledgers")
-}
-
-model AuditLog {
+// ─── REQUESTS / MESSAGES ─────────────────────────────────────────────────────
+model Request {
   id         Int      @id @default(autoincrement())
-  actorId    Int
-  action     String
-  targetType String
-  targetId   Int?
-  before     Json?
-  after      Json?
-  ipAddress  String?
-  createdAt  DateTime @default(now())
+  bookerId   Int      @map("booker_id")
+  title      String
+  category   String
+  details    String   @db.Text
+  status     String   @default("PENDING")
+  adminNotes String?  @map("admin_notes") @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
-  actor User @relation(fields: [actorId], references: [id])
+  booker     Booker   @relation(fields: [bookerId], references: [id])
 
-  @@index([actorId])
-  @@index([createdAt])
-  @@map("audit_logs")
+  @@map("requests")
+}
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  senderType String   @map("sender_type")
+  senderId   Int      @map("sender_id")
+  bookerId   Int      @map("booker_id")
+  message    String   @db.Text
+  isRead     Boolean  @default(false) @map("is_read")
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  booker     Booker   @relation(fields: [bookerId], references: [id])
+
+  @@map("messages")
 }

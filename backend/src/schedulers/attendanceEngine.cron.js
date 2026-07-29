@@ -1,40 +1,44 @@
 import prisma from '../config/database.js';
 import logger from '../utils/logger.js';
 
+// Runs at 11:00 PM daily — marks missing attendance as absent
 export async function runAttendanceEngine() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const officers = await prisma.user.findMany({ where: { role: 'sales_officer', isActive: true } });
+  logger.info(`[Attendance Engine] Checking for missing attendance on ${today.toISOString().slice(0, 10)}`);
 
-  for (const officer of officers) {
-    const attendance = await prisma.attendance.findUnique({
-      where: { userId_date: { userId: officer.id, date: today } },
-    });
+  // Get all active bookers
+  const bookers = await prisma.booker.findMany({
+    where: { jobStatus: 'ACTIVE', adminApproved: 'APPROVED' },
+    select: { id: true },
+  });
 
-    if (!attendance || (!attendance.dayStartTime && attendance.status !== 'cannot_work' && attendance.status !== 'leave')) {
-      // Mark absent and deduct leave
-      await prisma.$transaction(async (tx) => {
-        await tx.attendance.upsert({
-          where: { userId_date: { userId: officer.id, date: today } },
-          create: { userId: officer.id, date: today, status: 'absent' },
-          update: { status: 'absent' },
-        });
+  // Get those who already have an attendance record today
+  const presentIds = (await prisma.attendance.findMany({
+    where: { date: today },
+    select: { bookerId: true },
+  })).map(a => a.bookerId);
 
-        // Deduct 1 casual leave, then sick, then flag unpaid
-        if (officer.leaveBalanceCasual > 0) {
-          await tx.user.update({ where: { id: officer.id }, data: { leaveBalanceCasual: { decrement: 1 } } });
-        } else if (officer.leaveBalanceSick > 0) {
-          await tx.user.update({ where: { id: officer.id }, data: { leaveBalanceSick: { decrement: 1 } } });
-        }
+  // Absent bookers = all active - those with records
+  const absentIds = bookers
+    .map(b => b.id)
+    .filter(id => !presentIds.includes(id));
 
-        await tx.auditLog.create({
-          data: { actorId: 1, action: 'auto_absence_marked', targetType: 'attendance', targetId: officer.id,
-            after: { date: today, reason: 'No day-start recorded by 11PM' } },
-        });
-      });
-
-      logger.info(`Auto-absence marked for officer ${officer.id} on ${today.toISOString().slice(0, 10)}`);
-    }
+  if (absentIds.length === 0) {
+    logger.info('[Attendance Engine] All bookers checked in today.');
+    return;
   }
+
+  // Create absent records
+  await prisma.attendance.createMany({
+    data: absentIds.map(bookerId => ({
+      bookerId,
+      date: today,
+      status: 'absent',
+    })),
+    skipDuplicates: true,
+  });
+
+  logger.info(`[Attendance Engine] Marked ${absentIds.length} bookers as absent.`);
 }

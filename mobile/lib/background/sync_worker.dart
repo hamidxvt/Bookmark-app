@@ -1,9 +1,8 @@
 import '../data/local/app_database.dart';
+import '../data/local/daos/visits_dao.dart';
 import '../core/network/dio_client.dart';
 import '../core/constants/api_constants.dart';
 import '../core/storage/secure_storage.dart';
-
-const String syncTaskName = 'bookmark-sync';
 
 class SyncWorker {
   final AppDatabase _db;
@@ -14,33 +13,30 @@ class SyncWorker {
     try {
       final storage = SecureStorage();
       final token = await storage.getToken();
-      if (token == null) return true; // Not logged in — skip
+      if (token == null) return true;
 
-      final pending = await _db.visitsDao.getPendingSync();
+      final visitsDao = VisitsDao(_db);
+      final pending = await visitsDao.getPendingSync();
       if (pending.isEmpty) return true;
 
       final dio = DioClient(storage);
-
       for (final visit in pending) {
         try {
-          await dio.post(ApiConstants.visitComplete(visit.id), data: {
-            'contactPerson': visit.contactPerson,
-            'designation': visit.designation,
-            'phone': visit.phone,
-            'notes': visit.notes,
-            'visitType': visit.visitType,
-            'sampleDistributed': visit.sampleDistributed,
+          await dio.post(ApiConstants.visitComplete(visit['id']), data: {
+            'contactPerson': visit['contact_person'],
+            'phone': visit['contact_phone'],
+            'notes': visit['notes'],
+            'visitType': visit['visit_type'],
             'syncedOffline': true,
           });
-          await _db.visitsDao.markSynced(visit.id);
+          await visitsDao.markSynced(visit['id']);
         } catch (_) {
-          // One failure doesn't abort the whole batch
           continue;
         }
       }
       return true;
     } catch (_) {
-      return false; // WorkManager will retry
+      return false;
     }
   }
 }

@@ -1,59 +1,84 @@
 import prisma from '../config/database.js';
 import logger from '../utils/logger.js';
 
+// Runs on last day of each month at 11:55 PM
 export async function runPayrollEngine() {
   const now = new Date();
-  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  if (now.getDate() !== lastDayOfMonth) return; // Guard: only run on last day
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+  // Only run on the last day of the month
+  if (now.getDate() !== lastDay) return;
 
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
   const monthStart = new Date(year, month - 1, 1);
   const monthEnd = new Date(year, month, 0, 23, 59, 59);
 
-  const officers = await prisma.user.findMany({ where: { role: 'sales_officer', isActive: true } });
+  logger.info(`[Payroll Engine] Finalizing payroll for ${month}/${year}`);
 
-  for (const officer of officers) {
+  const bookers = await prisma.booker.findMany({
+    where: { jobStatus: 'ACTIVE', adminApproved: 'APPROVED' },
+    select: { id: true, basicSalary: true, ratesPerVisit: true },
+  });
+
+  for (const booker of bookers) {
     try {
       await prisma.$transaction(async (tx) => {
+        const dailyRate = Number(booker.ratesPerVisit ?? 3000);
+        const basic = Number(booker.basicSalary ?? 0);
+
         const presentDays = await tx.attendance.count({
-          where: { userId: officer.id, status: 'present', date: { gte: monthStart, lte: monthEnd } },
+          where: { bookerId: booker.id, status: 'present', date: { gte: monthStart, lte: monthEnd } },
         });
 
-        const performanceEarned = presentDays * officer.dailyPerformanceRate.toNumber();
+        const performanceEarned = presentDays * dailyRate;
 
-        // Penalty: rejected missed visit approvals this month
-        const rejectedVisits = await tx.visit.count({
-          where: { userId: officer.id, status: 'missed', approvalStatus: 'rejected', scheduledDate: { gte: monthStart, lte: monthEnd } },
+        const rejectedMissed = await tx.missedVisitReason.count({
+          where: {
+            bookerId: booker.id,
+            status: 'rejected',
+            visit: { visitDate: { gte: monthStart, lte: monthEnd } },
+          },
         });
-        const missedVisitPenalty = rejectedVisits * officer.dailyPerformanceRate.toNumber();
+        const missedVisitPenalty = rejectedMissed * dailyRate;
 
-        // Sample deduction: unrecovered after 20 days
         const overduesamples = await tx.sampleRequest.findMany({
-          where: { userId: officer.id, status: 'dispatched', reminder20Sent: true, recoveredAt: null },
+          where: { bookerId: booker.id, reminder20Sent: true, recoveredAt: null },
         });
-        const sampleDeduction = overduesamples.reduce((sum, s) => sum + s.totalValuePkr.toNumber(), 0);
+        const sampleDeduction = overduesamples.reduce((sum, s) => sum + Number(s.totalValuePkr), 0);
 
-        const securityDepositHeld = officer.basicSalary.toNumber() * 0.10;
-        const netPayable = officer.basicSalary.toNumber() + performanceEarned - missedVisitPenalty - sampleDeduction - securityDepositHeld;
+        const securityDepositHeld = basic * 0.10;
+        const netPayable = basic + performanceEarned - missedVisitPenalty - sampleDeduction - securityDepositHeld;
 
         await tx.payrollLedger.upsert({
-          where: { userId_month_year: { userId: officer.id, month, year } },
+          where: { bookerId_month_year: { bookerId: booker.id, month, year } },
           create: {
-            userId: officer.id, month, year, presentDays,
-            basicSalary: officer.basicSalary, performanceEarned, missedVisitPenalty,
-            sampleDeduction, securityDepositHeld, netPayable, isFinalized: true, calculatedAt: new Date(),
+            bookerId: booker.id, month, year, presentDays,
+            basicSalary: basic, performanceEarned, missedVisitPenalty,
+            sampleDeduction, securityDepositHeld, netPayable,
+            isFinalized: true, calculatedAt: new Date(),
           },
           update: {
-            presentDays, performanceEarned, missedVisitPenalty, sampleDeduction,
-            securityDepositHeld, netPayable, isFinalized: true, calculatedAt: new Date(),
+            presentDays, performanceEarned, missedVisitPenalty,
+            sampleDeduction, securityDepositHeld, netPayable,
+            isFinalized: true, calculatedAt: new Date(),
           },
         });
 
-        logger.info(`Payroll finalized: officer ${officer.id}, month ${month}/${year}, net PKR ${netPayable.toFixed(2)}`);
+        // Reset annual leave balance on December
+        if (month === 12) {
+          await tx.booker.update({
+            where: { id: booker.id },
+            data: { leaveBalanceSick: 10, leaveBalanceCasual: 18 },
+          });
+        }
+
+        logger.info(`[Payroll] Booker ${booker.id}: Basic ${basic} + Perf ${performanceEarned.toFixed(0)} - Penalties ${(missedVisitPenalty + sampleDeduction).toFixed(0)} = Net PKR ${netPayable.toFixed(0)}`);
       });
     } catch (e) {
-      logger.error(`Payroll failed for officer ${officer.id}: ${e.message}`);
+      logger.error(`[Payroll] Failed for booker ${booker.id}: ${e.message}`);
     }
   }
+
+  logger.info(`[Payroll Engine] Done. Finalized for ${bookers.length} bookers.`);
 }

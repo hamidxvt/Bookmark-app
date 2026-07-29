@@ -29,7 +29,7 @@ class _DayStartScreenState extends ConsumerState<DayStartScreen> {
       }
 
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
+        desiredAccuracy: LocationAccuracy.high,
       );
 
       final isMocked = await MockLocationGuard.isMocked(pos);
@@ -39,10 +39,8 @@ class _DayStartScreenState extends ConsumerState<DayStartScreen> {
 
       final dio = ref.read(dioClientProvider);
       await dio.post(ApiConstants.dayStart, data: {
-        'latitude': pos.latitude,
-        'longitude': pos.longitude,
-        'isMocked': false,
-        'batteryLevel': 100,
+        'lat': pos.latitude,
+        'lng': pos.longitude,
       });
 
       if (mounted) context.go('/visits');

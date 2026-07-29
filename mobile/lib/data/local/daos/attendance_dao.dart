@@ -1,27 +1,63 @@
-import 'package:drift/drift.dart';
-
+import 'package:sqflite/sqflite.dart';
 import '../app_database.dart';
-import '../tables/attendance_table.dart';
 
-part 'attendance_dao.g.dart';
+class AttendanceDao {
+  final AppDatabase db;
 
-@DriftAccessor(tables: [AttendanceTable])
-class AttendanceDao extends DatabaseAccessor<AppDatabase>
-    with _$AttendanceDaoMixin {
-  AttendanceDao(super.db);
+  AttendanceDao(this.db);
 
-  Future<AttendanceTableData?> getTodayAttendance(int userId) {
-    final today = DateTime.now();
-    final start = DateTime(today.year, today.month, today.day);
-    final end = start.add(const Duration(days: 1));
-    return (select(attendanceTable)
-          ..where((t) =>
-              t.userId.equals(userId) &
-              t.date.isBetweenValues(start, end)))
-        .getSingleOrNull();
+  Future<Map<String, dynamic>?> getTodayAttendance(int userId) async {
+    final database = await db.database;
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final results = await database.query(
+      'attendance',
+      where: 'user_id = ? AND date = ?',
+      whereArgs: [userId, today],
+    );
+    return results.isNotEmpty ? results.first : null;
   }
 
-  Future<void> upsertAttendance(AttendanceTableCompanion entry) {
-    return into(attendanceTable).insertOnConflictUpdate(entry);
+  Future<void> upsertAttendance(Map<String, dynamic> entry) async {
+    final database = await db.database;
+    final userId = entry['user_id'];
+    final date = entry['date'];
+
+    // Check if record exists
+    final existing = await database.query(
+      'attendance',
+      where: 'user_id = ? AND date = ?',
+      whereArgs: [userId, date],
+    );
+
+    if (existing.isNotEmpty) {
+      await database.update(
+        'attendance',
+        entry,
+        where: 'user_id = ? AND date = ?',
+        whereArgs: [userId, date],
+      );
+    } else {
+      await database.insert(
+        'attendance',
+        entry,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getAttendanceRange(
+    int userId,
+    DateTime start,
+    DateTime end,
+  ) async {
+    final database = await db.database;
+    final startStr = start.toIso8601String().split('T')[0];
+    final endStr = end.toIso8601String().split('T')[0];
+    return database.query(
+      'attendance',
+      where: 'user_id = ? AND date BETWEEN ? AND ?',
+      whereArgs: [userId, startStr, endStr],
+      orderBy: 'date DESC',
+    );
   }
 }

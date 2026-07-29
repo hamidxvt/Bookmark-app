@@ -246,10 +246,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         onTap: () => context.go('/visits'),
                       ).animate(delay: 300.ms).scale(begin: const Offset(0.8, 0.8)).fadeIn(),
                       _QuickAction(
-                        icon: Icons.refresh_rounded,
-                        label: 'Refresh',
-                        color: AppColors.textMuted,
-                        onTap: () => ref.invalidate(workdayStatusProvider),
+                        icon: Icons.account_balance_wallet_outlined,
+                        label: 'Earnings',
+                        color: AppColors.warning,
+                        onTap: () => context.go('/payroll'),
                       ).animate(delay: 350.ms).scale(begin: const Offset(0.8, 0.8)).fadeIn(),
                     ],
                   );

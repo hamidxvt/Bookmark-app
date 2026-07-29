@@ -1,40 +1,69 @@
-import 'package:drift/drift.dart';
-
+import 'package:sqflite/sqflite.dart';
 import '../app_database.dart';
-import '../tables/visits_table.dart';
 
-part 'visits_dao.g.dart';
+class VisitsDao {
+  final AppDatabase db;
 
-@DriftAccessor(tables: [VisitsTable])
-class VisitsDao extends DatabaseAccessor<AppDatabase> with _$VisitsDaoMixin {
-  VisitsDao(super.db);
+  VisitsDao(this.db);
 
-  Future<List<VisitsTableData>> getTodayVisits(DateTime date) {
-    final start = DateTime(date.year, date.month, date.day);
-    final end = start.add(const Duration(days: 1));
-    return (select(visitsTable)
-          ..where((t) => t.scheduledDate.isBetweenValues(start, end))
-          ..orderBy([(t) => OrderingTerm.asc(t.dailySequence)]))
-        .get();
+  Future<List<Map<String, dynamic>>> getTodayVisits(DateTime date) async {
+    final database = await db.database;
+    final dateStr = date.toIso8601String().split('T')[0];
+    return database.query(
+      'visits',
+      where: 'scheduled_date = ?',
+      whereArgs: [dateStr],
+      orderBy: 'daily_sequence ASC',
+    );
   }
 
-  Future<List<VisitsTableData>> getPendingSync() {
-    return (select(visitsTable)
-          ..where((t) => t.syncStatus.equals('pending_sync')))
-        .get();
+  Future<List<Map<String, dynamic>>> getPendingSync() async {
+    final database = await db.database;
+    return database.query(
+      'visits',
+      where: 'sync_status = ?',
+      whereArgs: ['pending_sync'],
+    );
   }
 
-  Future<void> markSynced(int id) {
-    return (update(visitsTable)..where((t) => t.id.equals(id)))
-        .write(const VisitsTableCompanion(syncStatus: Value('synced')));
+  Future<void> markSynced(int visitId) async {
+    final database = await db.database;
+    await database.update(
+      'visits',
+      {'sync_status': 'synced'},
+      where: 'id = ?',
+      whereArgs: [visitId],
+    );
   }
 
-  Future<void> upsertVisits(List<VisitsTableCompanion> visits) async {
-    await batch((b) => b.insertAllOnConflictUpdate(visitsTable, visits));
+  Future<void> upsertVisits(List<Map<String, dynamic>> visits) async {
+    final database = await db.database;
+    for (var visit in visits) {
+      await database.insert(
+        'visits',
+        visit,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
   }
 
-  Future<void> updateVisit(VisitsTableCompanion companion) {
-    return (update(visitsTable)..where((t) => t.id.equals(companion.id.value)))
-        .write(companion);
+  Future<void> updateVisit(Map<String, dynamic> visitData) async {
+    final database = await db.database;
+    await database.update(
+      'visits',
+      visitData,
+      where: 'id = ?',
+      whereArgs: [visitData['id']],
+    );
+  }
+
+  Future<Map<String, dynamic>?> getVisitById(int visitId) async {
+    final database = await db.database;
+    final results = await database.query(
+      'visits',
+      where: 'id = ?',
+      whereArgs: [visitId],
+    );
+    return results.isNotEmpty ? results.first : null;
   }
 }

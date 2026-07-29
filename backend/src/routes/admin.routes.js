@@ -1,19 +1,23 @@
 import { Router } from 'express';
-import { getOfficers, getLiveTracking, getMissedVisits, approveMissedVisit, getPayroll, approveLeave, approveSample, getLocationHistory } from '../controllers/admin.controller.js';
-import { auth } from '../middleware/auth.middleware.js';
-import { requireRole } from '../middleware/role.middleware.js';
+import {
+  getStats, getLeaves, reviewLeave,
+  getMissedVisits, reviewMissedVisit,
+  getBookers, approveBooker, getAttendance,
+} from '../controllers/admin.controller.js';
+import { authMiddleware } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-const adminAuth = [auth, requireRole(['super_admin', 'city_head', 'coordinator'])];
+// All admin routes require auth
+router.use(authMiddleware);
 
-router.get('/officers', ...adminAuth, getOfficers);
-router.get('/tracking/live', ...adminAuth, getLiveTracking);
-router.get('/missed-visits', ...adminAuth, getMissedVisits);
-router.post('/missed-visits/:id/approve', ...adminAuth, approveMissedVisit);
-router.get('/payroll/:month/:year', ...adminAuth, getPayroll);
-router.post('/leaves/:id/approve', ...adminAuth, approveLeave);
-router.post('/samples/:id/approve', ...adminAuth, approveSample);
-router.get('/locations/:id/history', ...adminAuth, getLocationHistory);
+router.get('/stats', getStats);
+router.get('/attendance', getAttendance);
+router.get('/bookers', getBookers);
+router.patch('/bookers/:id/approve', approveBooker);
+router.get('/leaves', getLeaves);
+router.patch('/leaves/:id', reviewLeave);
+router.get('/missed-visits', getMissedVisits);
+router.patch('/missed-visits/:id', reviewMissedVisit);
 
 export default router;

@@ -1,128 +1,175 @@
 import prisma from '../config/database.js';
+import { AppError } from '../middleware/errorHandler.js';
 
-export const getOfficers = async (req, res, next) => {
+// ── Dashboard stats ───────────────────────────────────────────────────────────
+
+export const getStats = async (req, res, next) => {
   try {
-    const where = { role: 'sales_officer', isActive: true };
-    if (req.user.role === 'city_head') where.cityId = req.user.cityId;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    const officers = await prisma.user.findMany({ where, select: { id: true, name: true, email: true, cityId: true, areaId: true } });
-    res.json({ success: true, data: { officers } });
+    const [totalBookers, activeBookers, totalCustomers, totalVisits, visitsToday, pendingLeaves, pendingMissed] =
+      await prisma.$transaction([
+        prisma.booker.count({ where: { adminApproved: 'APPROVED', deletedAt: null } }),
+        prisma.booker.count({ where: { jobStatus: 'ACTIVE', gpsStatus: 'ACTIVE' } }),
+        prisma.customer.count({ where: { deletedAt: null } }),
+        prisma.visit.count(),
+        prisma.visit.count({ where: { visitDate: { gte: today } } }),
+        prisma.leaveRequest.count({ where: { status: 'pending' } }),
+        prisma.missedVisitReason.count({ where: { status: 'pending' } }),
+      ]);
+
+    res.json({
+      success: true,
+      data: {
+        totalBookers, activeBookers, totalCustomers, totalVisits, visitsToday,
+        pendingLeaves, pendingMissed,
+      },
+    });
   } catch (err) { next(err); }
 };
 
-export const getLiveTracking = async (req, res, next) => {
+// ── Leave approvals ───────────────────────────────────────────────────────────
+
+export const getLeaves = async (req, res, next) => {
   try {
-    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const logs = await prisma.gpsLog.findMany({
-      where: { recordedAt: { gte: fiveMinAgo }, isMocked: false },
-      orderBy: { recordedAt: 'desc' },
-      distinct: ['userId'],
-      include: { user: { select: { name: true } } },
+    const { status } = req.query;
+    const leaves = await prisma.leaveRequest.findMany({
+      where: status ? { status } : {},
+      include: { booker: { select: { id: true, name: true, email: true, phone: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    res.json({ success: true, data: leaves });
+  } catch (err) { next(err); }
+};
+
+export const reviewLeave = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { status, adminNotes } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      throw new AppError('INVALID_STATUS', 400, 'Status must be approved or rejected');
+    }
+
+    const leave = await prisma.leaveRequest.findUnique({ where: { id } });
+    if (!leave) throw new AppError('NOT_FOUND', 404, 'Leave request not found');
+
+    // If approving, deduct leave balance
+    if (status === 'approved' && leave.status !== 'approved') {
+      const field = leave.leaveType === 'sick' ? 'leaveBalanceSick' : 'leaveBalanceCasual';
+      await prisma.booker.update({
+        where: { id: leave.bookerId },
+        data: { [field]: { decrement: leave.days } },
+      });
+    }
+
+    const updated = await prisma.leaveRequest.update({
+      where: { id },
+      data: { status, adminNotes: adminNotes ?? null, reviewedBy: req.user?.id ?? null, reviewedAt: new Date() },
     });
 
-    const officers = logs.map((l) => ({
-      userId: l.userId, name: l.user.name,
-      lastPing: l.recordedAt, lat: l.latitude, lng: l.longitude, batteryLevel: l.batteryLevel,
-    }));
-
-    res.json({ success: true, data: { officers } });
+    res.json({ success: true, data: updated });
   } catch (err) { next(err); }
 };
+
+// ── Missed visit approvals ────────────────────────────────────────────────────
 
 export const getMissedVisits = async (req, res, next) => {
   try {
-    const where = { status: 'missed', approvalStatus: 'pending' };
-    if (req.user.role === 'city_head') {
-      where.user = { cityId: req.user.cityId };
+    const { status } = req.query;
+    const reasons = await prisma.missedVisitReason.findMany({
+      where: status ? { status } : {},
+      include: {
+        booker: { select: { id: true, name: true, email: true } },
+        visit: {
+          select: {
+            id: true, visitDate: true,
+            customer: { select: { id: true, name: true, customerType: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+    res.json({ success: true, data: reasons });
+  } catch (err) { next(err); }
+};
+
+export const reviewMissedVisit = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id);
+    const { status, adminNote } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      throw new AppError('INVALID_STATUS', 400, 'Status must be approved or rejected');
     }
-    const visits = await prisma.visit.findMany({
-      where, include: { user: { select: { name: true } }, location: { select: { name: true } } },
-      orderBy: { updatedAt: 'desc' },
+
+    const reason = await prisma.missedVisitReason.update({
+      where: { id },
+      data: { status, adminNote: adminNote ?? null },
     });
-    res.json({ success: true, data: { visits } });
+
+    res.json({ success: true, data: reason });
   } catch (err) { next(err); }
 };
 
-export const approveMissedVisit = async (req, res, next) => {
+// ── Booker management ─────────────────────────────────────────────────────────
+
+export const getBookers = async (req, res, next) => {
+  try {
+    const { status, cityId } = req.query;
+    const bookers = await prisma.booker.findMany({
+      where: {
+        deletedAt: null,
+        ...(status && { adminApproved: status }),
+        ...(cityId && { cityId: parseInt(cityId) }),
+      },
+      select: {
+        id: true, name: true, email: true, phone: true,
+        jobStatus: true, adminApproved: true, cityId: true, regionId: true,
+        visitTargets: true, ratesPerVisit: true, basicSalary: true,
+        gpsStatus: true, lastSeenAt: true,
+        city: { select: { name: true } },
+        region: { select: { name: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, data: bookers });
+  } catch (err) { next(err); }
+};
+
+export const approveBooker = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id);
-    const { approved, comment } = req.body;
-    const status = approved ? 'approved' : 'rejected';
+    const { approved, jobStatus } = req.body;
 
-    await prisma.$transaction(async (tx) => {
-      await tx.visit.update({ where: { id }, data: { approvalStatus: status, approvedById: req.user.id } });
-      if (!approved) {
-        const visit = await tx.visit.findUnique({ where: { id }, include: { user: true } });
-        await tx.user.update({
-          where: { id: visit.userId },
-          data: { },  // Penalty handled by payroll engine
-        });
-      }
-      await tx.auditLog.create({
-        data: { actorId: req.user.id, action: `missed_visit_${status}`, targetType: 'visit', targetId: id, after: { comment }, ipAddress: req.ip },
-      });
+    const booker = await prisma.booker.update({
+      where: { id },
+      data: {
+        adminApproved: approved ? 'APPROVED' : 'NOT_APPROVED',
+        ...(jobStatus && { jobStatus }),
+      },
     });
 
-    res.json({ success: true, data: { approvalStatus: status } });
+    res.json({ success: true, data: booker });
   } catch (err) { next(err); }
 };
 
-export const getPayroll = async (req, res, next) => {
+// ── Attendance overview ───────────────────────────────────────────────────────
+
+export const getAttendance = async (req, res, next) => {
   try {
-    const month = parseInt(req.params.month);
-    const year = parseInt(req.params.year);
-    const where = { month, year };
-    if (req.user.role === 'city_head') where.user = { cityId: req.user.cityId };
+    const date = req.query.date ? new Date(req.query.date) : new Date();
+    date.setHours(0, 0, 0, 0);
 
-    const ledgers = await prisma.payrollLedger.findMany({
-      where, include: { user: { select: { name: true, email: true } } },
-    });
-    res.json({ success: true, data: { month, year, ledgers } });
-  } catch (err) { next(err); }
-};
-
-export const approveLeave = async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    const { approved } = req.body;
-
-    await prisma.$transaction(async (tx) => {
-      const leave = await tx.leaveRequest.findUnique({ where: { id } });
-      const status = approved ? 'approved' : 'rejected';
-      await tx.leaveRequest.update({ where: { id }, data: { status, approvedById: req.user.id } });
-
-      if (approved) {
-        const field = leave.leaveType === 'sick' ? 'leaveBalanceSick' : 'leaveBalanceCasual';
-        await tx.user.update({ where: { id: leave.userId }, data: { [field]: { decrement: leave.days } } });
-      }
-
-      await tx.auditLog.create({
-        data: { actorId: req.user.id, action: `leave_${status}`, targetType: 'leave_request', targetId: id, ipAddress: req.ip },
-      });
+    const records = await prisma.attendance.findMany({
+      where: { date },
+      include: { booker: { select: { id: true, name: true, email: true, phone: true } } },
+      orderBy: { startAt: 'desc' },
     });
 
-    res.json({ success: true, data: { message: `Leave ${approved ? 'approved' : 'rejected'}` } });
-  } catch (err) { next(err); }
-};
-
-export const approveSample = async (req, res, next) => {
-  try {
-    const id = parseInt(req.params.id);
-    const { approved } = req.body;
-    const status = approved ? 'approved' : 'rejected';
-    await prisma.sampleRequest.update({ where: { id }, data: { status, approvedById: req.user.id } });
-    res.json({ success: true, data: { status } });
-  } catch (err) { next(err); }
-};
-
-export const getLocationHistory = async (req, res, next) => {
-  try {
-    const locationId = parseInt(req.params.id);
-    const visits = await prisma.visit.findMany({
-      where: { locationId, status: 'completed' },
-      include: { user: { select: { name: true } } },
-      orderBy: { scheduledDate: 'desc' },
-    });
-    res.json({ success: true, data: { visits } });
+    res.json({ success: true, data: records });
   } catch (err) { next(err); }
 };

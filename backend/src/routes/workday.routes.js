@@ -1,23 +1,14 @@
 import { Router } from 'express';
-import { dayStart, dayEnd, cannotWork } from '../controllers/workday.controller.js';
-import { auth } from '../middleware/auth.middleware.js';
-import { validate } from '../middleware/validate.middleware.js';
-import { z } from 'zod';
+import { dayStart, dayEnd, cannotWork, getStatus } from '../controllers/workday.controller.js';
+import { authMiddleware } from '../middleware/auth.middleware.js';
 
 const router = Router();
 
-const locationSchema = z.object({
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
-  isMocked: z.boolean(),
-  batteryLevel: z.number().int().min(0).max(100).optional(),
-});
+router.use(authMiddleware);
 
-router.post('/day-start', auth, validate(locationSchema), dayStart);
-router.post('/day-end', auth, validate(locationSchema), dayEnd);
-router.post('/cannot-work', auth, validate(z.object({
-  reason: z.string().min(3),
-  notes: z.string().optional(),
-})), cannotWork);
+router.post('/day-start', dayStart);
+router.post('/day-end', dayEnd);
+router.post('/cannot-work', cannotWork);
+router.get('/status', getStatus);
 
 export default router;

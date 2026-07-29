@@ -1,37 +1,55 @@
 class ApiConstants {
   ApiConstants._();
 
-  // 10.0.2.2 maps to host machine localhost when running in Android emulator
-  static const String _devBase = 'http://10.0.2.2:3000/api/v1';
-  static const String _prodBase = 'https://api.bookmark.services/api/v1';
+  // Production: Next.js admin dashboard serves the mobile API
+  static const String _prodBase = 'https://bookmark-production-00c6.up.railway.app/api/mobile';
 
-  static const bool _isProduction = bool.fromEnvironment('dart.vm.product');
-  static String get baseUrl => _isProduction ? _prodBase : _devBase;
+  // Local dev: Node.js backend on port 3001 (needs: adb reverse tcp:3001 tcp:3001)
+  static const String _devBase = 'http://10.0.2.2:3001/api/v1';
 
-  // Auth
-  static const String login = '/auth/login';
+  // Use production — no local backend needed
+  static const bool _useProduction = true;
+  static String get baseUrl => _useProduction ? _prodBase : _devBase;
+
+  // ── Auth ────────────────────────────────────────────────────────────────
+  static const String login = '/auth';
   static const String changePassword = '/auth/change-password';
+  static const String me = '/me';
 
-  // Workday
-  static const String dayStart = '/workday/day-start';
-  static const String dayEnd = '/workday/day-end';
-  static const String cannotWork = '/workday/cannot-work';
+  // ── Workday ─────────────────────────────────────────────────────────────
+  static const String dayStart = '/workday';
+  static const String dayEnd = '/workday';
+  static const String cannotWork = '/workday';
+  static const String workdayStatus = '/workday';
 
-  // Visits
-  static const String todayVisits = '/visits/today';
+  // ── Visits ──────────────────────────────────────────────────────────────
+  static const String todayVisits = '/visits';
+  static const String adhocVisit = '/visits/adhoc';
   static String visitStart(int id) => '/visits/$id/start';
   static String visitComplete(int id) => '/visits/$id/complete';
+  static String visitMiss(int id) => '/visits/$id/miss';
   static String visitEdit(int id) => '/visits/$id/edit';
-  static String visitMissed(int id) => '/visits/$id/mark-missed';
-  static const String adhocVisit = '/visits/adhoc';
 
-  // Tracking
-  static const String trackingPing = '/tracking/ping';
+  // ── GPS Tracking ─────────────────────────────────────────────────────────
+  static const String gpsPing = '/gps';
+  static const String livePositions = '/gps/live';
 
-  // Samples
-  static const String sampleRequest = '/samples/request';
-  static String sampleRecover(int id) => '/samples/$id/recover';
+  // ── Leaves ──────────────────────────────────────────────────────────────
+  static const String leaveBalance = '/leaves';
+  static const String myLeaves = '/leaves';
+  static const String applyLeave = '/leaves';
 
-  // Leaves
-  static const String applyLeave = '/leaves/apply';
+  // ── Samples ─────────────────────────────────────────────────────────────
+  static const String mySamples = '/samples';
+  static const String requestSamples = '/samples';
+  static String recoverSample(int id) => '/samples/$id/recover';
+
+  // ── Payroll ─────────────────────────────────────────────────────────────
+  static const String myPayroll = '/payroll';
+
+  // ── Admin ────────────────────────────────────────────────────────────────
+  static const String adminStats = '/admin/stats';
+  static const String adminAttendance = '/admin/attendance';
+  static const String adminLeaves = '/admin/leaves';
+  static const String adminMissedVisits = '/admin/missed-visits';
 }

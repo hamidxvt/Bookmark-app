@@ -1,17 +1,23 @@
 import jwt from 'jsonwebtoken';
 import { AppError } from './errorHandler.js';
 
-export const auth = (req, res, next) => {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    return next(new AppError('UNAUTHORIZED', 401, 'Missing or invalid authorization header'));
-  }
-  const token = header.split(' ')[1];
+const JWT_SECRET = process.env.JWT_SECRET;
+
+export const authMiddleware = (req, res, next) => {
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload;
+    const auth = req.headers.authorization ?? '';
+    if (!auth.startsWith('Bearer ')) {
+      throw new AppError('UNAUTHORIZED', 401, 'Authentication token required');
+    }
+
+    const token = auth.slice(7);
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = payload; // { id, email, role }
     next();
-  } catch {
-    next(new AppError('TOKEN_INVALID', 401, 'Token is invalid or expired'));
+  } catch (err) {
+    if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
+      return next(new AppError('INVALID_TOKEN', 401, 'Invalid or expired token'));
+    }
+    next(err);
   }
 };
