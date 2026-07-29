@@ -22,7 +22,6 @@ export async function GET(req: Request) {
           skip,
           take,
           orderBy: { name: "asc" },
-          include: { brand: { select: { id: true, name: true } } },
         }),
         prisma.series.count(),
       ]);
