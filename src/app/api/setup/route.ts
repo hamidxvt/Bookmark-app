@@ -8,13 +8,6 @@ export async function GET() {
     const adminHash = await bcrypt.hash("Admin@123", 12);
     const officerHash = await bcrypt.hash("Officer@123", 12);
 
-    // Ensure a city exists
-    const city = await prisma.city.upsert({
-      where: { name: "Karachi" },
-      update: {},
-      create: { name: "Karachi" },
-    });
-
     // Admin user
     await prisma.user.upsert({
       where: { email: "admin@bookmark.pk" },
@@ -27,10 +20,19 @@ export async function GET() {
       },
     });
 
+    // Find or create city
+    let city = await prisma.city.findFirst({ where: { name: "Karachi" } });
+    if (!city) {
+      city = await prisma.city.create({ data: { name: "Karachi" } });
+    }
+
     // Test booker (sales officer)
     await prisma.booker.upsert({
       where: { email: "officer@bookmark.pk" },
-      update: {},
+      update: {
+        jobStatus: "ACTIVE",
+        adminApproved: "APPROVED",
+      },
       create: {
         name: "Test Officer",
         email: "officer@bookmark.pk",
@@ -46,7 +48,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      message: "Seeded: admin@bookmark.pk + officer@bookmark.pk",
+      message: "Seeded: admin@bookmark.pk / Admin@123  +  officer@bookmark.pk / Officer@123",
     });
   } catch (err) {
     console.error("[setup]", err);
