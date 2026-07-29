@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
 
+type LeaveRecord = Awaited<ReturnType<typeof prisma.leaveRequest.findMany>>[number];
+
 // GET /api/mobile/leaves — leave balance + history
 export async function GET(req: Request) {
   const user = getMobileUser(req);
@@ -17,16 +19,16 @@ export async function GET(req: Request) {
       take: 30,
     });
 
-    const approved = leaves.filter(l => l.status === "approved");
+    const approved = leaves.filter((l: LeaveRecord) => l.status === "approved");
     const sickTaken = approved
-      .filter(l => l.leaveType === "sick")
-      .reduce((sum, l) => {
+      .filter((l: LeaveRecord) => l.leaveType === "sick")
+      .reduce((sum: number, l: LeaveRecord) => {
         const days = Math.ceil((l.toDate.getTime() - l.fromDate.getTime()) / 86400000) + 1;
         return sum + days;
       }, 0);
     const casualTaken = approved
-      .filter(l => l.leaveType === "casual")
-      .reduce((sum, l) => {
+      .filter((l: LeaveRecord) => l.leaveType === "casual")
+      .reduce((sum: number, l: LeaveRecord) => {
         const days = Math.ceil((l.toDate.getTime() - l.fromDate.getTime()) / 86400000) + 1;
         return sum + days;
       }, 0);
@@ -42,7 +44,7 @@ export async function GET(req: Request) {
           sickRemaining: Math.max(0, 10 - sickTaken),
           casualRemaining: Math.max(0, 18 - casualTaken),
         },
-        history: leaves.map(l => ({
+        history: leaves.map((l: LeaveRecord) => ({
           id: l.id,
           type: l.leaveType,
           fromDate: l.fromDate,
