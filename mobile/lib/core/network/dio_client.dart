@@ -56,6 +56,12 @@ class DioClient {
 
   Future<Response> put(String path, {dynamic data}) =>
       _dio.put(path, data: data);
+
+  Future<Response> patch(String path, {dynamic data}) =>
+      _dio.patch(path, data: data);
+
+  Future<Response> delete(String path, {dynamic data}) =>
+      _dio.delete(path, data: data);
 }
 
 class ApiException implements Exception {
@@ -67,10 +73,15 @@ class ApiException implements Exception {
 
   factory ApiException.fromDio(DioException e) {
     final data = e.response?.data;
+    // Support both { error: "string" } and { error: { code, message } } formats
+    final errField = data?['error'];
+    final msg = errField is String
+        ? errField
+        : (errField is Map ? errField['message'] : null) ?? e.message ?? 'Something went wrong';
     return ApiException(
       statusCode: e.response?.statusCode ?? 0,
-      code: data?['error']?['code'] ?? 'UNKNOWN_ERROR',
-      message: data?['error']?['message'] ?? e.message ?? 'Something went wrong',
+      code: (errField is Map ? errField['code'] : null) ?? 'UNKNOWN_ERROR',
+      message: msg,
     );
   }
 
