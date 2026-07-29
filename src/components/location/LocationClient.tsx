@@ -127,7 +127,7 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
       {/* Side panel */}
       <div className="w-72 shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-y-auto">
         <div className="p-4 border-b border-slate-100">
-          <p className="text-sm font-semibold text-slate-800">Bookers — {city}</p>
+          <p className="text-sm font-semibold text-slate-800">Bookers in Field</p>
           <p className="text-xs text-slate-400">{bookers.length} members · Live data</p>
         </div>
 
@@ -156,7 +156,7 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-slate-800 truncate">{b.name}</p>
-                  <p className="text-xs text-slate-400">{(b.city as any)?.name ?? city}</p>
+                  <p className="text-xs text-slate-400">{(b.city as any)?.name ?? "Location tracking"}</p>
                   {b.lastSeenAt && (
                     <div className="flex items-center gap-1 mt-0.5">
                       <Clock className="h-3 w-3 text-slate-400" />
@@ -170,7 +170,7 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
           })}
 
           {!loading && bookers.length === 0 && (
-            <p className="px-5 py-8 text-center text-sm text-slate-400">No bookers found for {city}</p>
+            <p className="px-5 py-8 text-center text-sm text-slate-400">No bookers in field yet</p>
           )}
         </div>
 
