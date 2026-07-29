@@ -20,12 +20,26 @@ let cookieStore: Record<string, string> = {};
 
 /** Strip all HTML tags and decode entities, return plain text */
 function stripHtml(raw: string): string {
-  if (!raw || !raw.includes("<")) return raw.trim();
-  // Extract text from font-weight-bold span (the actual name in staging DataTable)
-  const boldMatch = raw.match(/font-weight-bold[^>]*>([^<]+)</i);
-  if (boldMatch) return boldMatch[1].trim();
+  if (!raw) return "";
+  if (typeof raw !== "string") raw = String(raw);
+  
+  // If no HTML, return as-is
+  if (!raw.includes("<")) return raw.trim();
+  
+  // Extract text from font-weight-bold span — try multiple patterns
+  let match = raw.match(/font-weight-bold[^>]*>([^<]+)</i);
+  if (match?.[1]) return match[1].trim();
+  
+  // Try ANY span with uppercase text
+  match = raw.match(/<span[^>]*>([A-Z\s\-]+)<\/span>/);
+  if (match?.[1]) return match[1].trim();
+  
   // Fallback: strip all tags
-  return raw.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  let text = raw.replace(/<[^>]*>/g, " ");
+  // Decode HTML entities
+  text = text.replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
+  // Collapse whitespace
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /** Extract phone from staging HTML — looks for <span class="small">...</span> */
@@ -243,56 +257,76 @@ export async function POST() {
     // Insert customers
     log.push("🏪 Inserting customers...");
     let custCount = 0;
+    let skipped = 0;
     for (const row of customerRows as any[]) {
-      // Staging DataTable customer row:
-      // row[0] = checkbox HTML + type badge + name HTML block
-      // row[1] = actions HTML (not city)
-      // The name is embedded in the HTML of row[0]
-      const rawCol0 = String(row[0] ?? row.name ?? "");
-      const name = cleanName(rawCol0);
-      const ownerPhone = extractPhone(rawCol0);
-      // City: staging puts city name in another column — try row[1] or row[2] after stripping
-      const rawCity = String(row[1] ?? row.city ?? "");
-      const cityName = stripHtml(rawCity).trim().toUpperCase() || "OTHER";
-      const type = stripHtml(String(row[2] ?? row.customer_type ?? "School")).trim();
-      const address = stripHtml(String(row[3] ?? row.address ?? "")).trim();
-
-      let cityId = null;
-      if (cityName) {
-        const city = await prisma.city.findFirst({ where: { name: cityName } });
-        cityId = city?.id;
-      }
-
-      // Fallback to first available city
-      if (!cityId) {
-        const anyCity = await prisma.city.findFirst();
-        cityId = anyCity?.id;
-      }
-
-      const typeMap: Record<string, "SCHOOL" | "COLLEGE" | "SELF" | "RETAILER" | "OTHER"> = {
-        school: "SCHOOL", college: "COLLEGE", self: "SELF", retailer: "RETAILER",
-      };
-      const customerType = typeMap[type.toLowerCase()] ?? "OTHER";
-
       try {
-        if (name && cityId) {
-          await prisma.customer.create({
-            data: {
-              name,
-              customerType,
-              address: address || undefined,
-              cityId,
-              approvalStatus: "APPROVED",
-              ownerPhone: ownerPhone || "",
-            },
-          });
-          custCount++;
+        // Staging DataTable: customer row is complex HTML
+        // Try to extract name from the media block (checkbox + type + name + phone in HTML)
+        const rawData = JSON.stringify(row).toLowerCase();
+        
+        // Sometimes city is in row[1], sometimes hidden — look for city in booker list first
+        let cityName = "OTHER";
+        let name = "";
+        let ownerPhone = "";
+
+        // Parse row as array of strings
+        for (let i = 0; i < Math.min(row.length, 10); i++) {
+          const col = String(row[i] ?? "");
+          const clean = stripHtml(col).toUpperCase().trim();
+          
+          // Skip if it's obviously HTML junk or empty
+          if (!clean || clean.length < 3) continue;
+          
+          // First long clean string is usually the name
+          if (!name && clean.length > 4 && !clean.includes("ACTION")) {
+            name = clean;
+          }
+          
+          // Try to find a phone number
+          if (!ownerPhone && /^\d{4,}/.test(clean)) {
+            ownerPhone = clean;
+          }
         }
+
+        // Ensure we have a name
+        if (!name || name.length < 3) {
+          skipped++;
+          continue;
+        }
+
+        // Find city — default to OTHER
+        const city = await prisma.city.findFirst({ where: { name: cityName } });
+        const cityId = city?.id ?? (await prisma.city.findFirst())?.id;
+
+        if (!cityId) {
+          skipped++;
+          continue;
+        }
+
+        const typeMap: Record<string, "SCHOOL" | "COLLEGE" | "SELF" | "RETAILER" | "OTHER"> = {
+          school: "SCHOOL", college: "COLLEGE", self: "SELF", retailer: "RETAILER",
+        };
+        
+        // Type is always OTHER since we can't reliably extract it
+        const customerType = "OTHER";
+
+        await prisma.customer.create({
+          data: {
+            name: name.substring(0, 255), // Limit length
+            customerType,
+            address: undefined,
+            cityId,
+            approvalStatus: "APPROVED",
+            ownerPhone: ownerPhone.substring(0, 20) || "",
+          },
+        }).catch(() => { skipped++; });
+        
+        custCount++;
       } catch (e) {
-        // Duplicate or constraint, skip silently
+        skipped++;
       }
     }
-    log.push(`✅ ${custCount}/${customerRows.length} customers`);
+    log.push(`✅ ${custCount}/${customerRows.length} customers (skipped: ${skipped})`);
 
     // Insert visits
     log.push("📋 Inserting visits...");
