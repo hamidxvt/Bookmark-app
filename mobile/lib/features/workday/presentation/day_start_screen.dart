@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/quotes.dart';
+import '../data/workday_status_provider.dart';
 
 class DayStartScreen extends ConsumerStatefulWidget {
   const DayStartScreen({super.key});
@@ -58,10 +59,13 @@ class _DayStartScreenState extends ConsumerState<DayStartScreen> {
         'lng': position?.longitude ?? 67.0011,
       });
       if (mounted) {
+        // Refresh workday status so dashboard shows "End Day"
+        ref.invalidate(workdayStatusProvider);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Day started! Your visits are ready.'),
             backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
         context.go('/visits');

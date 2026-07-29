@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/quotes.dart';
+import '../data/workday_status_provider.dart';
 
 class DayEndScreen extends ConsumerStatefulWidget {
   const DayEndScreen({super.key});
@@ -52,20 +53,24 @@ class _DayEndScreenState extends ConsumerState<DayEndScreen> {
         'lng': position?.longitude ?? 67.0011,
       });
       if (mounted) {
+        ref.invalidate(workdayStatusProvider);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Text('Day ended. Great work today!'),
             backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
           ),
         );
         context.go('/dashboard');
       }
     } catch (e) {
       if (mounted) {
+        final msg = e is ApiException ? e.message : 'Could not end day. Try again.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to end day: $e'),
+            content: Text(msg),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
