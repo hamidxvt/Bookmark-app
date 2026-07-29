@@ -25,9 +25,9 @@ export async function GET(req: Request) {
     };
 
     for (const req of requests) {
-      const type = req.type?.toLowerCase() ?? "casual";
+      const type = req.leaveType?.toLowerCase() ?? "casual";
       if (type in typeMap) {
-        const days = new Date(req.to).getTime() - new Date(req.from).getTime();
+        const days = new Date(req.toDate).getTime() - new Date(req.fromDate).getTime();
         typeMap[type].used += Math.ceil(days / (1000 * 60 * 60 * 24)) + 1;
       }
     }

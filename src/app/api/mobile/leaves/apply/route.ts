@@ -20,9 +20,9 @@ export async function POST(req: Request) {
     const request = await prisma.leaveRequest.create({
       data: {
         bookerId: user.id,
-        type: type.charAt(0).toUpperCase() + type.slice(1).toLowerCase(),
-        from: new Date(from),
-        to: new Date(to),
+        leaveType: type.charAt(0).toUpperCase() + type.slice(1).toLowerCase(),
+        fromDate: new Date(from),
+        toDate: new Date(to),
         reason,
         status: "pending",
       },

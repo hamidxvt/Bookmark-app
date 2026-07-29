@@ -15,9 +15,9 @@ export async function GET(req: Request) {
 
     const data = requests.map(r => ({
       id: r.id,
-      type: r.type ?? "Casual",
-      from: r.from.toISOString(),
-      to: r.to.toISOString(),
+      type: r.leaveType ?? "Casual",
+      from: r.fromDate.toISOString(),
+      to: r.toDate.toISOString(),
       reason: r.reason ?? "",
       status: r.status ?? "pending",
       createdAt: r.createdAt.toISOString(),
