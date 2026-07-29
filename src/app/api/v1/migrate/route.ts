@@ -120,7 +120,7 @@ export async function POST() {
         const city = cityName ? await prisma.city.findFirst({ where: { name: cityName } }) : null;
         const existing = await prisma.customer.findFirst({ where: { name, cityId: city?.id ?? undefined } });
         if (!existing) {
-          await prisma.customer.create({ data: { name, type: type as any, address: address || null, cityId: city?.id ?? null, approvalStatus: "APPROVED" } });
+          await prisma.customer.create({ data: { name, type: type as any, address: address || undefined, cityId: city?.id, approvalStatus: "APPROVED" } });
           custOk++;
         }
       } catch {}

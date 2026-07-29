@@ -191,8 +191,8 @@ async function migrateCustomers(rows: any[]) {
           data: {
             name,
             type: type as any,
-            address: address || null,
-            cityId: city?.id ?? null,
+            address: address || undefined,
+            cityId: city?.id,
             approvalStatus: "APPROVED",
           },
         });

@@ -8,7 +8,7 @@ export default function MigratePage() {
   const [error, setError] = useState("");
 
   async function runMigration() {
-    if (!confirm("This will pull all bookers, customers, visits, products from staging.bookmark.services and insert them into the live database. Run once only. Continue?")) return;
+    if (!confirm("This will pull all bookers, customers, visits, products from staging.bookmark.services and insert them into your Railway database. Run once only. Continue?")) return;
 
     setLoading(true);
     setLog([]);
@@ -16,7 +16,7 @@ export default function MigratePage() {
     setDone(false);
 
     try {
-      const res = await fetch("/api/v1/migrate", { method: "POST" });
+      const res = await fetch("/api/v1/migrate-from-staging", { method: "POST" });
       const json = await res.json();
       setLog(json.log ?? []);
       if (json.success) {
