@@ -1,5 +1,7 @@
 import { NextAuthOptions, getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET ?? "dev-secret-change-me-in-prod-32chars",
@@ -15,19 +17,27 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
 
-        // Demo login – replace with DB lookup when Prisma is connected
-        if (
-          credentials.email === "admin@gmail.com" &&
-          credentials.password === "admin#123"
-        ) {
+        try {
+          const user = await prisma.user.findUnique({
+            where: { email: credentials.email },
+            select: { id: true, name: true, email: true, role: true, password: true },
+          });
+
+          if (!user) return null;
+
+          const valid = await bcrypt.compare(credentials.password, user.password);
+          if (!valid) return null;
+
           return {
-            id: "1",
-            email: "admin@gmail.com",
-            name: "Sheraz Ahmed Nagani",
-            role: "ADMIN",
+            id: String(user.id),
+            email: user.email,
+            name: user.name,
+            role: user.role,
           };
+        } catch (err) {
+          console.error("[auth] DB lookup failed:", err);
+          return null;
         }
-        return null;
       },
     }),
   ],
