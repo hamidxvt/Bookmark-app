@@ -21,7 +21,6 @@ class BackgroundGpsService {
         enableHeadless: true, // Run headless tasks
         requiresBatteryNotLow: false,
         requiresDeviceIdle: false,
-        requiresNetworking: true,
         startOnBoot: true,
       ),
       _onBackgroundFetch,
