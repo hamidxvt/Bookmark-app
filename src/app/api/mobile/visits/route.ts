@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
 
+type Visit = Awaited<ReturnType<typeof prisma.visit.findMany>>[number];
+
 // GET /api/mobile/visits — today's visits for logged-in booker
 export async function GET(req: Request) {
   const user = getMobileUser(req);
@@ -33,7 +35,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({
       success: true,
-      data: visits.map((v, i) => ({
+      data: visits.map((v: Visit, i) => ({
         id: v.id,
         sequence: i + 1,
         customerId: v.customerId,
