@@ -1,12 +1,46 @@
 import { NextResponse } from "next/server";
-import { getDashboardStats } from "@/lib/staging";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
-    const stats = await getDashboardStats();
-    return NextResponse.json({ success: true, data: stats });
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [
+      totalBookers,
+      totalCustomers,
+      totalVisits,
+      visitsToday,
+      totalProducts,
+      pendingRequests,
+      pendingLeaves,
+      pendingMissedVisits,
+    ] = await Promise.all([
+      prisma.booker.count({ where: { adminApproved: "APPROVED" } }),
+      prisma.customer.count({ where: { deletedAt: null } }),
+      prisma.visit.count(),
+      prisma.visit.count({ where: { visitDate: today } }),
+      prisma.product.count(),
+      prisma.request.count({ where: { status: "PENDING" } }),
+      prisma.leaveRequest.count({ where: { status: "pending" } }),
+      prisma.missedVisitReason.count({ where: { status: "pending" } }),
+    ]);
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        totalBookers,
+        totalCustomers,
+        totalVisits,
+        visitsToday,
+        totalProducts,
+        pendingRequests,
+        pendingLeaves,
+        pendingMissedVisits,
+      },
+    });
   } catch (err) {
-    console.error("[api/dashboard]", err);
+    console.error("[api/v1/dashboard]", err);
     return NextResponse.json({ success: false, error: "Failed to fetch stats" }, { status: 500 });
   }
 }

@@ -67,7 +67,7 @@ export default function RequestsClient() {
       <div className="rounded-2xl bg-white border border-slate-200 shadow-xs overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <h3 className="text-sm font-semibold text-slate-800">Support Tickets</h3>
-          <span className="text-xs text-slate-400">{total.toLocaleString()} total · Live from staging</span>
+          <span className="text-xs text-slate-400">{total.toLocaleString()} total · Live data</span>
         </div>
 
         {loading ? (

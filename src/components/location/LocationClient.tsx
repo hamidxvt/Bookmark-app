@@ -7,11 +7,11 @@ import { getGpsStatusColor, timeAgo } from "@/lib/utils";
 interface BookerLoc {
   id: number;
   name: string;
-  city?: string;
-  latitude: string | null;
-  longitude: string | null;
-  gps_status: string;
-  last_seen_at: string | null;
+  city?: { id: number; name: string } | null;
+  lastLatitude: number | null;
+  lastLongitude: number | null;
+  gpsStatus: string;
+  lastSeenAt: string | null;
 }
 
 interface Counts {
@@ -33,8 +33,7 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
   async function load() {
     setLoading(true);
     try {
-      const cityParam = city !== "All" ? `?city=${city.toLowerCase()}` : "";
-      const res = await fetch(`/api/v1/location${cityParam}`).then(r => r.json());
+      const res = await fetch(`/api/v1/location`).then(r => r.json());
       if (res.success) {
         setBookers(res.data?.bookers ?? []);
         setCounts(res.data?.counts ?? { total: 0, active: 0, idle: 0, offline: 0 });
@@ -105,7 +104,7 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
 
         {/* Booker pins (positioned relatively until real map loads) */}
         {bookers.map((b, i) => {
-          const gps = getGpsStatusColor(b.gps_status ?? "OFFLINE");
+          const gps = getGpsStatusColor(b.gpsStatus ?? "OFFLINE");
           const top = 25 + (i * 18) % 50;
           const left = 15 + (i * 22) % 65;
           return (
@@ -126,7 +125,7 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
       <div className="w-72 shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-y-auto">
         <div className="p-4 border-b border-slate-100">
           <p className="text-sm font-semibold text-slate-800">Bookers — {city}</p>
-          <p className="text-xs text-slate-400">{bookers.length} members · Live from staging</p>
+          <p className="text-xs text-slate-400">{bookers.length} members · Live data</p>
         </div>
 
         <div className="flex-1 divide-y divide-slate-50">
@@ -141,7 +140,7 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
           ))}
 
           {!loading && bookers.map(b => {
-            const gps = getGpsStatusColor(b.gps_status ?? "OFFLINE");
+            const gps = getGpsStatusColor(b.gpsStatus ?? "OFFLINE");
             const isSelected = selected === b.id;
             return (
               <button key={b.id} onClick={() => setSelected(b.id === selected ? null : b.id)}
@@ -154,11 +153,11 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-slate-800 truncate">{b.name}</p>
-                  <p className="text-xs text-slate-400">{b.city ?? city}</p>
-                  {b.last_seen_at && (
+                  <p className="text-xs text-slate-400">{(b.city as any)?.name ?? city}</p>
+                  {b.lastSeenAt && (
                     <div className="flex items-center gap-1 mt-0.5">
                       <Clock className="h-3 w-3 text-slate-400" />
-                      <span className="text-[10px] text-slate-400">{timeAgo(b.last_seen_at)}</span>
+                      <span className="text-[10px] text-slate-400">{timeAgo(b.lastSeenAt)}</span>
                     </div>
                   )}
                 </div>
@@ -177,15 +176,15 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
           <div className="border-t border-slate-200 p-4 bg-slate-50">
             <p className="text-xs font-semibold text-slate-700 mb-2">📍 {selectedBooker.name}</p>
             <div className="space-y-1 text-xs text-slate-600">
-              <p>Status: <span className={`font-medium ${getGpsStatusColor(selectedBooker.gps_status ?? "OFFLINE").text}`}>
-                {getGpsStatusColor(selectedBooker.gps_status ?? "OFFLINE").label}
+              <p>Status: <span className={`font-medium ${getGpsStatusColor(selectedBooker.gpsStatus ?? "OFFLINE").text}`}>
+                {getGpsStatusColor(selectedBooker.gpsStatus ?? "OFFLINE").label}
               </span></p>
-              {selectedBooker.last_seen_at && (
-                <p>Last seen: <span className="font-medium text-slate-800">{timeAgo(selectedBooker.last_seen_at)}</span></p>
+              {selectedBooker.lastSeenAt && (
+                <p>Last seen: <span className="font-medium text-slate-800">{timeAgo(selectedBooker.lastSeenAt)}</span></p>
               )}
-              {selectedBooker.latitude && selectedBooker.longitude && (
+              {selectedBooker.lastLatitude && selectedBooker.lastLongitude && (
                 <p className="text-[10px] font-mono text-slate-400 mt-1">
-                  {selectedBooker.latitude}, {selectedBooker.longitude}
+                  {selectedBooker.lastLatitude}, {selectedBooker.lastLongitude}
                 </p>
               )}
             </div>

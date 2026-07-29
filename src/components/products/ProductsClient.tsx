@@ -96,7 +96,7 @@ export default function ProductsClient() {
           </tbody>
         </table>
         <div className="border-t border-slate-100 px-4 py-3">
-          <p className="text-xs text-slate-500">Showing {filtered.length} of {total.toLocaleString()} products · Live from staging</p>
+          <p className="text-xs text-slate-500">Showing {filtered.length} of {total.toLocaleString()} products · Live data</p>
         </div>
       </div>
     </div>

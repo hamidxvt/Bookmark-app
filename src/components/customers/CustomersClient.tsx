@@ -44,7 +44,7 @@ export default function CustomersClient() {
   useEffect(() => { load(page); }, [page]);
 
   const filtered = rows.filter(r => {
-    const name = stripHtml(r[1] ?? "").toLowerCase();
+    const name = (r.name ?? "").toLowerCase();
     return !search || name.includes(search.toLowerCase());
   });
 
@@ -94,42 +94,36 @@ export default function CustomersClient() {
                 ))}
               </tr>
             ))}
-            {!loading && filtered.map((r: any, i: number) => {
-              // DataTable: 0=index, 1=customer HTML, 2=city, 3=approved, 4=date, 5=action
-              const customerHtml = r[1] ?? "";
-              const city = stripHtml(r[2] ?? "");
-              const approvalHtml = r[3] ?? "";
-              const date = stripHtml(r[4] ?? "");
-              const name = stripHtml(customerHtml);
-
-              return (
-                <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-4 py-3 text-slate-400 text-xs">{page * PER_PAGE + i + 1}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
-                        {name[0] ?? "C"}
-                      </div>
-                      <span className="text-xs font-medium text-slate-800" dangerouslySetInnerHTML={{ __html: customerHtml }} />
+            {!loading && filtered.map((r: any, i: number) => (
+              <tr key={r.id ?? i} className="hover:bg-slate-50/50 transition-colors">
+                <td className="px-4 py-3 text-slate-400 text-xs">{page * PER_PAGE + i + 1}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
+                      {(r.name ?? "C")[0].toUpperCase()}
                     </div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">{city || "—"}</td>
-                  <td className="px-4 py-3"><ApprovalBadge html={approvalHtml} /></td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">{date}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"><Eye className="h-4 w-4" /></button>
-                      <button className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Pencil className="h-4 w-4" /></button>
+                    <div>
+                      <p className="text-xs font-medium text-slate-800">{r.name}</p>
+                      <p className="text-xs text-slate-400">{r.customerType === "SCHOOL" ? "School" : r.customerType === "BOOKSHOP" ? "Bookshop" : r.customerType}</p>
                     </div>
-                  </td>
-                </tr>
-              );
-            })}
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-slate-600 text-xs">{r.city?.name ?? "—"}</td>
+                <td className="px-4 py-3"><ApprovalBadge html={r.approvalStatus ?? ""} /></td>
+                <td className="px-4 py-3 text-slate-500 text-xs">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}</td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center gap-1">
+                    <button className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"><Eye className="h-4 w-4" /></button>
+                    <button className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Pencil className="h-4 w-4" /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
         <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
           <p className="text-xs text-slate-500">
-            Showing {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, total)} of {total.toLocaleString()} customers · Live from staging
+            Showing {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, total)} of {total.toLocaleString()} customers · Live data
           </p>
           <div className="flex items-center gap-1 text-xs text-slate-500">
             <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-40">← Prev</button>

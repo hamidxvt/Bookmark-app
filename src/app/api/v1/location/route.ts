@@ -1,14 +1,48 @@
 import { NextResponse } from "next/server";
-import { getBookerLocations } from "@/lib/staging";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const city = searchParams.get("city") ?? undefined;
-    const data = await getBookerLocations(city);
-    return NextResponse.json({ success: true, data });
+    const cityId = searchParams.get("cityId");
+
+    const where: Record<string, unknown> = {};
+    if (cityId) where.cityId = parseInt(cityId);
+
+    const bookers = await prisma.booker.findMany({
+      where: {
+        ...where,
+        adminApproved: "APPROVED",
+        lastLatitude: { not: null },
+        lastLongitude: { not: null },
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        gpsStatus: true,
+        lastLatitude: true,
+        lastLongitude: true,
+        lastSeenAt: true,
+        city: { select: { id: true, name: true } },
+      },
+      orderBy: { lastSeenAt: "desc" },
+    });
+
+    const counts = {
+      total: bookers.length,
+      active: bookers.filter(b => b.gpsStatus === "ACTIVE").length,
+      idle: bookers.filter(b => b.gpsStatus === "IDLE").length,
+      offline: bookers.filter(b => b.gpsStatus === "OFFLINE").length,
+    };
+
+    return NextResponse.json({
+      success: true,
+      data: { bookers, counts },
+    });
   } catch (err) {
-    console.error("[api/location]", err);
+    console.error("[api/v1/location]", err);
     return NextResponse.json({ success: false, error: "Failed to fetch locations" }, { status: 500 });
   }
 }
