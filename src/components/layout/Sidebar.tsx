@@ -228,12 +228,15 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
         "flex h-16 shrink-0 items-center border-b border-white/5 transition-all duration-300",
         collapsed ? "justify-center px-3" : "gap-3 px-5"
       )}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-400 to-blue-600 shadow-lg shadow-sky-500/20">
-          <BookOpen className="h-4.5 w-4.5 text-white" />
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-lg">
+          {/* Bookmark icon SVG */}
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 3H19C19.5523 3 20 3.44772 20 4V21L12 17L4 21V4C4 3.44772 4.44772 3 5 3Z" fill="#1A3A5C" stroke="#1A3A5C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-white leading-none truncate">Bookmark FFM</p>
+            <p className="text-sm font-bold text-white leading-none truncate">Bookmark</p>
             <p className="text-[10px] text-slate-500 mt-0.5">Field Force Manager</p>
           </div>
         )}

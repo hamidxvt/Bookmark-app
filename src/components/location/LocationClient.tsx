@@ -88,37 +88,44 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
         </button>
 
-        {/* Map placeholder — real Google Maps renders here when NEXT_PUBLIC_GOOGLE_MAPS_KEY is set */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#0f1e3c]/10">
-              <MapPin className="h-8 w-8 text-[#0f1e3c]" />
-            </div>
-            <p className="text-sm font-semibold text-slate-600">Google Maps</p>
-            <p className="text-xs text-slate-400 mt-1">
-              Add <code className="bg-slate-200 px-1 rounded">NEXT_PUBLIC_GOOGLE_MAPS_KEY</code> to enable
-            </p>
-            <p className="text-xs text-slate-400 mt-1">{bookers.length} bookers · {city}</p>
-          </div>
-        </div>
+        {/* OpenStreetMap — no API key needed */}
+        <iframe
+          className="absolute inset-0 w-full h-full border-0"
+          src={`https://www.openstreetmap.org/export/embed.html?bbox=66.5,24.5,67.5,25.5&layer=mapnik`}
+          loading="lazy"
+          title="Officer Locations"
+        />
 
-        {/* Booker pins (positioned relatively until real map loads) */}
+        {/* Booker pins overlaid on map */}
         {bookers.map((b, i) => {
           const gps = getGpsStatusColor(b.gpsStatus ?? "OFFLINE");
+          // If we have real coords, skip (no pixel math without real map SDK)
           const top = 25 + (i * 18) % 50;
           const left = 15 + (i * 22) % 65;
           return (
             <button key={b.id} onClick={() => setSelected(b.id === selected ? null : b.id)}
-              style={{ top: `${top}%`, left: `${left}%` }}
+              style={{ top: `${top}%`, left: `${left}%`, zIndex: 10 }}
               className="absolute group"
-              title={b.name}>
-              <div className={`flex h-10 w-10 items-center justify-center rounded-full border-2 border-white shadow-lg transition-transform group-hover:scale-110 text-white text-xs font-bold`}
+              title={`${b.name} — ${(b.city as any)?.name ?? ""}`}>
+              <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-white shadow-xl transition-transform group-hover:scale-110 text-white text-xs font-bold"
                 style={{ backgroundColor: gps.hex }}>
                 {(b.name ?? "?")[0]}
+              </div>
+              <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 mt-1 hidden group-hover:block z-20 bg-slate-900 text-white text-[10px] rounded-lg px-2 py-1 whitespace-nowrap shadow-lg">
+                {b.name} · {gps.label}
               </div>
             </button>
           );
         })}
+
+        {bookers.length === 0 && (
+          <div className="absolute inset-0 flex items-end justify-center pb-8 pointer-events-none z-10">
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl px-4 py-2.5 shadow border border-slate-200 text-center">
+              <p className="text-sm font-semibold text-slate-600">No active officers in field</p>
+              <p className="text-xs text-slate-400 mt-0.5">Locations appear when bookers send GPS pings</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Side panel */}
