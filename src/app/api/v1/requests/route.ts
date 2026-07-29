@@ -6,8 +6,16 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
+    const where: Record<string, unknown> = {};
+    if (status) {
+      const upper = status.toUpperCase();
+      if (["PENDING", "RESOLVED", "REJECTED"].includes(upper)) {
+        where.status = upper as "PENDING" | "RESOLVED" | "REJECTED";
+      }
+    }
+
     const requests = await prisma.request.findMany({
-      where: status ? { status: status.toUpperCase() as "PENDING" | "APPROVED" | "REJECTED" } : {},
+      where,
       include: {
         booker: { select: { id: true, name: true, email: true, phone: true } },
       },
@@ -28,13 +36,13 @@ export async function GET(req: Request) {
 export async function PATCH(req: Request) {
   try {
     const { id, status, adminNotes } = await req.json();
-    if (!id || !["APPROVED", "REJECTED"].includes(status?.toUpperCase())) {
-      return NextResponse.json({ success: false, error: "Invalid request" }, { status: 400 });
+    if (!id || !["RESOLVED", "REJECTED"].includes(status?.toUpperCase())) {
+      return NextResponse.json({ success: false, error: "Invalid status. Use RESOLVED or REJECTED" }, { status: 400 });
     }
 
     const request = await prisma.request.update({
       where: { id },
-      data: { status: status.toUpperCase(), adminNotes: adminNotes ?? null },
+      data: { status: status.toUpperCase() as "RESOLVED" | "REJECTED", adminNotes: adminNotes ?? null },
     });
 
     return NextResponse.json({ success: true, data: request });
