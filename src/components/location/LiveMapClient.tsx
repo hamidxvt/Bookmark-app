@@ -48,18 +48,27 @@ export default function LiveMapClient() {
   }, []);
 
   const active = officers.filter(o => o.gpsStatus === "ACTIVE").length;
-  const withLocation = officers.filter(o => o.lastLatitude && o.lastLongitude);
+  const withLocation = officers.filter(o => {
+    const lat = Number(o.lastLatitude);
+    const lng = Number(o.lastLongitude);
+    return !isNaN(lat) && !isNaN(lng) && lat && lng;
+  });
 
   // Build OpenStreetMap URL centered on officers, or default Pakistan view
   const mapSrc = withLocation.length > 0
     ? (() => {
-        const lats = withLocation.map(o => o.lastLatitude!);
-        const lngs = withLocation.map(o => o.lastLongitude!);
-        const minLat = Math.min(...lats) - 0.1;
-        const maxLat = Math.max(...lats) + 0.1;
-        const minLng = Math.min(...lngs) - 0.1;
-        const maxLng = Math.max(...lngs) + 0.1;
-        return `https://www.openstreetmap.org/export/embed.html?bbox=${minLng},${minLat},${maxLng},${maxLat}&layer=mapnik`;
+        try {
+          const lats = withLocation.map(o => Number(o.lastLatitude!)).filter(l => !isNaN(l));
+          const lngs = withLocation.map(o => Number(o.lastLongitude!)).filter(l => !isNaN(l));
+          if (lats.length === 0 || lngs.length === 0) throw new Error("No valid coordinates");
+          const minLat = Math.min(...lats) - 0.1;
+          const maxLat = Math.max(...lats) + 0.1;
+          const minLng = Math.min(...lngs) - 0.1;
+          const maxLng = Math.max(...lngs) + 0.1;
+          return `https://www.openstreetmap.org/export/embed.html?bbox=${minLng},${minLat},${maxLng},${maxLat}&layer=mapnik`;
+        } catch {
+          return "https://www.openstreetmap.org/export/embed.html?bbox=60.8,23.5,77.8,37.1&layer=mapnik";
+        }
       })()
     : "https://www.openstreetmap.org/export/embed.html?bbox=60.8,23.5,77.8,37.1&layer=mapnik";
 
@@ -116,17 +125,21 @@ export default function LiveMapClient() {
           {/* Officer pin labels overlaid on map */}
           {withLocation.length > 0 && (
             <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
-              {withLocation.map(o => (
-                <a key={o.id}
-                  href={`https://maps.google.com/?q=${o.lastLatitude},${o.lastLongitude}`}
-                  target="_blank" rel="noreferrer"
-                  className="flex items-center gap-2 rounded-lg bg-white/95 backdrop-blur px-3 py-1.5 shadow-md border border-slate-200 hover:bg-teal-50 transition-colors text-xs">
-                  <GpsStatusDot status={o.gpsStatus} />
-                  <span className="font-semibold text-slate-800">{o.name}</span>
-                  <span className="text-slate-400">{o.lastLatitude?.toFixed(3)}, {o.lastLongitude?.toFixed(3)}</span>
-                  <span className="text-teal-600">↗</span>
-                </a>
-              ))}
+              {withLocation.map(o => {
+                const lat = Number(o.lastLatitude) || 0;
+                const lng = Number(o.lastLongitude) || 0;
+                return (
+                  <a key={o.id}
+                    href={`https://maps.google.com/?q=${lat},${lng}`}
+                    target="_blank" rel="noreferrer"
+                    className="flex items-center gap-2 rounded-lg bg-white/95 backdrop-blur px-3 py-1.5 shadow-md border border-slate-200 hover:bg-teal-50 transition-colors text-xs">
+                    <GpsStatusDot status={o.gpsStatus} />
+                    <span className="font-semibold text-slate-800">{o.name}</span>
+                    <span className="text-slate-400">{lat.toFixed(3)}, {lng.toFixed(3)}</span>
+                    <span className="text-teal-600">↗</span>
+                  </a>
+                );
+              })}
             </div>
           )}
         </div>
@@ -160,7 +173,7 @@ export default function LiveMapClient() {
                   <p className="text-sm font-semibold text-slate-800">{o.name}</p>
                   <p className="text-xs text-slate-400 truncate">
                     {o.lastLatitude && o.lastLongitude
-                      ? `${o.lastLatitude.toFixed(4)}, ${o.lastLongitude.toFixed(4)}`
+                      ? `${Number(o.lastLatitude).toFixed(4)}, ${Number(o.lastLongitude).toFixed(4)}`
                       : "No location yet"}
                     {o.city ? ` · ${o.city.name}` : ""}
                   </p>
@@ -169,13 +182,17 @@ export default function LiveMapClient() {
                   <p className="text-xs text-slate-400">
                     {o.lastSeenAt ? new Date(o.lastSeenAt).toLocaleTimeString() : "Never"}
                   </p>
-                  {o.lastLatitude && o.lastLongitude && (
-                    <a href={`https://maps.google.com/?q=${o.lastLatitude},${o.lastLongitude}`}
-                      target="_blank" rel="noreferrer"
-                      className="text-xs text-teal-600 hover:underline">
-                      Open in Maps ↗
-                    </a>
-                  )}
+                  {o.lastLatitude && o.lastLongitude && (() => {
+                    const lat = Number(o.lastLatitude) || 0;
+                    const lng = Number(o.lastLongitude) || 0;
+                    return (
+                      <a href={`https://maps.google.com/?q=${lat},${lng}`}
+                        target="_blank" rel="noreferrer"
+                        className="text-xs text-teal-600 hover:underline">
+                        Open in Maps ↗
+                      </a>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
