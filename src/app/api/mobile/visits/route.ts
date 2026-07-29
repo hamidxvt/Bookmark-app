@@ -2,7 +2,29 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
 
-type Visit = Awaited<ReturnType<typeof prisma.visit.findMany>>[number];
+type Visit = {
+  id: number;
+  bookerId: number;
+  customerId: number;
+  visitDate: Date;
+  status: any;
+  priority: string | null;
+  checkInAt: Date | null;
+  checkOutAt: Date | null;
+  notes: string | null;
+  visitReport: string | null;
+  customer: {
+    id: number;
+    name: string;
+    customerType: string;
+    ownerName: string | null;
+    ownerPhone: string | null;
+    address: string | null;
+    latitude: any;
+    longitude: any;
+    workingPriority: string | null;
+  };
+};
 
 // GET /api/mobile/visits — today's visits for logged-in booker
 export async function GET(req: Request) {
