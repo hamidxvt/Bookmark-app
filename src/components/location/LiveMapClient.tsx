@@ -129,11 +129,9 @@ export default function LiveMapClient() {
       <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-slate-800">Officer Locations</h3>
-          {!connected && (
-            <span className="text-xs text-amber-600 bg-amber-50 rounded-full px-2 py-0.5 border border-amber-200">
-              Socket disconnected — polling fallback active
-            </span>
-          )}
+          <span className="text-xs text-teal-600 bg-teal-50 rounded-full px-2 py-0.5 border border-teal-200">
+            Live updates every 10s
+          </span>
         </div>
 
         {/* OpenStreetMap via iframe — no API key needed, truly free */}
@@ -152,9 +150,6 @@ export default function LiveMapClient() {
               className="w-full h-[420px] border-0"
               title="Live GPS Map"
             />
-            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur rounded-xl p-2 shadow-sm border border-slate-100 text-xs text-slate-500">
-              Pins auto-update via Socket.io
-            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-64 bg-slate-50">
