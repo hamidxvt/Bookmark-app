@@ -118,7 +118,7 @@ class PayrollScreen extends ConsumerWidget {
                 _SectionTitle('Salary Breakdown'),
                 const SizedBox(height: 8),
                 _BreakdownCard(items: [
-                  _SalaryRow('Basic Salary (full month)',  _fmt(basicSalary),   color: AppColors.textBody),
+                  _SalaryRow('Basic Salary (full month)',  _fmt(basicSalary),   color: AppColors.onBackground),
                   _SalaryRow('Earned Basic (${presentDays}d present)', _fmt(earnedBasic), color: AppColors.primary),
                   _SalaryRow('Running Pay (${completedVisits} visits)',  _fmt(runningPay),  color: AppColors.success),
                   if (adhocBonus > 0)
@@ -233,10 +233,10 @@ class _SalaryRow extends StatelessWidget {
     child: Row(
       children: [
         Expanded(child: Text(label,
-            style: TextStyle(fontSize: large ? 13 : 12, fontWeight: bold ? FontWeight.w700 : FontWeight.w400, color: AppColors.textBody))),
+            style: TextStyle(fontSize: large ? 13 : 12, fontWeight: bold ? FontWeight.w700 : FontWeight.w400, color: AppColors.onBackground))),
         Text(value,
             style: TextStyle(fontSize: large ? 15 : 13, fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-                color: color ?? AppColors.textBody)),
+                color: color ?? AppColors.onBackground)),
       ],
     ),
   );
