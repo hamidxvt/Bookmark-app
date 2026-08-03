@@ -45,6 +45,9 @@ class ApiConstants {
   static const String requestSamples = '/samples';
   static String recoverSample(int id) => '/samples/$id/recover';
 
+  // ── Products ─────────────────────────────────────────────────────────────
+  static const String productsSearch = '/products'; // GET ?q=search&limit=20
+
   // ── Payroll ─────────────────────────────────────────────────────────────
   static const String myPayroll = '/payroll';
 

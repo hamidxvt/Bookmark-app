@@ -6,7 +6,6 @@ class Visit {
   final int dailySequence;
   final double? latitude;
   final double? longitude;
-  /// Customer's stored GPS coordinates for geofencing
   final double? customerLat;
   final double? customerLng;
   final String? contactPerson;
@@ -15,6 +14,7 @@ class Visit {
   final String? visitType;
   final int carryForwardCount;
   final String? scheduledDate;
+  final bool isAdhoc;
 
   const Visit({
     required this.id,
@@ -32,32 +32,39 @@ class Visit {
     this.visitType,
     this.carryForwardCount = 0,
     this.scheduledDate,
+    this.isAdhoc = false,
   });
 
   factory Visit.fromJson(Map<String, dynamic> json) {
-    final loc = json['location'] as Map<String, dynamic>? ?? {};
     return Visit(
       id: json['id'] as int,
-      locationName: loc['name'] as String? ?? 'Unknown',
-      locationType: loc['type'] as String? ?? 'school',
-      status: json['status'] as String? ?? 'planned',
-      dailySequence: json['dailySequence'] as int? ?? 1,
-      latitude: (loc['latitude'] as num?)?.toDouble(),
-      longitude: (loc['longitude'] as num?)?.toDouble(),
-      customerLat: (loc['latitude'] as num?)?.toDouble(),
-      customerLng: (loc['longitude'] as num?)?.toDouble(),
-      contactPerson: json['contactPerson'] as String?,
-      contactPhone: json['contactPhone'] as String?,
+      // API returns flat fields: customerName, customerType
+      locationName: json['customerName'] as String? ??
+          (json['location'] as Map?)?['name'] as String? ?? 'Unknown',
+      locationType: (json['customerType'] as String? ??
+              (json['location'] as Map?)?['type'] as String? ?? 'school')
+          .toLowerCase(),
+      status: json['status'] as String? ?? 'pending',
+      dailySequence: json['sequence'] as int? ?? json['dailySequence'] as int? ?? 1,
+      latitude: (json['latitude'] as num?)?.toDouble() ??
+          ((json['location'] as Map?)?['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble() ??
+          ((json['location'] as Map?)?['longitude'] as num?)?.toDouble(),
+      customerLat: (json['latitude'] as num?)?.toDouble(),
+      customerLng: (json['longitude'] as num?)?.toDouble(),
+      contactPerson: json['contactPerson'] as String? ?? json['contact'] as String?,
+      contactPhone: json['contactPhone'] as String? ?? json['phone'] as String?,
       notes: json['notes'] as String?,
       visitType: json['visitType'] as String?,
       carryForwardCount: json['carryForwardCount'] as int? ?? 0,
-      scheduledDate: json['scheduledDate'] as String?,
+      scheduledDate: json['visitDate'] as String? ?? json['scheduledDate'] as String?,
+      isAdhoc: json['isAdhoc'] as bool? ?? false,
     );
   }
 
-  bool get isCompleted => status == 'completed';
-  bool get isMissed => status == 'missed';
-  bool get isInProgress => status == 'in_progress';
-  bool get isPlanned => status == 'planned';
+  bool get isCompleted   => status == 'completed';
+  bool get isMissed      => status == 'missed' || status == 'cancelled';
+  bool get isInProgress  => status == 'in_progress';
+  bool get isPlanned     => status == 'pending' || status == 'planned';
   bool get isCarryForward => carryForwardCount > 0;
 }

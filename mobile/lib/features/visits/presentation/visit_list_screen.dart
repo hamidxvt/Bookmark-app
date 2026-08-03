@@ -211,6 +211,17 @@ class _VisitTile extends ConsumerWidget {
                           visit.locationType == 'bookshop' ? 'Bookshop' : 'School',
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
+                        if (visit.isAdhoc) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('Ad-hoc', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.w600)),
+                          ),
+                        ],
                         if (visit.isCarryForward) ...[
                           const SizedBox(width: 8),
                           Container(
