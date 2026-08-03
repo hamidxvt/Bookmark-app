@@ -155,14 +155,14 @@ function NavItem({
         className={cn(
           "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 cursor-pointer",
           isActive
-            ? "bg-sky-500/15 text-sky-400 shadow-sm"
+            ? "bg-teal-500/15 text-teal-400 shadow-sm"
             : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
         )}
       >
-        <Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300")} />
+        <Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", isActive ? "text-teal-400" : "text-slate-500 group-hover:text-slate-300")} />
         {!collapsed && <span className="flex-1 truncate">{label}</span>}
         {!collapsed && isActive && (
-          <span className="h-1.5 w-1.5 rounded-full bg-sky-400 shadow-sky-400/50 shadow-sm" />
+          <span className="h-1.5 w-1.5 rounded-full bg-teal-400 shadow-teal-400/50 shadow-sm" />
         )}
         {/* Tooltip when collapsed */}
         {collapsed && (
@@ -186,7 +186,7 @@ function NavItem({
           isActive ? "text-slate-200 bg-white/5" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
         )}
       >
-        <Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", isActive ? "text-sky-400" : "text-slate-500 group-hover:text-slate-300")} />
+        <Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", isActive ? "text-teal-400" : "text-slate-500 group-hover:text-slate-300")} />
         {!collapsed && (
           <>
             <span className="flex-1 text-left truncate">{label}</span>
@@ -214,11 +214,11 @@ function NavItem({
                 className={cn(
                   "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150 cursor-pointer",
                   childActive
-                    ? "bg-sky-500/10 text-sky-400"
+                    ? "bg-teal-500/10 text-teal-400"
                     : "text-slate-500 hover:bg-white/5 hover:text-slate-300"
                 )}
               >
-                <span className={cn("h-1 w-1 rounded-full shrink-0", childActive ? "bg-sky-400" : "bg-slate-600")} />
+                <span className={cn("h-1 w-1 rounded-full shrink-0", childActive ? "bg-teal-400" : "bg-slate-600")} />
                 {c.label}
               </Link>
             );
@@ -276,7 +276,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
       <div className="shrink-0 border-t border-white/5 p-2.5 space-y-1">
         {!collapsed && (
           <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 mb-1">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-sky-400 to-blue-600 text-xs font-bold text-white">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#1A3A5C] to-[#2D5F8A] text-xs font-bold text-white">
               {session?.user?.name?.[0]?.toUpperCase() ?? "A"}
             </div>
             <div className="min-w-0">

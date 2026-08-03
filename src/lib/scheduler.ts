@@ -43,8 +43,14 @@ export async function planNextDayVisits(forToday = false) {
 
   console.log(`[scheduler] Planning visits for ${target.toDateString()}`);
 
+  // Ensure all approved bookers are ACTIVE (fixes migrated bookers with null jobStatus)
+  await prisma.booker.updateMany({
+    where: { adminApproved: "APPROVED", deletedAt: null, jobStatus: { not: "ACTIVE" } },
+    data: { jobStatus: "ACTIVE" },
+  });
+
   const activeBookers = await prisma.booker.findMany({
-    where: { jobStatus: "ACTIVE", adminApproved: "APPROVED", deletedAt: null },
+    where: { adminApproved: "APPROVED", deletedAt: null },
     select: { id: true, cityId: true },
   });
 
