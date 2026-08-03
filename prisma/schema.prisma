@@ -90,8 +90,12 @@ model Booker {
   profilePhoto  String?       @map("profile_photo")
   jobStatus     JobStatus     @default(NOT_ACTIVE) @map("job_status")
   adminApproved ApprovalStatus @default(PENDING) @map("admin_approved")
-  visitTargets  Int?          @map("visit_targets")
-  ratesPerVisit Decimal?      @map("rates_per_visit") @db.Decimal(10, 2)
+  visitTargets       Int?          @map("visit_targets")
+  ratesPerVisit      Decimal?      @map("rates_per_visit") @db.Decimal(10, 2)
+  basicSalary        Decimal?      @map("basic_salary") @db.Decimal(10, 2)
+  securityDepositPct Decimal?      @map("security_deposit_pct") @db.Decimal(5, 2) // e.g. 10 = 10%
+  rewardPoints       Int           @default(0) @map("reward_points")
+  sampleBudget       Decimal       @default(300000) @map("sample_budget") @db.Decimal(12, 2)
   lastLatitude  Decimal?      @map("last_latitude") @db.Decimal(10, 8)
   lastLongitude Decimal?      @map("last_longitude") @db.Decimal(11, 8)
   lastSeenAt    DateTime?     @map("last_seen_at")
@@ -263,20 +267,22 @@ enum ProductVisibility {
 
 // ─── VISITS ──────────────────────────────────────────────────────────────────
 model Visit {
-  id           Int         @id @default(autoincrement())
-  bookerId     Int         @map("booker_id")
-  customerId   Int         @map("customer_id")
-  visitDate    DateTime    @map("visit_date") @db.Date
-  checkInAt    DateTime?   @map("check_in_at")
-  checkOutAt   DateTime?   @map("check_out_at")
-  checkInLat   Decimal?    @map("check_in_lat") @db.Decimal(10, 8)
-  checkInLng   Decimal?    @map("check_in_lng") @db.Decimal(11, 8)
-  status       VisitStatus @default(PENDING)
-  priority     String?
-  notes        String?     @db.Text
-  visitReport  String?     @map("visit_report") @db.Text
-  createdAt    DateTime    @default(now()) @map("created_at")
-  updatedAt    DateTime    @updatedAt @map("updated_at")
+  id               Int         @id @default(autoincrement())
+  bookerId         Int         @map("booker_id")
+  customerId       Int         @map("customer_id")
+  visitDate        DateTime    @map("visit_date") @db.Date
+  checkInAt        DateTime?   @map("check_in_at")
+  checkOutAt       DateTime?   @map("check_out_at")
+  checkInLat       Decimal?    @map("check_in_lat") @db.Decimal(10, 8)
+  checkInLng       Decimal?    @map("check_in_lng") @db.Decimal(11, 8)
+  status           VisitStatus @default(PENDING)
+  priority         String?
+  notes            String?     @db.Text
+  visitReport      String?     @map("visit_report") @db.Text
+  isAdhoc          Boolean     @default(false) @map("is_adhoc")
+  carryForwardCount Int        @default(0) @map("carry_forward_count")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
 
   booker       Booker      @relation(fields: [bookerId], references: [id])
   customer     Customer    @relation(fields: [customerId], references: [id])

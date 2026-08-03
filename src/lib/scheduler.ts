@@ -64,16 +64,38 @@ export async function planNextDayVisits(forToday = false) {
     });
     const recentIds = recentlyVisited.map((v) => v.customerId);
 
-    const customers = await prisma.customer.findMany({
-      where: {
-        cityId: booker.cityId ?? 0,
-        approvalStatus: "APPROVED",
-        deletedAt: null,
-        id: recentIds.length > 0 ? { notIn: recentIds } : undefined,
-      },
-      orderBy: [{ workingPriority: "asc" }],
-      take: 7 - existing,
-    });
+    // Build customer filter — if booker has a city, prefer city match; otherwise use all
+    const customerWhere: Record<string, unknown> = {
+      approvalStatus: "APPROVED",
+      deletedAt: null,
+    };
+    if (recentIds.length > 0) customerWhere.id = { notIn: recentIds };
+
+    // Try city-specific customers first
+    let customers = booker.cityId
+      ? await prisma.customer.findMany({
+          where: { ...customerWhere, cityId: booker.cityId },
+          orderBy: [{ workingPriority: "asc" }],
+          take: 7 - existing,
+        })
+      : [];
+
+    // Fallback: if no city or city has < needed customers, fill from any city
+    if (customers.length < 7 - existing) {
+      const needed = 7 - existing - customers.length;
+      const usedIds = customers.map(c => c.id);
+      const fallbackWhere: Record<string, unknown> = { ...customerWhere };
+      if (usedIds.length > 0 || recentIds.length > 0) {
+        fallbackWhere.id = { notIn: [...usedIds, ...recentIds] };
+      }
+      if (booker.cityId) fallbackWhere.cityId = { not: booker.cityId }; // avoid duplicates
+      const extra = await prisma.customer.findMany({
+        where: fallbackWhere,
+        orderBy: [{ workingPriority: "asc" }],
+        take: needed,
+      });
+      customers = [...customers, ...extra];
+    }
 
     for (const c of customers) {
       await prisma.visit.create({

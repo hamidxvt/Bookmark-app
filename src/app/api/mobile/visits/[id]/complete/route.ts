@@ -15,7 +15,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const visit = await prisma.visit.findUnique({
       where: { id: visitId },
-      select: { id: true, bookerId: true, status: true },
+      select: { id: true, bookerId: true, status: true, isAdhoc: true },
     });
 
     if (!visit) {
@@ -47,7 +47,22 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       },
     });
 
-    return NextResponse.json({ success: true, data: updated, message: "Visit completed" });
+    // Award reward points for completing an ad-hoc (new discovery) visit
+    let rewardPointsEarned = 0;
+    if (visit.isAdhoc) {
+      rewardPointsEarned = 5; // 5 points per ad-hoc discovery
+      await prisma.booker.update({
+        where: { id: user.id },
+        data: { rewardPoints: { increment: rewardPointsEarned } },
+      }).catch(() => {});
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: updated,
+      message: "Visit completed",
+      rewardPointsEarned,
+    });
   } catch (err) {
     console.error("[mobile/visits/complete]", err);
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });

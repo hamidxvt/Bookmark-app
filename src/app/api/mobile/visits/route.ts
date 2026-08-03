@@ -13,6 +13,8 @@ type Visit = {
   checkOutAt: Date | null;
   notes: string | null;
   visitReport: string | null;
+  isAdhoc: boolean;
+  carryForwardCount: number;
   customer: {
     id: number;
     name: string;
@@ -75,6 +77,8 @@ export async function GET(req: Request) {
         notes: v.notes ?? "",
         visitReport: v.visitReport ?? "",
         visitDate: v.visitDate,
+        isAdhoc: v.isAdhoc ?? false,
+        carryForwardCount: v.carryForwardCount ?? 0,
       })),
     });
   } catch (err) {
@@ -125,6 +129,7 @@ export async function POST(req: Request) {
         checkInAt: new Date(),
         notes: notes ?? "",
         priority: "normal",
+        isAdhoc: true,
       },
     });
 
