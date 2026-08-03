@@ -57,13 +57,13 @@ export async function POST() {
 
     // Step 5: Reassign any bookers/customers without a valid city to DEFAULT
     const bookerFixed = await prisma.booker.updateMany({
-      where: { cityId: null },
+      where: { cityId: null as any },
       data: { cityId: defaultCity.id },
     });
     log.push(`✅ Assigned ${bookerFixed.count} city-less bookers to DEFAULT`);
 
     const customerFixed = await prisma.customer.updateMany({
-      where: { cityId: null },
+      where: { cityId: null as any },
       data: { cityId: defaultCity.id },
     });
     log.push(`✅ Assigned ${customerFixed.count} city-less customers to DEFAULT`);
