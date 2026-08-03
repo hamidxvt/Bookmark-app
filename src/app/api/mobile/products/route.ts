@@ -20,7 +20,8 @@ export async function GET(req: Request) {
       select: {
         id: true,
         name: true,
-        price: true,
+        retailPrice: true,
+        grade: true,
         brand: { select: { name: true } },
         series: { select: { name: true } },
       },
@@ -33,7 +34,8 @@ export async function GET(req: Request) {
       data: products.map(p => ({
         id: p.id,
         name: p.name,
-        price: p.price ? Number(p.price) : 0,
+        price: p.retailPrice ? Number(p.retailPrice) : 0,
+        grade: p.grade ?? "",
         brand: p.brand?.name ?? "",
         series: p.series?.name ?? "",
       })),

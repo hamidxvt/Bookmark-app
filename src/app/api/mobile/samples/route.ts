@@ -81,11 +81,11 @@ export async function POST(req: Request) {
     if (productId) {
       const product = await prisma.product.findUnique({
         where: { id: Number(productId) },
-        select: { name: true, price: true },
+        select: { name: true, retailPrice: true },
       });
       if (product) {
         pName = product.name;
-        pValue = pValue || (Number(product.price) * qty);
+        pValue = pValue || (Number(product.retailPrice) * qty);
       }
     }
 
