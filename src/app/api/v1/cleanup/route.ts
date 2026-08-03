@@ -1,9 +1,10 @@
 /**
  * POST /api/v1/cleanup
  * One-time DB cleanup:
- *  - Removes cities with HTML names (created by bad migration)
- *  - Reassigns orphaned customers to a default city
- *  - Sets all bookers to ACTIVE job status
+ *  - Strip HTML from city names using regex replace in Postgres
+ *  - Delete cities that are pure HTML / too long
+ *  - Reassign orphaned bookers/customers to a real default city
+ *  - Set all approved bookers to ACTIVE job status
  */
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
@@ -17,67 +18,75 @@ export async function POST() {
   const log: string[] = [];
 
   try {
-    // 1. Find and delete HTML city names
-    const allCities = await prisma.city.findMany({ select: { id: true, name: true } });
-    const htmlCities = allCities.filter(c => c.name.includes("<") || c.name.includes(">") || c.name.length > 100);
-    log.push(`Found ${htmlCities.length} HTML city names to clean`);
+    // Step 1: Strip HTML tags from ALL city names directly in Postgres
+    // Uses regex to remove anything that looks like HTML tags
+    await prisma.$executeRaw`
+      UPDATE cities
+      SET name = TRIM(REGEXP_REPLACE(name, '<[^>]+>', ' ', 'g'))
+      WHERE name ~ '<[^>]+>'
+    `;
+    log.push("✅ Stripped HTML tags from city names");
 
-    // Get or create a DEFAULT fallback city
+    // Step 2: Collapse multiple spaces left over from stripping
+    await prisma.$executeRaw`
+      UPDATE cities
+      SET name = TRIM(REGEXP_REPLACE(name, '\s+', ' ', 'g'))
+      WHERE name ~ '\s{2,}'
+    `;
+    log.push("✅ Collapsed whitespace in city names");
+
+    // Step 3: Delete cities that are now empty or gibberish (very long or blank)
+    const deleted = await prisma.city.deleteMany({
+      where: {
+        OR: [
+          { name: "" },
+          { name: { startsWith: "GENERIC PLACEHOLDER" } },
+          { name: { contains: "MEDIA-OBJECT" } },
+          { name: { contains: "IMG-SM" } },
+        ],
+      },
+    });
+    log.push(`✅ Deleted ${deleted.count} empty/gibberish cities`);
+
+    // Step 4: Ensure a DEFAULT city exists
     let defaultCity = await prisma.city.findFirst({ where: { name: "DEFAULT" } });
     if (!defaultCity) {
       defaultCity = await prisma.city.create({ data: { name: "DEFAULT" } });
+      log.push("✅ Created DEFAULT city");
     }
 
-    // Reassign customers from HTML cities to DEFAULT
-    if (htmlCities.length > 0) {
-      const htmlCityIds = htmlCities.map(c => c.id);
-      const reassigned = await prisma.customer.updateMany({
-        where: { cityId: { in: htmlCityIds } },
-        data: { cityId: defaultCity.id },
-      });
-      log.push(`Reassigned ${reassigned.count} customers from HTML cities to DEFAULT`);
+    // Step 5: Reassign any bookers/customers without a valid city to DEFAULT
+    const bookerFixed = await prisma.booker.updateMany({
+      where: { cityId: null },
+      data: { cityId: defaultCity.id },
+    });
+    log.push(`✅ Assigned ${bookerFixed.count} city-less bookers to DEFAULT`);
 
-      // Reassign bookers too
-      await prisma.booker.updateMany({
-        where: { cityId: { in: htmlCityIds } },
-        data: { cityId: defaultCity.id },
-      });
+    const customerFixed = await prisma.customer.updateMany({
+      where: { cityId: null },
+      data: { cityId: defaultCity.id },
+    });
+    log.push(`✅ Assigned ${customerFixed.count} city-less customers to DEFAULT`);
 
-      // Now safely delete HTML cities
-      await prisma.city.deleteMany({ where: { id: { in: htmlCityIds } } });
-      log.push(`Deleted ${htmlCities.length} HTML cities`);
-    }
-
-    // 2. Fix city names — trim and uppercase
-    const cleanCities = await prisma.city.findMany({ select: { id: true, name: true } });
-    let fixedNames = 0;
-    for (const city of cleanCities) {
-      const clean = city.name.trim().toUpperCase().substring(0, 100);
-      if (clean !== city.name) {
-        await prisma.city.update({ where: { id: city.id }, data: { name: clean } }).catch(() => {});
-        fixedNames++;
-      }
-    }
-    log.push(`Fixed ${fixedNames} city names`);
-
-    // 3. Set all migrated bookers to ACTIVE (they came in as NOT_ACTIVE from migration)
+    // Step 6: Activate all approved bookers
     const activated = await prisma.booker.updateMany({
       where: { adminApproved: "APPROVED" },
       data: { jobStatus: "ACTIVE" },
     });
-    log.push(`Activated ${activated.count} bookers`);
+    log.push(`✅ Activated ${activated.count} approved bookers`);
 
-    // 4. Count final stats
+    // Step 7: Print final stats
     const [cities, customers, bookers] = await Promise.all([
       prisma.city.count(),
-      prisma.customer.count(),
+      prisma.customer.count({ where: { approvalStatus: "APPROVED" } }),
       prisma.booker.count({ where: { jobStatus: "ACTIVE" } }),
     ]);
-
-    log.push(`✅ Final: ${cities} cities, ${customers} customers, ${bookers} active bookers`);
+    log.push(`📊 Final: ${cities} cities · ${customers} approved customers · ${bookers} active bookers`);
+    log.push("🎉 Cleanup complete! Refresh the dashboard to see clean data.");
 
     return NextResponse.json({ success: true, log });
   } catch (err: any) {
+    log.push(`❌ Error: ${err.message}`);
     return NextResponse.json({ success: false, error: err.message, log }, { status: 500 });
   }
 }

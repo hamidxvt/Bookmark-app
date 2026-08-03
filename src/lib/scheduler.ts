@@ -80,17 +80,16 @@ export async function planNextDayVisits(forToday = false) {
         })
       : [];
 
-    // Fallback: if no city or city has < needed customers, fill from any city
+    // Fallback: fill remaining slots from ANY city if city-specific wasn't enough
     if (customers.length < 7 - existing) {
       const needed = 7 - existing - customers.length;
-      const usedIds = customers.map(c => c.id);
-      const fallbackWhere: Record<string, unknown> = { ...customerWhere };
-      if (usedIds.length > 0 || recentIds.length > 0) {
-        fallbackWhere.id = { notIn: [...usedIds, ...recentIds] };
-      }
-      if (booker.cityId) fallbackWhere.cityId = { not: booker.cityId }; // avoid duplicates
+      const excludeIds = [...customers.map(c => c.id), ...recentIds];
       const extra = await prisma.customer.findMany({
-        where: fallbackWhere,
+        where: {
+          approvalStatus: "APPROVED",
+          deletedAt: null,
+          ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
+        },
         orderBy: [{ workingPriority: "asc" }],
         take: needed,
       });

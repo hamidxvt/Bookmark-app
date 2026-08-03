@@ -16,6 +16,12 @@ interface Booker {
   region: { id: number; name: string } | null;
 }
 
+function stripHtml(s: string | null | undefined): string {
+  if (!s) return "—";
+  const stripped = s.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return stripped.length > 0 ? stripped : "—";
+}
+
 function GpsBadge({ status }: { status: string }) {
   const s = status?.toUpperCase();
   if (s === "ACTIVE") return <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600"><span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />Active</span>;
@@ -386,7 +392,7 @@ export default function BookersClient() {
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-xs text-slate-500">{r.city?.name ?? "—"}</td>
+                <td className="px-4 py-3 text-xs text-slate-500">{stripHtml(r.city?.name)}</td>
                 <td className="px-4 py-3 text-xs text-slate-500">{r.phone}</td>
                 <td className="px-4 py-3"><GpsBadge status={r.gpsStatus} /></td>
                 <td className="px-4 py-3"><ApprovalBadge status={r.adminApproved} /></td>

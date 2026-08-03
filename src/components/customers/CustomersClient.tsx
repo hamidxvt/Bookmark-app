@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, Download, Eye, Pencil, RefreshCw } from "lucide-react";
 
-function stripHtml(s: string) {
-  return (s ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+function stripHtml(s: string | null | undefined) {
+  if (!s) return "";
+  return s.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
 }
 
 function ApprovalBadge({ html }: { html: string }) {
@@ -103,12 +104,12 @@ export default function CustomersClient() {
                       {(r.name ?? "C")[0].toUpperCase()}
                     </div>
                     <div>
-                      <p className="text-xs font-medium text-slate-800">{r.name}</p>
-                      <p className="text-xs text-slate-400">{r.customerType === "SCHOOL" ? "School" : r.customerType === "BOOKSHOP" ? "Bookshop" : r.customerType}</p>
+                      <p className="text-xs font-medium text-slate-800">{stripHtml(r.name)}</p>
+                      <p className="text-xs text-slate-400">{r.customerType === "SCHOOL" ? "School" : r.customerType === "BOOKSHOP" ? "Bookshop" : (r.customerType ?? "Other")}</p>
                     </div>
                   </div>
                 </td>
-                <td className="px-4 py-3 text-slate-600 text-xs">{r.city?.name ?? "—"}</td>
+                <td className="px-4 py-3 text-slate-600 text-xs">{stripHtml(r.city?.name) || "—"}</td>
                 <td className="px-4 py-3"><ApprovalBadge html={r.approvalStatus ?? ""} /></td>
                 <td className="px-4 py-3 text-slate-500 text-xs">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}</td>
                 <td className="px-4 py-3">
