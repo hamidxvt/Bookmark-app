@@ -84,41 +84,7 @@ class _VisitTile extends ConsumerWidget {
   const _VisitTile({required this.visit, required this.index});
 
   Future<void> _onTap(BuildContext context, WidgetRef ref) async {
-    final repo = ref.read(visitRepositoryProvider);
-    final geofence = await repo.checkGeofence(visit);
-
-    if (!context.mounted) return;
-
-    if (!geofence.allowed && geofence.distanceMeters > 0) {
-      final dist = geofence.distanceMeters.toStringAsFixed(0);
-      await showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Too Far from Location'),
-          content: Text(
-            'You are ${dist}m away from this visit location.\n\n'
-            'You must be within 200m to start this visit.\n\n'
-            'Please travel to the location and try again.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('OK'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                // Allow override if geofence is not critical (no GPS)
-                context.go('/visits/${visit.id}/complete');
-              },
-              child: const Text('Override (Supervisor)'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
+    // Start visit immediately — no geofencing required
     context.go('/visits/${visit.id}/complete');
   }
 
