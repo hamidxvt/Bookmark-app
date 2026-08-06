@@ -197,10 +197,9 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
         "flex h-16 shrink-0 items-center border-b border-white/5 transition-all duration-300",
         collapsed ? "justify-center px-3" : "gap-3 px-5"
       )}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0D9488] to-[#14B8A6] shadow-lg shadow-teal-500/25">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M5 3H19C19.5523 3 20 3.44772 20 4V21L12 17L4 21V4C4 3.44772 4.44772 3 5 3Z" fill="white"/>
-          </svg>
+        <div className="h-9 w-9 shrink-0 rounded-lg overflow-hidden shadow-lg shadow-teal-500/25 flex items-center justify-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/bookmark-logo.png" alt="Bookmark" className="h-full w-full object-cover" />
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
