@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { MapPin, RefreshCw, Users, Clock, Navigation, AlertTriangle, Building2, ChevronDown } from "lucide-react";
 
 interface City {
@@ -66,14 +66,20 @@ export default function LiveMapClient() {
   const markersRef = useRef<Map<number, any>>(new Map());
   const geoCircRef = useRef<any>(null);
 
-  const [officers,      setOfficers]      = useState<Officer[]>([]);
-  const [cities,        setCities]        = useState<City[]>([]);
-  const [selectedCity,  setSelectedCity]  = useState<City | null>(null);
-  const [loading,       setLoading]       = useState(true);
-  const [lastUpdate,    setLastUpdate]    = useState<Date | null>(null);
-  const [selected,      setSelected]      = useState<Officer | null>(null);
-  const [leafletLoaded, setLeafletLoaded] = useState(false);
-  const [cityDropOpen,  setCityDropOpen]  = useState(false);
+  const [officers,       setOfficers]      = useState<Officer[]>([]);
+  const [cities,         setCities]        = useState<City[]>([]);
+  const [selectedCity,   setSelectedCity]  = useState<City | null>(null);
+  const [loading,        setLoading]       = useState(true);
+  const [lastUpdate,     setLastUpdate]    = useState<Date | null>(null);
+  const [selected,       setSelected]      = useState<Officer | null>(null);
+  const [leafletLoaded,  setLeafletLoaded] = useState(false);
+  const [cityDropOpen,   setCityDropOpen]  = useState(false);
+  const [isClient,       setIsClient]      = useState(false);
+
+  // Ensure we only render map on client side
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Load Leaflet from CDN
   useEffect(() => {
@@ -92,12 +98,17 @@ export default function LiveMapClient() {
   // Init Leaflet map
   useEffect(() => {
     if (!leafletLoaded || !mapRef.current || leafletRef.current) return;
-    const L   = window.L;
-    const map = L.map(mapRef.current, { zoomControl: true }).setView([30.3753, 69.3451], 6);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: "© OpenStreetMap contributors", maxZoom: 19,
-    }).addTo(map);
-    leafletRef.current = map;
+    try {
+      const L   = window.L;
+      if (!L) return;
+      const map = L.map(mapRef.current, { zoomControl: true }).setView([30.3753, 69.3451], 6);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors", maxZoom: 19,
+      }).addTo(map);
+      leafletRef.current = map;
+    } catch (err) {
+      console.error("[Leaflet init]", err);
+    }
   }, [leafletLoaded]);
 
   // Load cities for filter
@@ -345,14 +356,18 @@ export default function LiveMapClient() {
           </div>
         </div>
 
-        {withLocation.length === 0 ? (
+        {!isClient || withLocation.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 bg-slate-50">
             <MapPin className="h-10 w-10 text-slate-200" />
-            <p className="mt-3 text-sm font-medium text-slate-400">No officers with location data</p>
-            <p className="text-xs text-slate-300 mt-1">Officers appear when they open the app and GPS pings</p>
+            <p className="mt-3 text-sm font-medium text-slate-400">
+              {!isClient ? "Loading map…" : "No officers with location data"}
+            </p>
+            <p className="text-xs text-slate-300 mt-1">
+              {!isClient ? "Please wait" : "Officers appear when they open the app and GPS pings"}
+            </p>
           </div>
         ) : (
-          <div ref={mapRef} className="w-full h-[440px]" />
+          <div ref={mapRef} className="w-full h-[440px] bg-slate-50" />
         )}
       </div>
 
