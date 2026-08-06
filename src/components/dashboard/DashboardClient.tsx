@@ -253,22 +253,50 @@ export default function DashboardClient() {
         )}
       </div>
 
-      {/* Quick Actions */}
-      <div className="rounded-2xl bg-gradient-to-br from-[#0f1e3c] to-[#1a3060] p-5">
-        <h3 className="text-sm font-semibold text-white mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Attendance", icon: Activity, href: "/attendance" },
-            { label: "Leave Requests", icon: CalendarX, href: "/leaves" },
-            { label: "Missed Visits", icon: FileText, href: "/missed-visits" },
-            { label: "Live Map", icon: MapPin, href: "/location" },
-          ].map((a) => (
-            <a key={a.label} href={a.href}
-              className="flex items-center gap-2.5 rounded-xl bg-white/10 px-4 py-3 text-sm font-medium text-white hover:bg-white/20 transition-colors">
-              <a.icon className="h-4 w-4 text-teal-400" />
-              {a.label}
-            </a>
-          ))}
+      {/* Quick Navigation & Controls */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Navigation Cards */}
+        <div className="rounded-2xl bg-gradient-to-br from-teal-400/10 to-teal-500/10 border border-teal-200/30 p-5">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-teal-600" />
+            Field Operations
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Live Location",   icon: MapPin, href: "/location" },
+              { label: "Attendance",      icon: Activity, href: "/attendance" },
+              { label: "Missed Visits",   icon: FileText, href: "/missed-visits" },
+              { label: "Payroll",         icon: Users, href: "/payroll" },
+            ].map((a) => (
+              <a key={a.label} href={a.href}
+                className="flex items-center gap-2.5 rounded-lg bg-white px-3 py-2 text-xs font-medium text-teal-700 hover:bg-teal-50 border border-teal-100 transition-colors shadow-sm">
+                <a.icon className="h-3.5 w-3.5 text-teal-600" />
+                {a.label}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {/* Management Controls */}
+        <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 p-5">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <UserCheck className="h-4 w-4 text-slate-700" />
+            Management
+          </h3>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Officer Management", icon: UserCheck, href: "/bookers" },
+              { label: "City Management", icon: MapPin, href: "/locations/cities" },
+              { label: "Customers", icon: Users, href: "/customers" },
+              { label: "Products", icon: Package, href: "/products" },
+            ].map((a) => (
+              <a key={a.label} href={a.href}
+                className="flex items-center gap-2.5 rounded-lg bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 border border-slate-200 transition-colors shadow-sm">
+                <a.icon className="h-3.5 w-3.5 text-slate-600" />
+                {a.label}
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </div>
