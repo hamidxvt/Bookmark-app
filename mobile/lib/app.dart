@@ -12,11 +12,10 @@ import 'features/visits/presentation/complete_visit_screen.dart';
 import 'features/visits/presentation/missed_visit_screen.dart';
 import 'features/workday/presentation/day_start_screen.dart';
 import 'features/workday/presentation/day_end_screen.dart';
-import 'features/samples/presentation/samples_screen.dart';
-import 'features/leaves/presentation/leaves_screen.dart';
 import 'features/payroll/presentation/payroll_screen.dart';
+import 'features/map/presentation/route_map_screen.dart';
+import 'features/profile/presentation/profile_screen.dart';
 
-// Stable router — only rebuilt once, uses refreshListenable for auth changes
 final _routerProvider = Provider<GoRouter>((ref) {
   final notifier = _AuthNotifierListenable(ref);
   return GoRouter(
@@ -47,14 +46,13 @@ final _routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) => MissedVisitScreen(
             visitId: int.parse(state.pathParameters['id']!)),
       ),
-      GoRoute(path: '/samples', builder: (_, __) => const SamplesScreen()),
-      GoRoute(path: '/leaves',  builder: (_, __) => const LeavesScreen()),
-      GoRoute(path: '/payroll', builder: (_, __) => const PayrollScreen()),
+      GoRoute(path: '/payroll',  builder: (_, __) => const PayrollScreen()),
+      GoRoute(path: '/map',      builder: (_, __) => const RouteMapScreen()),
+      GoRoute(path: '/profile',  builder: (_, __) => const ProfileScreen()),
     ],
   );
 });
 
-// Makes GoRouter react to auth state changes without rebuilding the whole tree
 class _AuthNotifierListenable extends ChangeNotifier {
   _AuthNotifierListenable(ProviderRef ref) {
     ref.listen(authProvider, (_, __) => notifyListeners());

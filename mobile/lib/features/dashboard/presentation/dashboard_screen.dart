@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/responsive_layout.dart';
 import '../../../core/services/gps_service.dart';
 import '../../auth/presentation/auth_notifier.dart';
 import '../../workday/data/workday_status_provider.dart';
@@ -21,7 +21,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Start GPS tracking (background service + foreground timer)
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await ref.read(gpsServiceProvider).startTracking();
     });
@@ -32,235 +31,268 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final auth = ref.watch(authProvider);
     final user = auth.user;
     final now = DateTime.now();
-    final greeting = _greeting(now.hour);
+    final initials = (user?.name.isNotEmpty == true)
+        ? user!.name.trim().split(' ').take(2).map((p) => p[0]).join().toUpperCase()
+        : 'OF';
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: const Color(0xFFF0F4F8),
       body: CustomScrollView(
         slivers: [
-          // ── Hero App Bar ──────────────────────────────────────────────
+          // ── Hero ──────────────────────────────────────────────────────────
           SliverAppBar(
-            expandedHeight: 180,
+            expandedHeight: 200,
             pinned: true,
-            backgroundColor: AppColors.primary,
+            stretch: true,
+            backgroundColor: const Color(0xFF1A3A5C),
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
-              background: GradientBox(
-                colors: AppColors.primaryGradient,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 22,
-                              backgroundColor: Colors.white.withOpacity(0.2),
-                              child: Text(
-                                (user?.name.isNotEmpty == true)
-                                    ? user!.name[0].toUpperCase()
-                                    : 'U',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 18,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    greeting,
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  Text(
-                                    user?.name.isNotEmpty == true
-                                        ? user!.name
-                                        : 'Field Officer',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.logout_rounded, color: Colors.white70),
-                              onPressed: () {
-                                ref.read(authProvider.notifier).logout();
-                                context.go('/login');
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          DateFormat('EEEE, dd MMMM yyyy').format(now),
-                          style: const TextStyle(
-                            color: Colors.white60,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
+              collapseMode: CollapseMode.parallax,
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Mesh gradient background
+                  Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFF1A3A5C), Color(0xFF0D9488)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
                     ),
                   ),
-                ),
+                  // Decorative circles
+                  Positioned(
+                    top: -40,
+                    right: -40,
+                    child: Container(
+                      width: 180,
+                      height: 180,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.05),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    bottom: -20,
+                    left: -30,
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.04),
+                      ),
+                    ),
+                  ),
+                  // Content
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              // Avatar
+                              Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.15),
+                                  border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    initials,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _greeting(now.hour),
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.75),
+                                        fontSize: 12,
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                    Text(
+                                      user?.name.isNotEmpty == true ? user!.name : 'Field Officer',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              // Profile button
+                              GestureDetector(
+                                onTap: () => context.go('/profile'),
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.12),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                  ),
+                                  child: const Icon(Icons.person_rounded, color: Colors.white, size: 20),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: () {
+                                  ref.read(authProvider.notifier).logout();
+                                  context.go('/login');
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.10),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: Colors.white.withOpacity(0.15)),
+                                  ),
+                                  child: Icon(Icons.logout_rounded, color: Colors.white.withOpacity(0.8), size: 20),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Text(
+                            DateFormat('EEEE, d MMMM yyyy').format(now),
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.65),
+                              fontSize: 12.5,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
 
           SliverPadding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                // ── Day Status ──────────────────────────────────────────
-                _DayStatusCard(),
-                const SizedBox(height: AppSpacing.md),
+                // ── Day Status ───────────────────────────────────────────────
+                Consumer(builder: (_, ref, __) {
+                  final ws = ref.watch(workdayStatusProvider);
+                  final s = ws.valueOrNull;
+                  final started = s?.dayStarted ?? false;
+                  final ended = s?.dayEnded ?? false;
+                  return _DayStatusCard(started: started, ended: ended).animate().slideX(begin: -0.06).fadeIn(duration: 400.ms);
+                }),
+                const SizedBox(height: 20),
 
-                // ── KPI Row ────────────────────────────────────────────
-                Text('Today\'s Summary',
-                    style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: AppSpacing.sm),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _KpiCard(
-                        icon: Icons.route_rounded,
-                        label: 'Visits',
-                        value: '7',
-                        sub: 'Planned today',
-                        color: AppColors.info,
-                      ).animate(delay: 100.ms).slideX(begin: -0.2).fadeIn(),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _KpiCard(
-                        icon: Icons.check_circle_outline_rounded,
-                        label: 'Done',
-                        value: '0',
-                        sub: 'Completed',
-                        color: AppColors.success,
-                      ).animate(delay: 200.ms).slideX(begin: 0.2).fadeIn(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _KpiCard(
-                        icon: Icons.calendar_today_rounded,
-                        label: 'Leave',
-                        value: '28',
-                        sub: 'Days remaining',
-                        color: AppColors.secondary,
-                      ).animate(delay: 300.ms).slideX(begin: -0.2).fadeIn(),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _KpiCard(
-                        icon: Icons.currency_rupee_rounded,
-                        label: 'Earned',
-                        value: '₨0',
-                        sub: 'This month',
-                        color: AppColors.warning,
-                      ).animate(delay: 400.ms).slideX(begin: 0.2).fadeIn(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.md),
-
-                // ── Quick Actions ──────────────────────────────────────
-                Text('Quick Actions',
-                    style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: AppSpacing.sm),
+                // ── Quick Actions ────────────────────────────────────────────
+                _sectionHeader('Quick Actions'),
+                const SizedBox(height: 10),
                 Consumer(builder: (context, ref, _) {
-                  final workday = ref.watch(workdayStatusProvider);
-                  final status = workday.valueOrNull;
-                  final dayStarted = status?.dayStarted ?? false;
-                  final dayEnded = status?.dayEnded ?? false;
+                  final ws = ref.watch(workdayStatusProvider);
+                  final s = ws.valueOrNull;
+                  final started = s?.dayStarted ?? false;
+                  final ended = s?.dayEnded ?? false;
 
                   return GridView.count(
                     crossAxisCount: 3,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.9,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 0.88,
                     children: [
-                      // Day action — context aware
-                      if (!dayStarted)
+                      // Context-aware day action
+                      if (!started)
                         _QuickAction(
                           icon: Icons.play_circle_outline_rounded,
                           label: 'Start Day',
                           color: AppColors.success,
                           onTap: () => context.go('/day-start'),
-                        ).animate(delay: 100.ms).scale(begin: const Offset(0.8, 0.8)).fadeIn()
-                      else if (!dayEnded)
+                        ).animate(delay: 60.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn()
+                      else if (!ended)
                         _QuickAction(
                           icon: Icons.stop_circle_outlined,
                           label: 'End Day',
                           color: AppColors.error,
                           onTap: () => context.go('/day-end'),
-                        ).animate(delay: 100.ms).scale(begin: const Offset(0.8, 0.8)).fadeIn()
+                        ).animate(delay: 60.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn()
                       else
                         _QuickAction(
                           icon: Icons.check_circle_rounded,
                           label: 'Day Done',
                           color: AppColors.success,
                           onTap: () {},
-                        ).animate(delay: 100.ms).scale(begin: const Offset(0.8, 0.8)).fadeIn(),
+                        ).animate(delay: 60.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn(),
 
                       _QuickAction(
-                        icon: Icons.map_outlined,
+                        icon: Icons.route_rounded,
                         label: 'My Visits',
                         color: AppColors.primary,
                         onTap: () => context.go('/visits'),
-                      ).animate(delay: 150.ms).scale(begin: const Offset(0.8, 0.8)).fadeIn(),
+                      ).animate(delay: 120.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn(),
+
                       _QuickAction(
-                        icon: Icons.book_outlined,
-                        label: 'Samples',
+                        icon: Icons.map_rounded,
+                        label: 'Route Map',
                         color: AppColors.secondary,
-                        onTap: () => context.go('/samples'),
-                      ).animate(delay: 200.ms).scale(begin: const Offset(0.8, 0.8)).fadeIn(),
-                      _QuickAction(
-                        icon: Icons.beach_access_outlined,
-                        label: 'Leave',
-                        color: AppColors.info,
-                        onTap: () => context.go('/leaves'),
-                      ).animate(delay: 250.ms).scale(begin: const Offset(0.8, 0.8)).fadeIn(),
-                      _QuickAction(
-                        icon: Icons.add_location_alt_outlined,
-                        label: 'Ad-hoc',
-                        color: AppColors.warning,
-                        onTap: () => context.go('/visits'),
-                      ).animate(delay: 300.ms).scale(begin: const Offset(0.8, 0.8)).fadeIn(),
+                        onTap: () => context.go('/map'),
+                      ).animate(delay: 180.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn(),
+
                       _QuickAction(
                         icon: Icons.account_balance_wallet_outlined,
                         label: 'Earnings',
                         color: AppColors.warning,
                         onTap: () => context.go('/payroll'),
-                      ).animate(delay: 350.ms).scale(begin: const Offset(0.8, 0.8)).fadeIn(),
+                      ).animate(delay: 240.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn(),
+
+                      _QuickAction(
+                        icon: Icons.person_pin_circle_rounded,
+                        label: 'Profile',
+                        color: AppColors.info,
+                        onTap: () => context.go('/profile'),
+                      ).animate(delay: 300.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn(),
                     ],
                   );
                 }),
-                const SizedBox(height: AppSpacing.md),
+                const SizedBox(height: 20),
 
-                // ── Motivational Quote ─────────────────────────────────
-                _QuoteCard()
-                    .animate(delay: 500.ms)
-                    .slideY(begin: 0.2)
-                    .fadeIn(duration: 600.ms),
+                // ── Today's Stats ────────────────────────────────────────────
+                _sectionHeader("Today's Stats"),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(child: _StatCard(icon: Icons.school_outlined, label: 'Planned', value: '7', color: AppColors.info)
+                      .animate(delay: 100.ms).slideX(begin: -0.1).fadeIn()),
+                  const SizedBox(width: 10),
+                  Expanded(child: _StatCard(icon: Icons.check_circle_outline_rounded, label: 'Done', value: '0', color: AppColors.success)
+                      .animate(delay: 200.ms).slideX(begin: 0.1).fadeIn()),
+                ]),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(child: _StatCard(icon: Icons.currency_rupee_rounded, label: 'Earned', value: '₨0', color: AppColors.warning)
+                      .animate(delay: 300.ms).slideX(begin: -0.1).fadeIn()),
+                  const SizedBox(width: 10),
+                  Expanded(child: _StatCard(icon: Icons.gps_fixed_rounded, label: 'GPS', value: 'Live', color: AppColors.secondary)
+                      .animate(delay: 400.ms).slideX(begin: 0.1).fadeIn()),
+                ]),
                 const SizedBox(height: AppSpacing.lg),
               ]),
             ),
@@ -270,142 +302,95 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  Widget _sectionHeader(String title) => Text(
+    title,
+    style: const TextStyle(
+      fontSize: 15,
+      fontWeight: FontWeight.w700,
+      color: Color(0xFF1E293B),
+      letterSpacing: -0.2,
+    ),
+  );
+
   String _greeting(int hour) {
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
+    if (hour < 12) return 'Good Morning 👋';
+    if (hour < 17) return 'Good Afternoon 👋';
+    return 'Good Evening 👋';
   }
 }
 
-// ── Day Status Card ────────────────────────────────────────────────────────────
+// ── Day Status Card (glassmorphism) ──────────────────────────────────────────
 class _DayStatusCard extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.secondary.withOpacity(0.12),
-            AppColors.secondary.withOpacity(0.04),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(
-          color: AppColors.secondary.withOpacity(0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.secondary.withOpacity(0.15),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.wb_sunny_rounded,
-              color: AppColors.secondary,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Day Not Started',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: AppColors.secondary,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                Text(
-                  'Tap "Start Day" to begin tracking visits',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded, color: AppColors.secondary),
-        ],
-      ),
-    ).animate().slideX(begin: -0.1).fadeIn(duration: 500.ms);
-  }
-}
-
-// ── KPI Card ──────────────────────────────────────────────────────────────────
-class _KpiCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String sub;
-  final Color color;
-
-  const _KpiCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.sub,
-    required this.color,
-  });
+  final bool started;
+  final bool ended;
+  const _DayStatusCard({required this.started, required this.ended});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.outline, width: 0.5),
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
+    final Color color = ended
+        ? AppColors.success
+        : started
+            ? AppColors.secondary
+            : AppColors.warning;
+    final String title = ended
+        ? 'Day Completed'
+        : started
+            ? 'Day In Progress'
+            : 'Day Not Started';
+    final String sub = ended
+        ? 'Great work today! See you tomorrow.'
+        : started
+            ? 'GPS tracking active — visit your assigned schools'
+            : 'Tap Start Day to activate GPS tracking';
+    final IconData icon = ended
+        ? Icons.check_circle_rounded
+        : started
+            ? Icons.gps_fixed_rounded
+            : Icons.play_circle_outline_rounded;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [color.withOpacity(0.13), color.withOpacity(0.05)],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
             ),
-            child: Icon(icon, color: color, size: 20),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: color.withOpacity(0.3), width: 1),
           ),
-          const SizedBox(height: 12),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: AppColors.onSurface,
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            sub,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: AppColors.onBackground,
-                ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          child: Row(children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(title,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: color)),
+                const SizedBox(height: 2),
+                Text(sub,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              ]),
+            ),
+          ]),
+        ),
       ),
     );
   }
 }
 
-// ── Quick Action ──────────────────────────────────────────────────────────────
+// ── Quick Action (glassmorphism card) ────────────────────────────────────────
 class _QuickAction extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -423,86 +408,119 @@ class _QuickAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.outline, width: 0.5),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Icon(icon, color: color, size: 24),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.85),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: color.withOpacity(0.15), width: 1),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onSurface,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [color.withOpacity(0.15), color.withOpacity(0.08)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
+                  child: Icon(icon, color: color, size: 22),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                    letterSpacing: -0.1,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-// ── Quote Card ────────────────────────────────────────────────────────────────
-class _QuoteCard extends StatelessWidget {
-  static const _quotes = [
-    '"Every visit is an opportunity. Make it count."',
-    '"Consistency builds trust. Show up every day."',
-    '"Your territory is your business. Own it."',
-    '"Small actions done daily create big results."',
-    '"Be the officer that schools remember."',
-  ];
+// ── Stat Card ────────────────────────────────────────────────────────────────
+class _StatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  const _StatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final idx = DateTime.now().day % _quotes.length;
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withOpacity(0.06),
-            AppColors.secondary.withOpacity(0.06),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        border: Border.all(color: AppColors.primary.withOpacity(0.15)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.format_quote_rounded,
-              color: AppColors.primary.withOpacity(0.4), size: 32),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _quotes[idx],
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontStyle: FontStyle.italic,
-                    color: AppColors.primary,
-                    height: 1.5,
-                  ),
-            ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(value,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                  letterSpacing: -0.5,
+                )),
+            Text(label,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF94A3B8),
+                  fontWeight: FontWeight.w500,
+                )),
+          ]),
+        ),
+      ]),
     );
   }
 }

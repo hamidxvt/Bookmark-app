@@ -35,8 +35,10 @@ dependencies:
   # Secure Storage — iOS Keychain / Android KeyStore
   flutter_secure_storage: 9.0.0
 
-  # Maps & Location
-  google_maps_flutter: 2.6.0
+  # Maps & Location (flutter_map = free OpenStreetMap, no API key needed)
+  flutter_map: 7.0.2
+  latlong2: 0.9.1
+  url_launcher: 6.2.6
   geolocator: 11.0.0
   permission_handler: 11.3.0
 

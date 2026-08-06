@@ -35,6 +35,12 @@ class ApiConstants {
   static const String gpsPing = '/gps';
   static const String livePositions = '/gps/live';
 
+  // ── Route Optimization ────────────────────────────────────────────────────
+  static const String routeOptimized = '/route';
+
+  // ── Profile ───────────────────────────────────────────────────────────────
+  static const String profile = '/profile';
+
   // ── Leaves ──────────────────────────────────────────────────────────────
   static const String leaveBalance = '/leaves';
   static const String myLeaves = '/leaves';
