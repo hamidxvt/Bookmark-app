@@ -34,7 +34,7 @@ export async function GET(req: Request) {
     }
 
     // Monthly stats
-    const [totalVisits, completedVisits, missedVisits, attendance] = await Promise.all([
+    const [totalVisits, completedVisits, cancelledVisits, attendance] = await Promise.all([
       prisma.visit.count({
         where: { bookerId: user.id, visitDate: { gte: monthStart, lte: monthEnd } },
       }),
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
         where: { bookerId: user.id, visitDate: { gte: monthStart, lte: monthEnd }, status: "COMPLETED" },
       }),
       prisma.visit.count({
-        where: { bookerId: user.id, visitDate: { gte: monthStart, lte: monthEnd }, status: "MISSED" },
+        where: { bookerId: user.id, visitDate: { gte: monthStart, lte: monthEnd }, status: "CANCELLED" },
       }),
       prisma.attendance.findMany({
         where: { bookerId: user.id, date: { gte: monthStart, lte: monthEnd } },
@@ -70,7 +70,7 @@ export async function GET(req: Request) {
         stats: {
           totalVisits,
           completedVisits,
-          missedVisits,
+          cancelledVisits,
           shiftsWorked,
           month: now.toLocaleString("en-PK", { month: "long", year: "numeric" }),
         },
