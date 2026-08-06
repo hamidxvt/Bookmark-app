@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Navigation, UserCheck, ClipboardList, Users,
   Package, ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, X,
-  Clock, AlertTriangle, Banknote, Database, Download, Zap,
+  Clock, AlertTriangle, Banknote, Database, Download, Zap, MapPin,
 } from "lucide-react";
 import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
@@ -28,8 +28,13 @@ const NAV = [
     ],
   },
   {
-    section: "MASTER DATA",
+    section: "LOCATIONS & MANAGEMENT",
     items: [
+      {
+        icon: MapPin,
+        label: "City Management",
+        href: "/locations/cities",
+      },
       {
         icon: Users,
         label: "Customers",
