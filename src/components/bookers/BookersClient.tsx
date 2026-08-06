@@ -41,6 +41,7 @@ function OfficerModal({
   booker, onClose, onSaved,
 }: { booker?: Booker | null; onClose: () => void; onSaved: () => void }) {
   const isEdit = !!booker;
+  const [cities, setCities] = useState<Array<{ id: number; name: string }>>([]);
   const [form, setForm] = useState({
     name: booker?.name ?? "", email: booker?.email ?? "",
     password: "", phone: booker?.phone ?? "",
@@ -48,9 +49,16 @@ function OfficerModal({
     visitTargets: booker?.visitTargets ?? "", sampleBudget: booker?.sampleBudget ?? 300000,
     adminApproved: booker?.adminApproved ?? "PENDING",
     jobStatus: booker?.jobStatus ?? "NOT_ACTIVE",
+    cityId: booker?.city?.id ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/v1/cities").then(r => r.json()).then(d => {
+      if (d.success && d.data) setCities(d.data);
+    }).catch(() => {});
+  }, []);
 
   const set = (k: string, v: string | number) => setForm(p => ({ ...p, [k]: v }));
 
@@ -68,6 +76,7 @@ function OfficerModal({
         sampleBudget: form.sampleBudget,
         adminApproved: form.adminApproved,
         jobStatus: form.jobStatus,
+        cityId: form.cityId ? parseInt(String(form.cityId)) : null,
       };
       if (!isEdit && form.password) body.password = form.password;
       const res = await fetch(url, {
@@ -149,6 +158,17 @@ function OfficerModal({
                 <option value="NOT_ACTIVE">Not Active</option>
               </select>
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Assigned City</label>
+            <select value={form.cityId} onChange={e => set("cityId", e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none">
+              <option value="">— Select City —</option>
+              {cities.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
           </div>
 
           <div className="flex gap-3 pt-2">
