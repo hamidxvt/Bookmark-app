@@ -83,31 +83,51 @@ export default function LiveMapClient() {
 
   // Load Leaflet from CDN
   useEffect(() => {
-    if (document.querySelector("#leaflet-css")) { setLeafletLoaded(true); return; }
-    const link   = document.createElement("link");
-    link.id      = "leaflet-css";
-    link.rel     = "stylesheet";
-    link.href    = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    if (document.querySelector("#leaflet-css")) { 
+      setLeafletLoaded(true); 
+      return; 
+    }
+    const link = document.createElement("link");
+    link.id = "leaflet-css";
+    link.rel = "stylesheet";
+    link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    link.onerror = () => console.warn("Failed to load Leaflet CSS");
     document.head.appendChild(link);
+
     const script = document.createElement("script");
-    script.src   = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-    script.onload = () => setLeafletLoaded(true);
+    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    script.onload = () => {
+      console.log("Leaflet loaded successfully");
+      setLeafletLoaded(true);
+    };
+    script.onerror = () => {
+      console.error("Failed to load Leaflet JS from CDN");
+      setLeafletLoaded(true); // Still set to true so we can show fallback UI
+    };
     document.head.appendChild(script);
   }, []);
 
   // Init Leaflet map
   useEffect(() => {
     if (!leafletLoaded || !mapRef.current || leafletRef.current) return;
+    
+    // Check if window.L is available
+    const L = (window as any).L;
+    if (!L || !L.map) {
+      console.warn("Leaflet not available, map will show fallback");
+      return;
+    }
+
     try {
-      const L   = window.L;
-      if (!L) return;
       const map = L.map(mapRef.current, { zoomControl: true }).setView([30.3753, 69.3451], 6);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors", maxZoom: 19,
+        attribution: "© OpenStreetMap contributors",
+        maxZoom: 19,
       }).addTo(map);
       leafletRef.current = map;
+      console.log("Map initialized successfully");
     } catch (err) {
-      console.error("[Leaflet init]", err);
+      console.error("[Leaflet init error]", err);
     }
   }, [leafletLoaded]);
 
