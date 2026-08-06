@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { Bell, User, ChevronDown, Menu, LogOut, CalendarOff, FileQuestion, Inbox } from "lucide-react";
+import { Bell, User, ChevronDown, Menu, LogOut, CalendarOff, FileQuestion } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { signOut } from "next-auth/react";
 import { useSidebar } from "./SidebarContext";
@@ -15,12 +15,12 @@ function getBreadcrumbs(pathname: string): { label: string; href?: string }[] {
   let path = "";
   const labels: Record<string, string> = {
     dashboard: "Dashboard", bookers: "Sales Team", customers: "Customers",
-    visits: "Visits", products: "Products", requests: "Requests", inbox: "Inbox",
+    visits: "Visits", products: "Products",
     location: "Live Location", locations: "Locations", cities: "Cities",
     zones: "Zones", areas: "Areas", add: "Add", today: "Today",
     brands: "Brands", subjects: "Subjects", series: "Series", profile: "Profile",
     scheduler: "Run Schedulers", migrate: "Migrate Data", reports: "Export Data",
-    attendance: "Attendance", payroll: "Payroll", "leave-requests": "Leave Requests",
+    attendance: "Attendance", payroll: "Payroll",
     "missed-visits": "Missed Visits",
   };
   for (const seg of segments) {
@@ -43,7 +43,7 @@ type Notif = {
 const typeIcon = {
   leave: <CalendarOff className="h-3.5 w-3.5 text-amber-500" />,
   missed: <FileQuestion className="h-3.5 w-3.5 text-rose-500" />,
-  request: <Inbox className="h-3.5 w-3.5 text-sky-500" />,
+  request: <Bell className="h-3.5 w-3.5 text-teal-500" />,
 };
 
 export default function Header() {
@@ -169,7 +169,7 @@ export default function Header() {
               {notifs.length > 0 && (
                 <div className="px-4 py-2.5 border-t border-slate-100">
                   <Link
-                    href="/leave-requests"
+                    href="/missed-visits"
                     onClick={() => setBellOpen(false)}
                     className="text-xs text-teal-600 hover:text-teal-700 font-medium"
                   >

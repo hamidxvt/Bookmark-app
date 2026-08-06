@@ -5,9 +5,8 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Navigation, UserCheck, ClipboardList, Users,
-  Globe, Package, BookOpen, MessageSquare, Bell, ChevronDown,
-  LogOut, PanelLeftClose, PanelLeftOpen, X,
-  Calendar, Clock, AlertTriangle, Banknote, Database, Download, Zap,
+  Package, ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, X,
+  Clock, AlertTriangle, Banknote, Database, Download, Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { signOut, useSession } from "next-auth/react";
@@ -17,27 +16,15 @@ const NAV = [
   {
     section: "GENERAL",
     items: [
-      { icon: LayoutDashboard, label: "Home", href: "/dashboard" },
-      { icon: Navigation, label: "Live Location", href: "/location" },
+      { icon: LayoutDashboard, label: "Home",          href: "/dashboard" },
+      { icon: Navigation,      label: "Live Location", href: "/location"  },
     ],
   },
   {
     section: "SALES",
     items: [
-      {
-        icon: UserCheck,
-        label: "Sales Team",
-        href: "/bookers",
-      },
-      {
-        icon: ClipboardList,
-        label: "Visits",
-        children: [
-          { label: "All Visits", href: "/visits" },
-          { label: "Today's Visits", href: "/visits/today" },
-          { label: "Schedule Visit", href: "/visits/add" },
-        ],
-      },
+      { icon: UserCheck,    label: "Sales Team", href: "/bookers" },
+      { icon: ClipboardList, label: "Visits",    href: "/visits"  },
     ],
   },
   {
@@ -47,39 +34,19 @@ const NAV = [
         icon: Users,
         label: "Customers",
         children: [
-          { label: "Customer List", href: "/customers" },
-          { label: "Add Customer", href: "/customers/add" },
+          { label: "Customer List", href: "/customers"     },
+          { label: "Add Customer",  href: "/customers/add" },
         ],
       },
-      {
-        icon: Globe,
-        label: "Locations",
-        children: [
-          { label: "Cities", href: "/locations/cities" },
-          { label: "Zones / Regions", href: "/locations/zones" },
-          { label: "Areas", href: "/locations/areas" },
-        ],
-      },
-    ],
-  },
-  {
-    section: "PRODUCTS",
-    items: [
       {
         icon: Package,
         label: "Products",
         children: [
-          { label: "Products List", href: "/products" },
-          { label: "Add Product", href: "/products/add" },
-        ],
-      },
-      {
-        icon: BookOpen,
-        label: "Catalog",
-        children: [
-          { label: "Brands", href: "/products/brands" },
-          { label: "Subjects", href: "/products/subjects" },
-          { label: "Series", href: "/products/series" },
+          { label: "Products List", href: "/products"     },
+          { label: "Add Product",   href: "/products/add" },
+          { label: "Brands",        href: "/products/brands"   },
+          { label: "Subjects",      href: "/products/subjects" },
+          { label: "Series",        href: "/products/series"   },
         ],
       },
     ],
@@ -87,17 +54,9 @@ const NAV = [
   {
     section: "FIELD OPS",
     items: [
-      { icon: Clock, label: "Attendance", href: "/attendance" },
-      { icon: Calendar, label: "Leave Requests", href: "/leaves" },
+      { icon: Clock,    label: "Attendance",   href: "/attendance"   },
       { icon: AlertTriangle, label: "Missed Visits", href: "/missed-visits" },
-      { icon: Banknote, label: "Payroll", href: "/payroll" },
-    ],
-  },
-  {
-    section: "SUPPORT",
-    items: [
-      { icon: Bell, label: "Requests", href: "/requests" },
-      { icon: MessageSquare, label: "Inbox", href: "/inbox" },
+      { icon: Banknote, label: "Payroll",      href: "/payroll"      },
     ],
   },
   {
@@ -107,11 +66,10 @@ const NAV = [
         icon: Download,
         label: "Export Data",
         children: [
-          { label: "Export Visits", href: "/reports/visits" },
-          { label: "Export Officers", href: "/reports/bookers" },
-          { label: "Export Customers", href: "/reports/customers" },
-          { label: "Export Attendance", href: "/reports/attendance" },
-          { label: "Export Leaves", href: "/reports/leaves" },
+          { label: "Visits",     href: "/reports" },
+          { label: "Officers",   href: "/reports" },
+          { label: "Customers",  href: "/reports" },
+          { label: "Attendance", href: "/reports" },
         ],
       },
     ],
@@ -119,8 +77,8 @@ const NAV = [
   {
     section: "ADMIN",
     items: [
-      { icon: Zap, label: "Run Schedulers", href: "/scheduler" },
-      { icon: Database, label: "Migrate Data", href: "/migrate" },
+      { icon: Zap,      label: "Run Schedulers", href: "/scheduler" },
+      { icon: Database, label: "Migrate Data",   href: "/migrate"   },
     ],
   },
 ];
@@ -239,16 +197,15 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
         "flex h-16 shrink-0 items-center border-b border-white/5 transition-all duration-300",
         collapsed ? "justify-center px-3" : "gap-3 px-5"
       )}>
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-lg">
-          {/* Bookmark icon SVG */}
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M5 3H19C19.5523 3 20 3.44772 20 4V21L12 17L4 21V4C4 3.44772 4.44772 3 5 3Z" fill="#1A3A5C" stroke="#1A3A5C" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#0D9488] to-[#14B8A6] shadow-lg shadow-teal-500/25">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M5 3H19C19.5523 3 20 3.44772 20 4V21L12 17L4 21V4C4 3.44772 4.44772 3 5 3Z" fill="white"/>
           </svg>
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-white leading-none truncate">Bookmark</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">Field Force Manager</p>
+            <p className="text-[10px] text-[#0D9488] font-semibold mt-0.5">Field Force Manager</p>
           </div>
         )}
       </div>
@@ -325,7 +282,7 @@ export default function Sidebar() {
 
       {/* Mobile drawer */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#0a1628] border-r border-white/5 shadow-2xl shadow-black/50 transition-transform duration-300 ease-in-out lg:hidden",
+        "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#0F1E3C] border-r border-white/5 shadow-2xl shadow-black/50 transition-transform duration-300 ease-in-out lg:hidden",
         open ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Mobile close button */}
@@ -340,13 +297,13 @@ export default function Sidebar() {
 
       {/* Desktop sidebar */}
       <aside className={cn(
-        "hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 bg-[#0a1628] border-r border-white/5 transition-all duration-300 ease-in-out",
+        "hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 bg-[#0F1E3C] border-r border-white/5 transition-all duration-300 ease-in-out",
         sidebarWidth
       )}>
         {/* Collapse toggle */}
         <button
           onClick={toggleCollapsed}
-          className="absolute -right-3 top-20 z-50 flex h-6 w-6 items-center justify-center rounded-full border border-slate-700 bg-[#0a1628] text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-all shadow-md cursor-pointer"
+          className="absolute -right-3 top-20 z-50 flex h-6 w-6 items-center justify-center rounded-full border border-slate-700 bg-[#0F1E3C] text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-all shadow-md cursor-pointer"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed
