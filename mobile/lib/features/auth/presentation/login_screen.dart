@@ -30,9 +30,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
     await ref.read(authProvider.notifier).login(
-          _emailCtrl.text.trim(),
-          _passCtrl.text,
-        );
+      _emailCtrl.text.trim(),
+      _passCtrl.text,
+    );
     if (mounted && ref.read(authProvider).isAuthenticated) {
       context.go('/dashboard');
     }
@@ -50,9 +50,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background gradient header
+          // Background gradient
           Positioned(
-            top: 0, left: 0, right: 0,
+            top: 0,
+            left: 0,
+            right: 0,
             height: size.height * 0.42,
             child: const GradientBox(
               colors: AppColors.primaryGradient,
@@ -62,9 +64,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
           // Decorative circles
           Positioned(
-            top: -60, right: -60,
+            top: -60,
+            right: -60,
             child: Container(
-              width: 200, height: 200,
+              width: 200,
+              height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withOpacity(0.05),
@@ -72,9 +76,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
           ),
           Positioned(
-            top: 40, left: -80,
+            top: 40,
+            left: -80,
             child: Container(
-              width: 180, height: 180,
+              width: 180,
+              height: 180,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withOpacity(0.07),
@@ -86,7 +92,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // Logo + title section
+                  // Logo + title
                   SizedBox(
                     height: size.height * 0.32,
                     child: Column(
@@ -130,173 +136,183 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         Text(
                           'Bookmark SFA',
                           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.5,
-                              ),
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                          ),
                         )
                             .animate(delay: 200.ms)
-                            .slideY(begin: 0.3, end: 0, duration: 500.ms, curve: Curves.easeOut)
+                            .slideY(
+                              begin: 0.3,
+                              end: 0,
+                              duration: 500.ms,
+                              curve: Curves.easeOut,
+                            )
                             .fadeIn(),
                         const SizedBox(height: 6),
                         Text(
                           'Field Force Management',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.white.withOpacity(0.75),
-                                letterSpacing: 0.5,
-                              ),
+                            color: Colors.white.withOpacity(0.75),
+                            letterSpacing: 0.5,
+                          ),
                         )
                             .animate(delay: 300.ms)
-                            .slideY(begin: 0.3, end: 0, duration: 500.ms, curve: Curves.easeOut)
+                            .slideY(
+                              begin: 0.3,
+                              end: 0,
+                              duration: 500.ms,
+                              curve: Curves.easeOut,
+                            )
                             .fadeIn(),
                       ],
                     ),
                   ),
 
-                  // Card form
+                  // Form card
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(24),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withOpacity(0.12),
-                              blurRadius: 20,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Form(
-                            key: _formKey,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Welcome back',
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFF0F172A),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Sign in to manage your field operations',
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: const Color(0xFF64748B),
-                                  ),
-                                ),
-                                const SizedBox(height: 32),
-                                
-                                // Email
-                                TextFormField(
-                                  controller: _emailCtrl,
-                                  keyboardType: TextInputType.emailAddress,
-                                  textInputAction: TextInputAction.next,
-                                  autocorrect: false,
-                                  decoration: const InputDecoration(
-                                    labelText: 'Email',
-                                    hintText: 'officer@bookmark.pk',
-                                    prefixIcon: Icon(Icons.email_outlined),
-                                  ),
-                                  validator: (v) {
-                                    if (v == null || v.isEmpty) return 'Email is required';
-                                    if (!v.contains('@')) return 'Enter a valid email';
-                                    return null;
-                                  },
-                                ),
-                                const SizedBox(height: 16),
-
-                                // Password
-                                TextFormField(
-                                  controller: _passCtrl,
-                                  obscureText: _obscure,
-                                  textInputAction: TextInputAction.done,
-                                  onFieldSubmitted: (_) => _submit(),
-                                  decoration: InputDecoration(
-                                    labelText: 'Password',
-                                    prefixIcon: const Icon(Icons.lock_outline_rounded),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _obscure
-                                            ? Icons.visibility_outlined
-                                            : Icons.visibility_off_outlined,
-                                      ),
-                                      onPressed: () => setState(() => _obscure = !_obscure),
-                                    ),
-                                  ),
-                                  validator: (v) {
-                                    if (v == null || v.isEmpty) return 'Password is required';
-                                    if (v.length < 6) return 'Minimum 6 characters';
-                                    return null;
-                                  },
-                                ),
-
-                                // Error message with close button
-                                if (auth.error != null) ...[
-                                  const SizedBox(height: 16),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.error.withOpacity(0.08),
-                                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                                      border: Border.all(
-                                        color: AppColors.error.withOpacity(0.3),
-                                      ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.error_outline_rounded,
-                                            color: AppColors.error, size: 18),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Text(
-                                            auth.error!,
-                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                  color: AppColors.error,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                          ),
-                                        ),
-                                        IconButton(
-                                          icon: Icon(Icons.close_rounded,
-                                              color: AppColors.error, size: 18),
-                                          onPressed: _clearError,
-                                          padding: EdgeInsets.zero,
-                                          constraints: const BoxConstraints(),
-                                        ),
-                                      ],
-                                    ),
-                                  ).animate().shakeX(duration: 400.ms, hz: 3, amount: 4),
-                                ],
-
-                                const SizedBox(height: 28),
-
-                                FilledButton(
-                                  onPressed: auth.isLoading ? null : _submit,
-                                  child: auth.isLoading
-                                      ? const SizedBox(
-                                          width: 22,
-                                          height: 22,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : const Text('Sign In'),
-                                ),
-                              ],
-                            ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.12),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
                           ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Welcome back',
+                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Sign in to manage your field operations',
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                              const SizedBox(height: 32),
+
+                              // Email field
+                              TextFormField(
+                                controller: _emailCtrl,
+                                keyboardType: TextInputType.emailAddress,
+                                textInputAction: TextInputAction.next,
+                                autocorrect: false,
+                                decoration: const InputDecoration(
+                                  labelText: 'Email',
+                                  hintText: 'officer@bookmark.pk',
+                                  prefixIcon: Icon(Icons.email_outlined),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) return 'Email is required';
+                                  if (!v.contains('@')) return 'Enter a valid email';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 16),
+
+                              // Password field
+                              TextFormField(
+                                controller: _passCtrl,
+                                obscureText: _obscure,
+                                textInputAction: TextInputAction.done,
+                                onFieldSubmitted: (_) => _submit(),
+                                decoration: InputDecoration(
+                                  labelText: 'Password',
+                                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                  suffixIcon: IconButton(
+                                    icon: Icon(
+                                      _obscure
+                                          ? Icons.visibility_outlined
+                                          : Icons.visibility_off_outlined,
+                                    ),
+                                    onPressed: () => setState(() => _obscure = !_obscure),
+                                  ),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) return 'Password is required';
+                                  if (v.length < 6) return 'Minimum 6 characters';
+                                  return null;
+                                },
+                              ),
+
+                              // Error message
+                              if (auth.error != null) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.error.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(AppRadius.sm),
+                                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.error_outline_rounded, color: AppColors.error, size: 18),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          auth.error!,
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: AppColors.error,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: Icon(Icons.close_rounded, color: AppColors.error, size: 18),
+                                        onPressed: _clearError,
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(),
+                                      ),
+                                    ],
+                                  ),
+                                ).animate().shakeX(duration: 400.ms, hz: 3, amount: 4),
+                              ],
+
+                              const SizedBox(height: 28),
+
+                              // Sign in button
+                              FilledButton(
+                                onPressed: auth.isLoading ? null : _submit,
+                                child: auth.isLoading
+                                    ? const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.5,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                    : const Text('Sign In'),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     )
                         .animate(delay: 400.ms)
-                        .slideY(begin: 0.2, end: 0, duration: 600.ms, curve: Curves.easeOutCubic)
+                        .slideY(
+                          begin: 0.2,
+                          end: 0,
+                          duration: 600.ms,
+                          curve: Curves.easeOutCubic,
+                        )
                         .fadeIn(),
                   ),
                 ],
