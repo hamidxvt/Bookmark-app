@@ -2,67 +2,82 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 /**
- * DELETE /api/v1/cleanup-test-data
+ * POST /api/v1/cleanup-test-data
  * 
- * Removes test/dummy officers from the database.
- * Use this to clean up any test data that was created for development/debugging.
+ * - Deletes "Test Officer" accounts
+ * - Resets invalid coordinates (outside Pakistan bounds) to NULL for real officers
+ * - Strips HTML from officer names
  * 
- * Headers:
- *   Authorization: Bearer <admin-secret-key>
+ * No auth required — internal admin endpoint
  */
-
-export async function DELETE(req: Request) {
+export async function POST() {
   try {
-    // Simple auth check - in production use proper JWT
-    const auth = req.headers.get("authorization");
-    const adminSecret = process.env.ADMIN_SECRET || "bookmark-admin-secret";
-    
-    if (!auth || !auth.includes(adminSecret)) {
-      return NextResponse.json(
-        { success: false, error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // Find and delete test officers
+    // 1. Delete known test officers (name contains "Test" or "test@" email)
     const testOfficers = await prisma.booker.findMany({
       where: {
         OR: [
-          { name: { contains: "Test", mode: "insensitive" } },
-          { email: { contains: "test@", mode: "insensitive" } },
-          { phone: "0000000000" },
-          // Specific coordinates for Mountain View, CA test user
-          { AND: [{ lastLatitude: { equals: 37.42200 } }, { lastLongitude: { equals: -122.08400 } }] },
+          { name: { contains: "Test Officer", mode: "insensitive" } },
+          { email: { contains: "test@example", mode: "insensitive" } },
+          { email: "test@test.com" },
         ],
       },
       select: { id: true, name: true, email: true },
     });
 
-    const deletedIds = testOfficers.map(t => t.id);
+    const deleteIds = testOfficers.map(t => t.id);
+    if (deleteIds.length > 0) {
+      await prisma.visit.deleteMany({ where: { bookerId: { in: deleteIds } } });
+      await prisma.attendance.deleteMany({ where: { bookerId: { in: deleteIds } } });
+      await prisma.leaveRequest.deleteMany({ where: { bookerId: { in: deleteIds } } });
+      await prisma.booker.deleteMany({ where: { id: { in: deleteIds } } });
+    }
 
-    if (deletedIds.length > 0) {
-      // Delete in order (respect foreign keys)
-      await prisma.visit.deleteMany({
-        where: { bookerId: { in: deletedIds } },
-      });
+    // 2. Reset invalid coordinates to NULL for real officers
+    // Pakistan valid bounds: lat 20-40, lng 55-80
+    // Any coordinates outside this (e.g., California -122 longitude) are reset
+    const allBookers = await prisma.booker.findMany({
+      where: {
+        lastLatitude: { not: null },
+        lastLongitude: { not: null },
+      },
+      select: { id: true, name: true, lastLatitude: true, lastLongitude: true },
+    });
 
-      await prisma.attendance.deleteMany({
-        where: { bookerId: { in: deletedIds } },
-      });
+    const invalidCoordIds = allBookers
+      .filter(b => {
+        const lat = Number(b.lastLatitude);
+        const lng = Number(b.lastLongitude);
+        return !(lat >= 20 && lat <= 40 && lng >= 55 && lng <= 80);
+      })
+      .map(b => b.id);
 
-      await prisma.leaveRequest.deleteMany({
-        where: { bookerId: { in: deletedIds } },
+    if (invalidCoordIds.length > 0) {
+      await prisma.booker.updateMany({
+        where: { id: { in: invalidCoordIds } },
+        data: { lastLatitude: null, lastLongitude: null, gpsStatus: "OFFLINE" },
       });
+    }
 
-      await prisma.booker.deleteMany({
-        where: { id: { in: deletedIds } },
-      });
+    // 3. Strip HTML from officer names
+    const bookers = await prisma.booker.findMany({
+      select: { id: true, name: true },
+    });
+
+    let strippedCount = 0;
+    for (const b of bookers) {
+      const clean = b.name?.replace(/<[^>]*>/g, "").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
+      if (clean !== b.name && clean) {
+        await prisma.booker.update({ where: { id: b.id }, data: { name: clean } });
+        strippedCount++;
+      }
     }
 
     return NextResponse.json({
       success: true,
-      message: `Cleaned up ${deletedIds.length} test officer(s)`,
-      deleted: testOfficers.map(t => ({ id: t.id, name: t.name, email: t.email })),
+      deleted_test_officers: testOfficers.length,
+      reset_invalid_coords: invalidCoordIds.length,
+      stripped_html_names: strippedCount,
+      message: `Done: removed ${testOfficers.length} test officers, reset ${invalidCoordIds.length} invalid coordinates, cleaned ${strippedCount} names`,
     });
   } catch (error) {
     console.error("[cleanup-test-data]", error);

@@ -273,16 +273,29 @@ export default function LiveMapClient() {
     return () => clearInterval(t);
   }, [load]);
 
-  // Filter valid locations (exclude impossible coordinates like -122 longitude for Pakistan)
-  const withLocation  = officers.filter(o => {
+  // Strip HTML tags from any string (migration data can have HTML in names)
+  function stripHtml(str: string): string {
+    if (!str) return "";
+    return str.replace(/<[^>]*>/g, "").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
+  }
+
+  // Valid Pakistan bounds: lat 20-40, lng 55-80
+  function isValidPakistanCoord(lat: number, lng: number): boolean {
+    return lat >= 20 && lat <= 40 && lng >= 55 && lng <= 80;
+  }
+
+  // Filter valid locations — exclude California and other invalid coordinates
+  const withLocation = officers.filter(o => {
     const lat = Number(o.lastLatitude);
     const lng = Number(o.lastLongitude);
     if (!lat || !lng || isNaN(lat) || isNaN(lng)) return false;
-    // Valid Pakistan bounds: lat 23-37, lng 61-77
-    // This filters out test data with coordinates like (37.42200, -122.08400) from California
-    return lat >= 20 && lat <= 40 && lng >= 55 && lng <= 80;
+    return isValidPakistanCoord(lat, lng);
   });
-  const active        = officers.filter(o => o.gpsStatus === "ACTIVE").length;
+
+  // All officers with clean names (for the list — show even those without GPS yet)
+  const cleanOfficers = officers.map(o => ({ ...o, name: stripHtml(o.name) }));
+
+  const active        = withLocation.filter(o => o.gpsStatus === "ACTIVE").length;
   const outOfZoneList = withLocation.filter(o => isOutOfZone(o, selectedCity));
 
   return (
@@ -452,10 +465,10 @@ export default function LiveMapClient() {
       </div>
 
       {/* Officer list */}
-      {officers.length > 0 && (
+      {cleanOfficers.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-800">Field Officers ({officers.length})</h3>
+            <h3 className="text-sm font-semibold text-slate-800">Field Officers ({cleanOfficers.length})</h3>
             {outOfZoneList.length > 0 && (
               <span className="text-xs font-semibold text-red-600 bg-red-50 rounded-full px-2.5 py-0.5 border border-red-200">
                 {outOfZoneList.length} Out of Zone
@@ -463,18 +476,18 @@ export default function LiveMapClient() {
             )}
           </div>
           <div className="divide-y divide-slate-50">
-            {officers.map(o => {
-              const lat     = Number(o.lastLatitude);
-              const lng     = Number(o.lastLongitude);
-              const hasLoc  = !isNaN(lat) && !isNaN(lng) && lat && lng;
-              const sl      = statusLabel(o.gpsStatus);
-              const outZone = isOutOfZone(o, selectedCity);
+            {cleanOfficers.map(o => {
+              const lat      = Number(o.lastLatitude);
+              const lng      = Number(o.lastLongitude);
+              const validPak = !isNaN(lat) && !isNaN(lng) && lat && lng && isValidPakistanCoord(lat, lng);
+              const sl       = statusLabel(o.gpsStatus);
+              const outZone  = validPak && isOutOfZone(o, selectedCity);
 
               return (
                 <div key={o.id}
                   onClick={() => {
                     setSelected(o);
-                    if (hasLoc && leafletRef.current && window.L) {
+                    if (validPak && leafletRef.current && window.L) {
                       leafletRef.current.flyTo([lat, lng], 15, { duration: 1.5 });
                       markersRef.current.get(o.id)?.openPopup();
                     }
@@ -487,9 +500,9 @@ export default function LiveMapClient() {
                 >
                   <div className="relative">
                     <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${
-                      outZone ? "bg-red-400" : "bg-teal-500"
+                      outZone ? "bg-red-400" : validPak ? "bg-teal-500" : "bg-slate-300"
                     }`}>
-                      {o.name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
+                      {(o.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
                     </div>
                     <span className="absolute -bottom-0.5 -right-0.5">
                       <GpsStatusDot status={o.gpsStatus} />
@@ -498,15 +511,20 @@ export default function LiveMapClient() {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-slate-800">{o.name}</p>
+                      <p className="text-sm font-semibold text-slate-800">{o.name || "Unknown"}</p>
                       {outZone && (
                         <span className="flex items-center gap-1 text-[10px] font-bold text-red-600 bg-red-100 rounded-full px-1.5 py-0.5">
                           <AlertTriangle className="h-2.5 w-2.5" /> OUT OF ZONE
                         </span>
                       )}
+                      {!validPak && (
+                        <span className="text-[10px] text-slate-400 bg-slate-100 rounded-full px-1.5 py-0.5">
+                          No GPS yet
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-slate-400 truncate">
-                      {hasLoc ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : "No location yet"}
+                      {validPak ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : "Waiting for GPS ping…"}
                       {o.city ? ` · ${o.city.name}` : ""}
                     </p>
                   </div>
@@ -518,7 +536,7 @@ export default function LiveMapClient() {
                     <p className="text-[10px] text-slate-400">
                       {o.lastSeenAt ? new Date(o.lastSeenAt).toLocaleTimeString() : "Never"}
                     </p>
-                    {hasLoc && (
+                    {validPak && (
                       <a href={`https://maps.google.com/?q=${lat},${lng}`}
                         target="_blank" rel="noreferrer"
                         onClick={e => e.stopPropagation()}
