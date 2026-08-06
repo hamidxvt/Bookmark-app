@@ -70,14 +70,16 @@ export async function planNextDayVisits(forToday = false) {
     });
     const recentIds = recentlyVisited.map((v) => v.customerId);
 
-    // Build customer filter — if booker has a city, prefer city match; otherwise use all
+    // Build customer filter — prefer customers WITH GPS coordinates
     const customerWhere: Record<string, unknown> = {
       approvalStatus: "APPROVED",
       deletedAt: null,
+      latitude:  { not: null },
+      longitude: { not: null },
     };
     if (recentIds.length > 0) customerWhere.id = { notIn: recentIds };
 
-    // Try city-specific customers first
+    // Try city-specific customers with GPS coords first
     let customers = booker.cityId
       ? await prisma.customer.findMany({
           where: { ...customerWhere, cityId: booker.cityId },
@@ -86,7 +88,25 @@ export async function planNextDayVisits(forToday = false) {
         })
       : [];
 
-    // Fallback: fill remaining slots from ANY city if city-specific wasn't enough
+    // Fallback 1: any customer WITH GPS coords if city-specific wasn't enough
+    if (customers.length < 7 - existing) {
+      const needed = 7 - existing - customers.length;
+      const excludeIds = [...customers.map(c => c.id), ...recentIds];
+      const extra = await prisma.customer.findMany({
+        where: {
+          approvalStatus: "APPROVED",
+          deletedAt: null,
+          latitude:  { not: null },
+          longitude: { not: null },
+          ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
+        },
+        orderBy: [{ workingPriority: "asc" }],
+        take: needed,
+      });
+      customers = [...customers, ...extra];
+    }
+
+    // Fallback 2: customers without coords if still not enough
     if (customers.length < 7 - existing) {
       const needed = 7 - existing - customers.length;
       const excludeIds = [...customers.map(c => c.id), ...recentIds];

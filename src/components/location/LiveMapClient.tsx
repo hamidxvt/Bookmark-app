@@ -111,42 +111,46 @@ export default function LiveMapClient() {
     document.head.appendChild(script);
   }, []);
 
-  // Init Leaflet map
+  // Init Leaflet map — and once ready, immediately draw any existing markers
   useEffect(() => {
     if (!leafletLoaded || !mapRef.current || leafletRef.current) return;
     
-    // Check if window.L is available
     const L = (window as any).L;
     if (!L || !L.map) {
-      const msg = "Leaflet library not loaded from CDN";
-      console.error(msg);
-      setMapError(msg);
-      return;
+      // Leaflet script may still be loading — retry after 500ms
+      const t = setTimeout(() => {
+        const L2 = (window as any).L;
+        if (!L2?.map) { setMapError("Map library failed to load. Check your internet connection."); return; }
+        try {
+          if (mapRef.current!.childNodes.length > 0) mapRef.current!.innerHTML = "";
+          const map = L2.map(mapRef.current!, { zoomControl: true }).setView([34.3512, 72.0189], 12);
+          L2.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "© OpenStreetMap", maxZoom: 19,
+          }).addTo(map);
+          leafletRef.current = map;
+          setMapError(null);
+          // Re-draw any officers already loaded
+          setOfficers(prev => { updateMarkers(prev); return prev; });
+        } catch (err) { setMapError(`Map init error: ${String(err)}`); }
+      }, 600);
+      return () => clearTimeout(t);
     }
 
     try {
-      if (mapRef.current.childNodes.length > 0) {
-        mapRef.current.innerHTML = "";
-      }
-      
-      const map = L.map(mapRef.current, { 
-        zoomControl: true,
-        attributionControl: true,
-      }).setView([30.3753, 69.3451], 6);
-      
+      if (mapRef.current.childNodes.length > 0) mapRef.current.innerHTML = "";
+      const map = L.map(mapRef.current, { zoomControl: true }).setView([34.3512, 72.0189], 12);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap",
-        maxZoom: 19,
+        attribution: "© OpenStreetMap", maxZoom: 19,
       }).addTo(map);
-      
       leafletRef.current = map;
-      console.log("✓ Map initialized successfully");
+      console.log("✓ Map initialized");
       setMapError(null);
+      // Re-draw any officers already loaded
+      setOfficers(prev => { updateMarkers(prev); return prev; });
     } catch (err) {
-      const errMsg = `Map init error: ${String(err)}`;
-      console.error(errMsg);
-      setMapError(errMsg);
+      setMapError(`Map init error: ${String(err)}`);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leafletLoaded]);
 
   // Load cities for filter
