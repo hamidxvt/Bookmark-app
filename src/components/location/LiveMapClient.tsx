@@ -92,18 +92,21 @@ export default function LiveMapClient() {
     link.id = "leaflet-css";
     link.rel = "stylesheet";
     link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-    link.onerror = () => console.warn("Failed to load Leaflet CSS");
+    link.onerror = () => {
+      console.error("Failed to load Leaflet CSS");
+      setMapError("Failed to load map library CSS");
+    };
     document.head.appendChild(link);
 
     const script = document.createElement("script");
     script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
     script.onload = () => {
-      console.log("Leaflet loaded successfully");
+      console.log("✓ Leaflet loaded successfully");
       setLeafletLoaded(true);
     };
     script.onerror = () => {
-      console.error("Failed to load Leaflet JS from CDN");
-      setLeafletLoaded(true); // Still set to true so we can show fallback UI
+      console.error("Failed to load Leaflet JS");
+      setMapError("Failed to load map library JavaScript");
     };
     document.head.appendChild(script);
   }, []);
