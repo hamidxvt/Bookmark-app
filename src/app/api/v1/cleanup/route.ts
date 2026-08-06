@@ -58,11 +58,11 @@ export async function POST() {
     });
     log.push(`✅ Assigned ${bookerFixed.count} city-less bookers to DEFAULT`);
 
-    const customerFixed = await prisma.customer.updateMany({
-      where: { cityId: null as any },
-      data: { cityId: defaultCity.id },
-    });
-    log.push(`✅ Assigned ${customerFixed.count} city-less customers to DEFAULT`);
+    // Only update customers with null cityId using raw SQL
+    const customerFixed = await prisma.$executeRaw`
+      UPDATE customers SET city_id = ${defaultCity.id} WHERE city_id IS NULL
+    `;
+    log.push(`✅ Assigned ${customerFixed} city-less customers to DEFAULT`);
 
     // Step 6: Activate all approved bookers
     const activated = await prisma.booker.updateMany({
