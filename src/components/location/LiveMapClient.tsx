@@ -186,6 +186,8 @@ export default function LiveMapClient() {
       const lat = Number(o.lastLatitude);
       const lng = Number(o.lastLongitude);
       if (!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+      // Skip invalid coordinates (test data from outside Pakistan)
+      if (lat < 20 || lat > 40 || lng < 55 || lng > 80) return;
       seen.add(o.id);
 
       const outOfZone = isOutOfZone(o, selectedCity);
@@ -271,7 +273,15 @@ export default function LiveMapClient() {
     return () => clearInterval(t);
   }, [load]);
 
-  const withLocation  = officers.filter(o => Number(o.lastLatitude) && Number(o.lastLongitude));
+  // Filter valid locations (exclude impossible coordinates like -122 longitude for Pakistan)
+  const withLocation  = officers.filter(o => {
+    const lat = Number(o.lastLatitude);
+    const lng = Number(o.lastLongitude);
+    if (!lat || !lng || isNaN(lat) || isNaN(lng)) return false;
+    // Valid Pakistan bounds: lat 23-37, lng 61-77
+    // This filters out test data with coordinates like (37.42200, -122.08400) from California
+    return lat >= 20 && lat <= 40 && lng >= 55 && lng <= 80;
+  });
   const active        = officers.filter(o => o.gpsStatus === "ACTIVE").length;
   const outOfZoneList = withLocation.filter(o => isOutOfZone(o, selectedCity));
 
