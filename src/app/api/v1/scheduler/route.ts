@@ -1,13 +1,11 @@
 /**
  * POST /api/v1/scheduler?job=<jobName>
- * Manually trigger any scheduled job (admin only).
+ * Manually trigger any scheduled job.
  * 
  * jobs: plan_visits | mark_absent | payroll | sample_reminders
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import {
   planNextDayVisits,
   autoMarkAbsent,
@@ -16,8 +14,6 @@ import {
 } from "@/lib/scheduler";
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const job = req.nextUrl.searchParams.get("job") ?? "all";
 
