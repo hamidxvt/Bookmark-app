@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function POST() {
+  console.log("[cleanup] START - no auth required");
   const log: string[] = [];
 
   try {
