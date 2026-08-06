@@ -30,10 +30,14 @@ enum UserRole {
 
 // ─── GEOGRAPHY ───────────────────────────────────────────────────────────────
 model City {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  id              Int       @id @default(autoincrement())
+  name            String    @unique
+  latitude        Float?    @map("latitude")
+  longitude       Float?    @map("longitude")
+  geofenceRadius  Int?      @default(5000) @map("geofence_radius") // metres
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   regions   Region[]
   areas     Area[]
@@ -59,12 +63,16 @@ model Region {
 }
 
 model Area {
-  id        Int       @id @default(autoincrement())
-  regionId  Int       @map("region_id")
-  cityId    Int       @map("city_id")
-  name      String
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
+  id              Int       @id @default(autoincrement())
+  regionId        Int       @map("region_id")
+  cityId          Int       @map("city_id")
+  name            String
+  latitude        Float?    @map("latitude")
+  longitude       Float?    @map("longitude")
+  geofenceRadius  Int?      @default(500) @map("geofence_radius")  // metres
+  address         String?   @map("address")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   region    Region    @relation(fields: [regionId], references: [id], onDelete: Cascade)
   city      City      @relation(fields: [cityId], references: [id])
