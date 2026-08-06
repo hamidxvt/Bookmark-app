@@ -192,107 +192,107 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 32),
-
-                              // Email
-                              TextFormField(
-                                controller: _emailCtrl,
-                                keyboardType: TextInputType.emailAddress,
-                                textInputAction: TextInputAction.next,
-                                autocorrect: false,
-                                decoration: const InputDecoration(
-                                  labelText: 'Email',
-                                  hintText: 'officer@bookmark.pk',
-                                  prefixIcon: Icon(Icons.email_outlined),
-                                ),
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Email is required';
-                                  if (!v.contains('@')) return 'Enter a valid email';
-                                  return null;
-                                },
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Password
-                              TextFormField(
-                                controller: _passCtrl,
-                                obscureText: _obscure,
-                                textInputAction: TextInputAction.done,
-                                onFieldSubmitted: (_) => _submit(),
-                                decoration: InputDecoration(
-                                  labelText: 'Password',
-                                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                                  suffixIcon: IconButton(
-                                    icon: Icon(
-                                      _obscure
-                                          ? Icons.visibility_outlined
-                                          : Icons.visibility_off_outlined,
-                                    ),
-                                    onPressed: () => setState(() => _obscure = !_obscure),
+                                
+                                // Email
+                                TextFormField(
+                                  controller: _emailCtrl,
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  autocorrect: false,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                    hintText: 'officer@bookmark.pk',
+                                    prefixIcon: Icon(Icons.email_outlined),
                                   ),
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Email is required';
+                                    if (!v.contains('@')) return 'Enter a valid email';
+                                    return null;
+                                  },
                                 ),
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Password is required';
-                                  if (v.length < 6) return 'Minimum 6 characters';
-                                  return null;
-                                },
-                              ),
-
-                              // Error message with close button
-                              if (auth.error != null) ...[
                                 const SizedBox(height: 16),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.error.withOpacity(0.08),
-                                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                                    border: Border.all(
-                                      color: AppColors.error.withOpacity(0.3),
+
+                                // Password
+                                TextFormField(
+                                  controller: _passCtrl,
+                                  obscureText: _obscure,
+                                  textInputAction: TextInputAction.done,
+                                  onFieldSubmitted: (_) => _submit(),
+                                  decoration: InputDecoration(
+                                    labelText: 'Password',
+                                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(
+                                        _obscure
+                                            ? Icons.visibility_outlined
+                                            : Icons.visibility_off_outlined,
+                                      ),
+                                      onPressed: () => setState(() => _obscure = !_obscure),
                                     ),
                                   ),
-                                  child: Row(
-                                    children: [
-                                      Icon(Icons.error_outline_rounded,
-                                          color: AppColors.error, size: 18),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Text(
-                                          auth.error!,
-                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                color: AppColors.error,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                        ),
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Password is required';
+                                    if (v.length < 6) return 'Minimum 6 characters';
+                                    return null;
+                                  },
+                                ),
+
+                                // Error message with close button
+                                if (auth.error != null) ...[
+                                  const SizedBox(height: 16),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.error.withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                                      border: Border.all(
+                                        color: AppColors.error.withOpacity(0.3),
                                       ),
-                                      IconButton(
-                                        icon: Icon(Icons.close_rounded,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.error_outline_rounded,
                                             color: AppColors.error, size: 18),
-                                        onPressed: _clearError,
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                      ),
-                                    ],
-                                  ),
-                                ).animate().shakeX(duration: 400.ms, hz: 3, amount: 4),
-                              ],
-
-                              const SizedBox(height: 28),
-
-                              FilledButton(
-                                onPressed: auth.isLoading ? null : _submit,
-                                child: auth.isLoading
-                                    ? const SizedBox(
-                                        width: 22,
-                                        height: 22,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          color: Colors.white,
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            auth.error!,
+                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                  color: AppColors.error,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                          ),
                                         ),
-                                      )
-                                    : const Text('Sign In'),
-                              ),
-                            ],
+                                        IconButton(
+                                          icon: Icon(Icons.close_rounded,
+                                              color: AppColors.error, size: 18),
+                                          onPressed: _clearError,
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(),
+                                        ),
+                                      ],
+                                    ),
+                                  ).animate().shakeX(duration: 400.ms, hz: 3, amount: 4),
+                                ],
+
+                                const SizedBox(height: 28),
+
+                                FilledButton(
+                                  onPressed: auth.isLoading ? null : _submit,
+                                  child: auth.isLoading
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text('Sign In'),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
                       ),
                     )
                         .animate(delay: 400.ms)
