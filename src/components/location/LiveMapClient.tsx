@@ -32,14 +32,14 @@ function statusLabel(s: string) {
 
 declare global {
   interface Window {
-    L: typeof import("leaflet");
+    L: any; // Leaflet loaded from CDN
   }
 }
 
 export default function LiveMapClient() {
   const mapRef      = useRef<HTMLDivElement>(null);
-  const leafletRef  = useRef<import("leaflet").Map | null>(null);
-  const markersRef  = useRef<Map<number, import("leaflet").Marker>>(new Map());
+  const leafletRef  = useRef<any>(null); // Leaflet map instance
+  const markersRef  = useRef<Map<number, any>>(new Map()); // Leaflet markers
 
   const [officers,   setOfficers]   = useState<Officer[]>([]);
   const [loading,    setLoading]    = useState(true);
