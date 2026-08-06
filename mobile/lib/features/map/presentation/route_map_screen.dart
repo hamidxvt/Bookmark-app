@@ -35,12 +35,13 @@ class RouteStop {
   });
 
   factory RouteStop.fromJson(Map<String, dynamic> j) {
+    final customer = j['customer'] as Map<String, dynamic>? ?? {};
     return RouteStop(
       visitId: j['visitId'] ?? 0,
       sequence: j['sequence'] ?? 0,
-      customerName: j['customerName'] ?? 'Unknown',
-      lat: (j['lat'] ?? 0).toDouble(),
-      lng: (j['lng'] ?? 0).toDouble(),
+      customerName: customer['name'] ?? j['customerName'] ?? 'Unknown',
+      lat: (customer['latitude'] ?? j['lat'] ?? 0).toDouble(),
+      lng: (customer['longitude'] ?? j['lng'] ?? 0).toDouble(),
       distanceKm: (j['distanceKm'] ?? 0).toDouble(),
       googleMapsUrl: j['googleMapsUrl'] ?? '',
       status: j['status'] ?? 'PENDING',
@@ -59,11 +60,10 @@ final routeProvider = FutureProvider.autoDispose<List<RouteStop>>((ref) async {
   final lngParam = pos?.longitude.toString() ?? '';
 
   final res = await dio.get(
-    '/route',
-    queryParameters: {
-      if (latParam.isNotEmpty) 'lat': latParam,
-      if (lngParam.isNotEmpty) 'lng': lngParam,
-    },
+    '/route?${[
+      if (latParam.isNotEmpty) 'lat=$latParam',
+      if (lngParam.isNotEmpty) 'lng=$lngParam',
+    ].join('&')}',
   );
 
   final stops = (res.data['stops'] as List? ?? [])
@@ -151,13 +151,12 @@ class _MapView extends StatelessWidget {
 
             // Route polyline
             if (validStops.length > 1)
-              PolylineLayer(
+              PolylineLayer<Object>(
                 polylines: [
                   Polyline(
                     points: validStops.map((s) => LatLng(s.lat, s.lng)).toList(),
                     strokeWidth: 4,
                     color: const Color(0xFF0D9488),
-                    isDotted: false,
                   ),
                 ],
               ),

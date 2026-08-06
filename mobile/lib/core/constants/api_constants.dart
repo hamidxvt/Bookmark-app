@@ -41,28 +41,9 @@ class ApiConstants {
   // ── Profile ───────────────────────────────────────────────────────────────
   static const String profile = '/profile';
 
-  // ── Leaves ──────────────────────────────────────────────────────────────
-  static const String leaveBalance = '/leaves';
-  static const String myLeaves = '/leaves';
-  static const String applyLeave = '/leaves';
-
-  // ── Samples ─────────────────────────────────────────────────────────────
-  static const String mySamples = '/samples';
-  static const String requestSamples = '/samples';
-  static String recoverSample(int id) => '/samples/$id/recover';
-
-  // ── Products ─────────────────────────────────────────────────────────────
-  static const String productsSearch = '/products'; // GET ?q=search&limit=20
-
-  // ── Payroll ─────────────────────────────────────────────────────────────
+  // ── Payroll / Earnings ───────────────────────────────────────────────────
   static const String myPayroll = '/payroll';
 
   // ── FCM / Push Notifications ─────────────────────────────────────────────
   static const String registerFcm = '/fcm';
-
-  // ── Admin ────────────────────────────────────────────────────────────────
-  static const String adminStats = '/admin/stats';
-  static const String adminAttendance = '/admin/attendance';
-  static const String adminLeaves = '/admin/leaves';
-  static const String adminMissedVisits = '/admin/missed-visits';
 }
