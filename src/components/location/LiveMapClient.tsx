@@ -75,6 +75,7 @@ export default function LiveMapClient() {
   const [leafletLoaded,  setLeafletLoaded] = useState(false);
   const [cityDropOpen,   setCityDropOpen]  = useState(false);
   const [isClient,       setIsClient]      = useState(false);
+  const [mapError,       setMapError]      = useState<string | null>(null);
 
   // Ensure we only render map on client side
   useEffect(() => {
@@ -114,20 +115,34 @@ export default function LiveMapClient() {
     // Check if window.L is available
     const L = (window as any).L;
     if (!L || !L.map) {
-      console.warn("Leaflet not available, map will show fallback");
+      const msg = "Leaflet library not loaded from CDN";
+      console.error(msg);
+      setMapError(msg);
       return;
     }
 
     try {
-      const map = L.map(mapRef.current, { zoomControl: true }).setView([30.3753, 69.3451], 6);
+      if (mapRef.current.childNodes.length > 0) {
+        mapRef.current.innerHTML = "";
+      }
+      
+      const map = L.map(mapRef.current, { 
+        zoomControl: true,
+        attributionControl: true,
+      }).setView([30.3753, 69.3451], 6);
+      
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
+        attribution: "© OpenStreetMap",
         maxZoom: 19,
       }).addTo(map);
+      
       leafletRef.current = map;
-      console.log("Map initialized successfully");
+      console.log("✓ Map initialized successfully");
+      setMapError(null);
     } catch (err) {
-      console.error("[Leaflet init error]", err);
+      const errMsg = `Map init error: ${String(err)}`;
+      console.error(errMsg);
+      setMapError(errMsg);
     }
   }, [leafletLoaded]);
 
@@ -402,7 +417,16 @@ export default function LiveMapClient() {
           </div>
         </div>
 
-        {!isClient || withLocation.length === 0 ? (
+        {mapError ? (
+          <div className="flex flex-col items-center justify-center h-64 bg-red-50 border border-red-200 rounded-b-2xl">
+            <AlertTriangle className="h-10 w-10 text-red-400" />
+            <p className="mt-3 text-sm font-medium text-red-700">Map Failed to Load</p>
+            <p className="text-xs text-red-600 mt-1">{mapError}</p>
+            <button onClick={() => window.location.reload()} className="mt-3 px-3 py-1.5 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">
+              Reload Page
+            </button>
+          </div>
+        ) : !isClient || withLocation.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 bg-slate-50">
             <MapPin className="h-10 w-10 text-slate-200" />
             <p className="mt-3 text-sm font-medium text-slate-400">
@@ -413,7 +437,7 @@ export default function LiveMapClient() {
             </p>
           </div>
         ) : (
-          <div ref={mapRef} className="w-full h-[440px] bg-slate-50" />
+          <div ref={mapRef} className="w-full h-[440px] bg-slate-100 border-b border-slate-200" />
         )}
       </div>
 
