@@ -314,6 +314,32 @@ export default function LiveMapClient() {
         </div>
       </div>
 
+      {/* KPI Stats */}
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label: "Officers",     value: officers.length,       icon: Users,          cls: "text-slate-600 bg-slate-100" },
+          { label: "Active GPS",   value: active,                icon: Navigation,     cls: "text-emerald-600 bg-emerald-50" },
+          { label: "Out of Zone",  value: outOfZoneList.length,  icon: AlertTriangle,  cls: outOfZoneList.length > 0 ? "text-red-600 bg-red-50" : "text-slate-400 bg-slate-50" },
+          { label: "Last Update",  value: null,                  icon: Clock,          cls: "text-slate-500 bg-slate-50" },
+        ].map(s => (
+          <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${s.cls} mb-2`}>
+              <s.icon className="h-3.5 w-3.5" />
+            </div>
+            {s.value !== null ? (
+              <p className={`text-2xl font-bold ${s.label === "Out of Zone" && s.value > 0 ? "text-red-600" : "text-slate-900"}`}>
+                {s.value}
+              </p>
+            ) : (
+              <p className="text-sm font-semibold text-slate-700">
+                {lastUpdate ? lastUpdate.toLocaleTimeString() : "Waiting…"}
+              </p>
+            )}
+            <p className="text-xs text-slate-500">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
       {/* Out of zone alert */}
       {outOfZoneList.length > 0 && (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
