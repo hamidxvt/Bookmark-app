@@ -75,71 +75,51 @@ function LiveMap({ officers, selected, onSelect }: {
   const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
   const zoom = pts.length === 1 ? 15 : 13;
 
-  // OSM iframe URL (shows real street map)
-  const osmUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${centerLng - 0.05},${centerLat - 0.03},${centerLng + 0.05},${centerLat + 0.03}&layer=mapnik&marker=${centerLat},${centerLng}`;
+  // For a single officer — show their exact location with OSM marker
+  // For multiple officers — show bounding box of all
+  const isSingle = pts.length === 1;
 
-  // For SVG overlay projection — use same bbox as iframe
-  const bboxW = 0.10, bboxH = 0.06;
-  const minLng = centerLng - bboxW / 2, maxLng = centerLng + bboxW / 2;
-  const minLat = centerLat - bboxH / 2, maxLat = centerLat + bboxH / 2;
-
-  function toXY(lat: number, lng: number): [number, number] {
-    const x = ((lng - minLng) / (maxLng - minLng)) * size.w;
-    const y = size.h - ((lat - minLat) / (maxLat - minLat)) * size.h;
-    return [x, y];
-  }
+  // Build proper OSM URL — using mlat/mlon puts the default OSM marker at exact location
+  // For single officer: center on them with marker
+  // For multiple: fit bbox, no marker (we show cards below)
+  const osmUrl = isSingle
+    ? `https://www.openstreetmap.org/?mlat=${Number(pts[0].lastLatitude)}&mlon=${Number(pts[0].lastLongitude)}#map=16/${Number(pts[0].lastLatitude)}/${Number(pts[0].lastLongitude)}&layers=N`
+    : `https://www.openstreetmap.org/export/embed.html?bbox=${Math.min(...pts.map(o => Number(o.lastLongitude))) - 0.02},${Math.min(...pts.map(o => Number(o.lastLatitude))) - 0.01},${Math.max(...pts.map(o => Number(o.lastLongitude))) + 0.02},${Math.max(...pts.map(o => Number(o.lastLatitude))) + 0.01}&layer=mapnik`;
 
   return (
     <div ref={containerRef} className="relative w-full h-[440px] overflow-hidden rounded-b-2xl">
-      {/* Real OpenStreetMap tiles */}
+      {/* Real OpenStreetMap — marker is built into the URL, no SVG overlay needed */}
       <iframe
-        key={`${centerLat}-${centerLng}-${zoom}`}
+        key={`${centerLat.toFixed(4)}-${centerLng.toFixed(4)}`}
         src={osmUrl}
         className="absolute inset-0 w-full h-full border-0"
         title="Live GPS Map"
         loading="eager"
+        sandbox="allow-scripts allow-same-origin"
       />
 
-      {/* SVG overlay for officer pins — updates every 10s */}
-      <svg className="absolute inset-0 w-full h-full pointer-events-none"
-        viewBox={`0 0 ${size.w} ${size.h}`}>
-        {pts.map(o => {
-          const lat = Number(o.lastLatitude), lng = Number(o.lastLongitude);
-          const [x, y] = toXY(lat, lng);
-          const initials = stripHtml(o.name).split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
-          const isActive = o.gpsStatus?.toUpperCase() === "ACTIVE";
-          const isSel    = selected?.id === o.id;
-          const fill     = isActive ? "#0D9488" : "#94a3b8";
+      {/* Officer info cards for multiple officers */}
+      {!isSingle && (
+        <div className="absolute bottom-3 left-3 flex gap-2 flex-wrap max-w-full">
+          {pts.map(o => {
+            const lat = Number(o.lastLatitude), lng = Number(o.lastLongitude);
+            const isActive = o.gpsStatus?.toUpperCase() === "ACTIVE";
+            return (
+              <a key={o.id}
+                href={`https://maps.google.com/?q=${lat},${lng}`}
+                target="_blank" rel="noreferrer"
+                className="flex items-center gap-1.5 bg-white/95 backdrop-blur rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow border border-slate-200 hover:border-teal-400 transition-colors">
+                <span className={`h-2 w-2 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
+                {stripHtml(o.name)} ↗
+              </a>
+            );
+          })}
+        </div>
+      )}
 
-          return (
-            <g key={o.id} style={{ pointerEvents: "all", cursor: "pointer" }}
-              onClick={() => onSelect(o)}>
-              {/* Pulse ring for active */}
-              {isActive && (
-                <circle cx={x} cy={y} r={24} fill={fill} opacity={0.0}>
-                  <animate attributeName="r" values="14;28;14" dur="2s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite" />
-                </circle>
-              )}
-              {/* Selection ring */}
-              {isSel && <circle cx={x} cy={y} r={22} fill="none" stroke={fill} strokeWidth="2.5" strokeDasharray="4 2" />}
-              {/* Main pin circle */}
-              <circle cx={x} cy={y} r={16} fill={fill} stroke="white" strokeWidth="3"
-                filter="drop-shadow(0 2px 6px rgba(0,0,0,0.35))" />
-              {/* Initials */}
-              <text x={x} y={y + 4} textAnchor="middle" fontSize="9" fontWeight="700"
-                fill="white" fontFamily="system-ui,sans-serif">{initials}</text>
-              {/* Name label */}
-              <rect x={x - 28} y={y + 20} width="56" height="14" rx="4"
-                fill="white" opacity="0.92" filter="drop-shadow(0 1px 2px rgba(0,0,0,0.15))" />
-              <text x={x} y={y + 30} textAnchor="middle" fontSize="8" fontWeight="600"
-                fill="#0f172a" fontFamily="system-ui,sans-serif">
-                {stripHtml(o.name).slice(0, 10)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 text-[10px] text-slate-500 border border-slate-200 shadow">
+        Live · updates every 10s
+      </div>
     </div>
   );
 }
