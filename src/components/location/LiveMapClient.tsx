@@ -39,77 +39,108 @@ function statusLabel(s: string) {
   return                     { text: "Offline",  cls: "text-slate-500  bg-slate-50  border-slate-200"  };
 }
 
-// ── Simple SVG map canvas ─────────────────────────────────────────────────────
-// Projects lat/lng to pixel using equirectangular projection.
-// Pans / zooms to fit all officers automatically.
-function SvgMap({ officers, selected, onSelect }: {
+// ── Live Map using OpenStreetMap iframe + SVG overlay ────────────────────────
+// Uses OSM static tile iframe for the real map background,
+// with an SVG overlay layer for officer pins that updates every 10s.
+function LiveMap({ officers, selected, onSelect }: {
   officers: Officer[];
   selected: Officer | null;
   onSelect: (o: Officer) => void;
 }) {
-  const W = 900, H = 440;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ w: 900, h: 440 });
+
   const pts = officers.filter(o => {
     const lt = Number(o.lastLatitude), lg = Number(o.lastLongitude);
     return lt && lg && isValidPakCoord(lt, lg);
   });
 
+  // Track container size for responsive overlay
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const ro = new ResizeObserver(entries => {
+      const e = entries[0];
+      setSize({ w: e.contentRect.width, h: e.contentRect.height });
+    });
+    ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
   if (pts.length === 0) return null;
 
-  // Compute bounding box with padding
+  // Compute map bounds centered on officers
   const lats = pts.map(o => Number(o.lastLatitude));
   const lngs = pts.map(o => Number(o.lastLongitude));
-  const pad = 0.02;
-  const minLat = Math.min(...lats) - pad, maxLat = Math.max(...lats) + pad;
-  const minLng = Math.min(...lngs) - pad, maxLng = Math.max(...lngs) + pad;
+  const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+  const zoom = pts.length === 1 ? 15 : 13;
+
+  // OSM iframe URL (shows real street map)
+  const osmUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${centerLng - 0.05},${centerLat - 0.03},${centerLng + 0.05},${centerLat + 0.03}&layer=mapnik&marker=${centerLat},${centerLng}`;
+
+  // For SVG overlay projection — use same bbox as iframe
+  const bboxW = 0.10, bboxH = 0.06;
+  const minLng = centerLng - bboxW / 2, maxLng = centerLng + bboxW / 2;
+  const minLat = centerLat - bboxH / 2, maxLat = centerLat + bboxH / 2;
 
   function toXY(lat: number, lng: number): [number, number] {
-    const x = ((lng - minLng) / (maxLng - minLng)) * W;
-    const y = H - ((lat - minLat) / (maxLat - minLat)) * H;
+    const x = ((lng - minLng) / (maxLng - minLng)) * size.w;
+    const y = size.h - ((lat - minLat) / (maxLat - minLat)) * size.h;
     return [x, y];
   }
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full"
-      style={{ background: "linear-gradient(135deg,#e8f4f8 0%,#d4edda 100%)" }}>
-      {/* Grid lines */}
-      {[0.25, 0.5, 0.75].map(t => (
-        <g key={t}>
-          <line x1={W * t} y1={0} x2={W * t} y2={H} stroke="#c8dce8" strokeWidth="1" strokeDasharray="4 4" />
-          <line x1={0} y1={H * t} x2={W} y2={H * t} stroke="#c8dce8" strokeWidth="1" strokeDasharray="4 4" />
-        </g>
-      ))}
+    <div ref={containerRef} className="relative w-full h-[440px] overflow-hidden rounded-b-2xl">
+      {/* Real OpenStreetMap tiles */}
+      <iframe
+        key={`${centerLat}-${centerLng}-${zoom}`}
+        src={osmUrl}
+        className="absolute inset-0 w-full h-full border-0"
+        title="Live GPS Map"
+        loading="eager"
+      />
 
-      {/* Officer markers */}
-      {pts.map(o => {
-        const lat = Number(o.lastLatitude), lng = Number(o.lastLongitude);
-        const [x, y] = toXY(lat, lng);
-        const initials = stripHtml(o.name).split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
-        const isActive = o.gpsStatus?.toUpperCase() === "ACTIVE";
-        const isSel    = selected?.id === o.id;
-        const fill     = isActive ? "#0D9488" : "#94a3b8";
+      {/* SVG overlay for officer pins — updates every 10s */}
+      <svg className="absolute inset-0 w-full h-full pointer-events-none"
+        viewBox={`0 0 ${size.w} ${size.h}`}>
+        {pts.map(o => {
+          const lat = Number(o.lastLatitude), lng = Number(o.lastLongitude);
+          const [x, y] = toXY(lat, lng);
+          const initials = stripHtml(o.name).split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
+          const isActive = o.gpsStatus?.toUpperCase() === "ACTIVE";
+          const isSel    = selected?.id === o.id;
+          const fill     = isActive ? "#0D9488" : "#94a3b8";
 
-        return (
-          <g key={o.id} onClick={() => onSelect(o)} style={{ cursor: "pointer" }}>
-            {isSel && <circle cx={x} cy={y} r={26} fill={fill} opacity={0.2} />}
-            {isActive && (
-              <circle cx={x} cy={y} r={22} fill={fill} opacity={0.15}>
-                <animate attributeName="r" from="18" to="28" dur="1.5s" repeatCount="indefinite" />
-                <animate attributeName="opacity" from="0.2" to="0" dur="1.5s" repeatCount="indefinite" />
-              </circle>
-            )}
-            <circle cx={x} cy={y} r={18} fill={fill} stroke="white" strokeWidth="3"
-              filter="drop-shadow(0 2px 4px rgba(0,0,0,0.25))" />
-            <text x={x} y={y + 4} textAnchor="middle" fontSize="9" fontWeight="700"
-              fill="white" fontFamily="system-ui,sans-serif">{initials}</text>
-            <text x={x} y={y + 32} textAnchor="middle" fontSize="9" fontWeight="600"
-              fill="#1e293b" fontFamily="system-ui,sans-serif"
-              style={{ textShadow: "0 1px 2px white" }}>
-              {stripHtml(o.name).slice(0, 14)}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+          return (
+            <g key={o.id} style={{ pointerEvents: "all", cursor: "pointer" }}
+              onClick={() => onSelect(o)}>
+              {/* Pulse ring for active */}
+              {isActive && (
+                <circle cx={x} cy={y} r={24} fill={fill} opacity={0.0}>
+                  <animate attributeName="r" values="14;28;14" dur="2s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" values="0.3;0;0.3" dur="2s" repeatCount="indefinite" />
+                </circle>
+              )}
+              {/* Selection ring */}
+              {isSel && <circle cx={x} cy={y} r={22} fill="none" stroke={fill} strokeWidth="2.5" strokeDasharray="4 2" />}
+              {/* Main pin circle */}
+              <circle cx={x} cy={y} r={16} fill={fill} stroke="white" strokeWidth="3"
+                filter="drop-shadow(0 2px 6px rgba(0,0,0,0.35))" />
+              {/* Initials */}
+              <text x={x} y={y + 4} textAnchor="middle" fontSize="9" fontWeight="700"
+                fill="white" fontFamily="system-ui,sans-serif">{initials}</text>
+              {/* Name label */}
+              <rect x={x - 28} y={y + 20} width="56" height="14" rx="4"
+                fill="white" opacity="0.92" filter="drop-shadow(0 1px 2px rgba(0,0,0,0.15))" />
+              <text x={x} y={y + 30} textAnchor="middle" fontSize="8" fontWeight="600"
+                fill="#0f172a" fontFamily="system-ui,sans-serif">
+                {stripHtml(o.name).slice(0, 10)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
 
@@ -242,7 +273,7 @@ export default function LiveMapClient() {
           </div>
         ) : (
           <div className="w-full h-[440px] relative overflow-hidden bg-gradient-to-br from-blue-50 to-teal-50">
-            <SvgMap officers={withLoc} selected={selected} onSelect={setSelected} />
+            <LiveMap officers={withLoc} selected={selected} onSelect={setSelected} />
             {/* Selected officer detail card */}
             {selected && (() => {
               const lat = Number(selected.lastLatitude), lng = Number(selected.lastLongitude);
