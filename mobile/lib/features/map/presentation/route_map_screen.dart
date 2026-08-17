@@ -131,7 +131,7 @@ class _MapView extends StatelessWidget {
     final validStops = stops.where((s) => s.lat != 0 && s.lng != 0).toList();
     final center = validStops.isNotEmpty
         ? LatLng(validStops[0].lat, validStops[0].lng)
-        : const LatLng(24.8607, 67.0011); // Default Karachi
+        : const LatLng(34.3512, 72.0189); // Default Thana Malakand
 
     return Stack(
       children: [
