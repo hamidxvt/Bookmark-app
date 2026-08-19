@@ -138,16 +138,22 @@ export async function planNextDayVisits(forToday = false) {
     if (booker.id === 88) console.log(`[scheduler] Booker 88: assigning ${customers.length} total customers`);
 
     for (const c of customers) {
-      await prisma.visit.create({
-        data: {
-          bookerId: booker.id,
-          customerId: c.id,
-          visitDate: target,
-          status: "PENDING",
-        },
-      });
-      assignedTodayIds.add(c.id);
-      planned++;
+      try {
+        await prisma.visit.create({
+          data: {
+            bookerId: booker.id,
+            customerId: c.id,
+            visitDate: target,
+            status: "PENDING",
+          },
+        });
+        assignedTodayIds.add(c.id);
+        planned++;
+      } catch (err: any) {
+        const msg = `[scheduler] Error creating visit for booker ${booker.id}, customer ${c.id}: ${err.message}`;
+        console.error(msg);
+        if (booker.id === 88) console.error(`[scheduler] Error for officer 88: ${err.message}`);
+      }
     }
   }
 
