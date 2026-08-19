@@ -34,6 +34,7 @@ export async function GET(req: Request) {
         visitDate: { gte: today, lt: tomorrow },
         status: { in: ["PENDING", "IN_PROGRESS"] },
       },
+      take: 20, // Cap at 20 stops for performance
       include: {
         customer: {
           select: {
