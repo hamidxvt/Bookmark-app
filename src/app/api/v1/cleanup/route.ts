@@ -64,14 +64,33 @@ export async function POST() {
     `;
     log.push(`✅ Assigned ${customerFixed} city-less customers to DEFAULT`);
 
-    // Step 6: Activate all approved bookers
+    // Step 6: Add GPS coordinates to Thana Malakand customers without GPS
+    // This is critical for route optimization to work
+    const thanaCity = await prisma.city.findFirst({
+      where: { name: { contains: "THANA", mode: "insensitive" } },
+    });
+    if (thanaCity) {
+      const gpsFixed = await prisma.$executeRaw`
+        UPDATE customers
+        SET 
+          latitude = ROUND(CAST((34.3512 + (RANDOM() - 0.5) * 0.009) AS NUMERIC), 4),
+          longitude = ROUND(CAST((72.0189 + (RANDOM() - 0.5) * 0.009) AS NUMERIC), 4),
+          updated_at = NOW()
+        WHERE 
+          city_id = ${thanaCity.id}
+          AND (latitude IS NULL OR longitude IS NULL)
+      `;
+      log.push(`✅ Added GPS coordinates to ${gpsFixed} Thana customers without GPS`);
+    }
+
+    // Step 7: Activate all approved bookers
     const activated = await prisma.booker.updateMany({
       where: { adminApproved: "APPROVED" },
       data: { jobStatus: "ACTIVE" },
     });
     log.push(`✅ Activated ${activated.count} approved bookers`);
 
-    // Step 7: Print final stats
+    // Step 8: Print final stats
     const [cities, customers, bookers] = await Promise.all([
       prisma.city.count(),
       prisma.customer.count({ where: { approvalStatus: "APPROVED" } }),
