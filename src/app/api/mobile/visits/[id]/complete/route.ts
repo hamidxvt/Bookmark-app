@@ -62,17 +62,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (followUpDate && visit.customerId) {
       try {
         const fuDate = new Date(followUpDate);
-        fuDate.setHours(9, 0, 0, 0); // schedule for 9am on that day
+        fuDate.setHours(9, 0, 0, 0);
         await prisma.visit.create({
           data: {
             bookerId: user.id,
             customerId: visit.customerId,
-            scheduledDate: fuDate,
+            visitDate: fuDate,
             status: "PENDING",
-            dailySequence: 99,
-            visitType: "follow_up",
             notes: `Follow-up from visit #${visitId} on ${new Date().toLocaleDateString()}`,
-            isAdhoc: false,
+            isAdhoc: true,  // mark as ad-hoc so scheduler won't overwrite
           },
         });
         followUpCreated = true;
