@@ -10,7 +10,8 @@ interface City {
 }
 
 interface Officer {
-  id: number; name: string; email: string;
+  id: number; name: string; email: string; phone: string;
+  profilePhoto: string | null;
   gpsStatus: string;
   lastLatitude: number | null; lastLongitude: number | null;
   lastSeenAt: string | null;
@@ -118,7 +119,14 @@ function LiveMap({ officers, selected, onSelect }: {
               <a key={o.id}
                 href={`https://maps.google.com/?q=${lat},${lng}`}
                 target="_blank" rel="noreferrer"
-                className="flex items-center gap-1.5 bg-white/95 backdrop-blur rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow border border-slate-200 hover:border-teal-400 transition-colors">
+                className="flex items-center gap-2 bg-white/95 backdrop-blur rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow border border-slate-200 hover:border-teal-400 transition-colors">
+                {o.profilePhoto ? (
+                  <img src={o.profilePhoto} alt={o.name} className="h-5 w-5 rounded-full object-cover" />
+                ) : (
+                  <span className={`h-5 w-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${isActive ? "bg-emerald-500" : "bg-slate-300"}`}>
+                    {stripHtml(o.name)[0]}
+                  </span>
+                )}
                 <span className={`h-2 w-2 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
                 {stripHtml(o.name)} ↗
               </a>
@@ -167,7 +175,7 @@ export default function LiveMapClient() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 10_000);
+    const t = setInterval(load, 3_000); // Real-time: every 3 seconds
     return () => clearInterval(t);
   }, [load]);
 
@@ -301,10 +309,14 @@ export default function LiveMapClient() {
                   {/* Officer header */}
                   <div className="p-4 border-b border-slate-100">
                     <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="h-9 w-9 rounded-full bg-teal-500 flex items-center justify-center text-white text-sm font-bold">
-                          {stripHtml(selected.name).split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2)}
-                        </div>
+                      <div className="flex items-center gap-3">
+                        {selected.profilePhoto ? (
+                          <img src={selected.profilePhoto} alt={selected.name} className="h-10 w-10 rounded-full object-cover border-2 border-teal-200" />
+                        ) : (
+                          <div className="h-10 w-10 rounded-full bg-teal-500 flex items-center justify-center text-white text-sm font-bold">
+                            {stripHtml(selected.name).split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2)}
+                          </div>
+                        )}
                         <div>
                           <p className="text-sm font-bold text-slate-900">{stripHtml(selected.name)}</p>
                           <p className="text-xs text-slate-500">{selected.city?.name ?? "Unknown City"}</p>
@@ -398,9 +410,13 @@ export default function LiveMapClient() {
                 <div key={o.id} onClick={() => valid && setSelected(o)}
                   className={`flex items-center gap-4 px-5 py-3 transition-colors ${valid ? "cursor-pointer hover:bg-slate-50" : ""} ${selected?.id === o.id ? "bg-teal-50 border-l-4 border-teal-500" : ""}`}>
                   <div className="relative">
-                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${valid ? "bg-teal-500" : "bg-slate-300"}`}>
-                      {(o.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
-                    </div>
+                    {o.profilePhoto ? (
+                      <img src={o.profilePhoto} alt={o.name} className="h-9 w-9 rounded-full object-cover border-2 border-teal-200" />
+                    ) : (
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${valid ? "bg-teal-500" : "bg-slate-300"}`}>
+                        {(o.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
+                      </div>
+                    )}
                     <span className="absolute -bottom-0.5 -right-0.5"><GpsDot s={o.gpsStatus} /></span>
                   </div>
                   <div className="flex-1 min-w-0">

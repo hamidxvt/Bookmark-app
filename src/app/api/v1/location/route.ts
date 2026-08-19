@@ -21,6 +21,7 @@ export async function GET(req: Request) {
         name: true,
         email: true,
         phone: true,
+        profilePhoto: true,
         gpsStatus: true,
         lastLatitude: true,
         lastLongitude: true,
