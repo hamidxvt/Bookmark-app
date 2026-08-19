@@ -39,8 +39,9 @@ const NAV = [
         icon: Users,
         label: "Customers",
         children: [
-          { label: "Customer List", href: "/customers"     },
-          { label: "Add Customer",  href: "/customers/add" },
+          { label: "Customer List",    href: "/customers"          },
+          { label: "Add Customer",     href: "/customers/add"      },
+          { label: "Update Requests",  href: "/customer-updates"   },
         ],
       },
       {
