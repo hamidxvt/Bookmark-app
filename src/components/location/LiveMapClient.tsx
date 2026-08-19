@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { MapPin, RefreshCw, Users, Clock, Navigation, Building2, ChevronDown, ExternalLink, CheckCircle2, Circle, Calendar } from "lucide-react";
+import { RefreshCw, Users, Clock, Navigation, Building2, ChevronDown, ExternalLink, CheckCircle2, Circle, Calendar } from "lucide-react";
 
 interface City {
   id: number; name: string;
@@ -19,21 +19,25 @@ interface Officer {
 }
 
 interface OfficerVisit {
-  id: number;
-  sequence: number;
-  customerName: string;
-  address: string;
+  id: number; sequence: number;
+  customerName: string; address: string;
   status: string;
-  latitude: number | null;
-  longitude: number | null;
+  latitude: number | null; longitude: number | null;
 }
 
-function stripHtml(s: string): string {
+function stripHtml(s: string) {
   return (s || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
 }
 
-function isValidPakCoord(lat: number, lng: number): boolean {
+function isValidPakCoord(lat: number, lng: number) {
   return lat >= 20 && lat <= 40 && lng >= 55 && lng <= 80;
+}
+
+function statusLabel(s: string) {
+  const u = s?.toUpperCase();
+  if (u === "ACTIVE") return { text: "Active",  cls: "text-emerald-700 bg-emerald-50 border-emerald-200" };
+  if (u === "IDLE")   return { text: "Idle",    cls: "text-amber-700  bg-amber-50  border-amber-200"  };
+  return                     { text: "Offline", cls: "text-slate-500  bg-slate-50  border-slate-200"  };
 }
 
 function GpsDot({ s }: { s: string }) {
@@ -43,100 +47,166 @@ function GpsDot({ s }: { s: string }) {
   return <span className="h-2.5 w-2.5 rounded-full bg-slate-300 inline-block" />;
 }
 
-function statusLabel(s: string) {
-  const u = s?.toUpperCase();
-  if (u === "ACTIVE") return { text: "Active",   cls: "text-emerald-700 bg-emerald-50 border-emerald-200" };
-  if (u === "IDLE")   return { text: "Idle",     cls: "text-amber-700  bg-amber-50  border-amber-200"  };
-  return                     { text: "Offline",  cls: "text-slate-500  bg-slate-50  border-slate-200"  };
-}
-
-// ── Live Map using OpenStreetMap iframe + SVG overlay ────────────────────────
-// Uses OSM static tile iframe for the real map background,
-// with an SVG overlay layer for officer pins that updates every 10s.
-function LiveMap({ officers, selected, onSelect }: {
+// ── Leaflet Map with real-time avatar markers ─────────────────────────────────
+function LiveMap({ officers, onSelect }: {
   officers: Officer[];
-  selected: Officer | null;
   onSelect: (o: Officer) => void;
 }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 900, h: 440 });
+  const mapRef   = useRef<HTMLDivElement>(null);
+  const lMap     = useRef<any>(null);
+  const markers  = useRef<Record<number, any>>({});
+  const [ready, setReady] = useState(false);
 
-  const pts = officers.filter(o => {
-    const lt = Number(o.lastLatitude), lg = Number(o.lastLongitude);
-    return lt && lg && isValidPakCoord(lt, lg);
-  });
+  // Build custom HTML marker icon
+  const buildIcon = useCallback((o: Officer) => {
+    const L = (window as any).L;
+    const isActive = o.gpsStatus?.toUpperCase() === "ACTIVE";
+    const initials = stripHtml(o.name).split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
+    const dot = isActive
+      ? `<span style="position:absolute;bottom:2px;right:2px;width:9px;height:9px;background:#10b981;border-radius:50%;border:1.5px solid white;animation:pulse 1.5s infinite;"></span>`
+      : `<span style="position:absolute;bottom:2px;right:2px;width:9px;height:9px;background:#94a3b8;border-radius:50%;border:1.5px solid white;"></span>`;
 
-  // Track container size for responsive overlay
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const ro = new ResizeObserver(entries => {
-      const e = entries[0];
-      setSize({ w: e.contentRect.width, h: e.contentRect.height });
+    const inner = o.profilePhoto
+      ? `<img src="${o.profilePhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
+      : `<span style="font-size:13px;font-weight:700;color:white;">${initials}</span>`;
+
+    const html = `
+      <div style="position:relative;width:46px;height:46px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:${isActive ? "#0d9488" : "#94a3b8"};
+          border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.35);
+          display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;">
+          ${inner}
+        </div>
+        ${dot}
+        <div style="position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
+          background:rgba(15,30,60,0.85);color:white;font-size:9px;font-weight:600;
+          border-radius:4px;padding:1px 5px;white-space:nowrap;max-width:80px;
+          overflow:hidden;text-overflow:ellipsis;">
+          ${initials}
+        </div>
+      </div>
+    `;
+
+    return L.divIcon({
+      html,
+      iconSize: [46, 64],
+      iconAnchor: [23, 50],
+      className: "",
     });
-    ro.observe(containerRef.current);
-    return () => ro.disconnect();
   }, []);
 
-  if (pts.length === 0) return null;
+  // Initialise Leaflet once
+  useEffect(() => {
+    if (typeof window === "undefined") return;
 
-  // Compute map bounds centered on officers
-  const lats = pts.map(o => Number(o.lastLatitude));
-  const lngs = pts.map(o => Number(o.lastLongitude));
-  const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-  const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
-  const zoom = pts.length === 1 ? 15 : 13;
+    const initMap = () => {
+      const L = (window as any).L;
+      if (!L || !mapRef.current || lMap.current) return;
 
-  // For a single officer — show their exact location with OSM marker
-  // For multiple officers — show bounding box of all
-  const isSingle = pts.length === 1;
+      const map = L.map(mapRef.current, {
+        center: [34.3512, 72.0189],
+        zoom: 13,
+        zoomControl: true,
+      });
 
-  // Use embeddable OSM URL for both single and multiple officers
-  // The non-embed URL (openstreetmap.org/?) blocks iframes via X-Frame-Options
-  const pad = 0.015;
-  const osmUrl = isSingle
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${Number(pts[0].lastLongitude)-pad},${Number(pts[0].lastLatitude)-pad},${Number(pts[0].lastLongitude)+pad},${Number(pts[0].lastLatitude)+pad}&layer=mapnik&marker=${Number(pts[0].lastLatitude)},${Number(pts[0].lastLongitude)}`
-    : `https://www.openstreetmap.org/export/embed.html?bbox=${Math.min(...pts.map(o => Number(o.lastLongitude)))-0.03},${Math.min(...pts.map(o => Number(o.lastLatitude)))-0.02},${Math.max(...pts.map(o => Number(o.lastLongitude)))+0.03},${Math.max(...pts.map(o => Number(o.lastLatitude)))+0.02}&layer=mapnik`;
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+        maxZoom: 19,
+      }).addTo(map);
+
+      // Add pulse animation CSS
+      const style = document.createElement("style");
+      style.textContent = `@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.3)}}`;
+      document.head.appendChild(style);
+
+      lMap.current = map;
+      setReady(true);
+    };
+
+    if ((window as any).L) {
+      initMap();
+      return;
+    }
+
+    // Load Leaflet CSS
+    if (!document.querySelector("#leaflet-css")) {
+      const link = document.createElement("link");
+      link.id = "leaflet-css";
+      link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+      document.head.appendChild(link);
+    }
+
+    // Load Leaflet JS
+    if (!document.querySelector("#leaflet-js")) {
+      const script = document.createElement("script");
+      script.id = "leaflet-js";
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+      script.onload = initMap;
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  // Update markers whenever officers data changes
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!ready || !lMap.current || !L) return;
+
+    const map = lMap.current;
+    const validOfficers = officers.filter(o => {
+      const lt = Number(o.lastLatitude), lg = Number(o.lastLongitude);
+      return lt && lg && isValidPakCoord(lt, lg);
+    });
+
+    const currentIds = new Set(validOfficers.map(o => o.id));
+
+    // Remove markers for officers no longer present
+    Object.keys(markers.current).forEach(id => {
+      if (!currentIds.has(Number(id))) {
+        markers.current[Number(id)].remove();
+        delete markers.current[Number(id)];
+      }
+    });
+
+    validOfficers.forEach(o => {
+      const lat = Number(o.lastLatitude);
+      const lng = Number(o.lastLongitude);
+      const icon = buildIcon(o);
+
+      if (markers.current[o.id]) {
+        // Smooth position update — no map flash
+        markers.current[o.id].setLatLng([lat, lng]);
+        markers.current[o.id].setIcon(icon);
+      } else {
+        // New marker
+        const m = L.marker([lat, lng], { icon })
+          .addTo(map)
+          .on("click", () => onSelect(o));
+        markers.current[o.id] = m;
+      }
+    });
+
+    // Pan to show all officers on first load
+    if (validOfficers.length > 0 && Object.keys(markers.current).length === validOfficers.length) {
+      const bounds = L.latLngBounds(validOfficers.map(o => [Number(o.lastLatitude), Number(o.lastLongitude)]));
+      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
+    }
+  }, [officers, ready, buildIcon, onSelect]);
 
   return (
-    <div ref={containerRef} className="relative w-full h-[440px] overflow-hidden rounded-b-2xl">
-      {/* Real OpenStreetMap — marker is built into the URL, no SVG overlay needed */}
-      <iframe
-        key={`${centerLat.toFixed(4)}-${centerLng.toFixed(4)}`}
-        src={osmUrl}
-        className="absolute inset-0 w-full h-full border-0"
-        title="Live GPS Map"
-        loading="eager"
-        sandbox="allow-scripts allow-same-origin"
-      />
-
-      {/* Officer info cards for multiple officers */}
-      {!isSingle && (
-        <div className="absolute bottom-3 left-3 flex gap-2 flex-wrap max-w-full">
-          {pts.map(o => {
-            const lat = Number(o.lastLatitude), lng = Number(o.lastLongitude);
-            const isActive = o.gpsStatus?.toUpperCase() === "ACTIVE";
-            return (
-              <a key={o.id}
-                href={`https://maps.google.com/?q=${lat},${lng}`}
-                target="_blank" rel="noreferrer"
-                className="flex items-center gap-2 bg-white/95 backdrop-blur rounded-lg px-2.5 py-1.5 text-xs font-semibold shadow border border-slate-200 hover:border-teal-400 transition-colors">
-                {o.profilePhoto ? (
-                  <img src={o.profilePhoto} alt={o.name} className="h-5 w-5 rounded-full object-cover" />
-                ) : (
-                  <span className={`h-5 w-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold ${isActive ? "bg-emerald-500" : "bg-slate-300"}`}>
-                    {stripHtml(o.name)[0]}
-                  </span>
-                )}
-                <span className={`h-2 w-2 rounded-full ${isActive ? "bg-emerald-500 animate-pulse" : "bg-slate-300"}`} />
-                {stripHtml(o.name)} ↗
-              </a>
-            );
-          })}
+    <div className="relative w-full h-[480px]">
+      <div ref={mapRef} className="absolute inset-0 rounded-b-2xl" />
+      {!ready && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-50 rounded-b-2xl">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            Loading map…
+          </div>
         </div>
       )}
-
-      <div className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm rounded-lg px-2 py-1 text-[10px] text-slate-500 border border-slate-200 shadow">
-        Live · updates every 10s
+      <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-2.5 py-1 text-[11px] font-medium text-emerald-600 border border-emerald-200 shadow z-[1000] flex items-center gap-1.5">
+        <span className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse inline-block" />
+        Live · updates every 5s
       </div>
     </div>
   );
@@ -144,17 +214,16 @@ function LiveMap({ officers, selected, onSelect }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function LiveMapClient() {
-  const [officers,     setOfficers]     = useState<Officer[]>([]);
-  const [cities,       setCities]       = useState<City[]>([]);
-  const [selCity,      setSelCity]      = useState<City | null>(null);
-  const [loading,      setLoading]      = useState(true);
-  const [lastUpdate,   setLastUpdate]   = useState<Date | null>(null);
-  const [selected,     setSelected]     = useState<Officer | null>(null);
-  const [dropOpen,     setDropOpen]     = useState(false);
+  const [officers,      setOfficers]      = useState<Officer[]>([]);
+  const [cities,        setCities]        = useState<City[]>([]);
+  const [selCity,       setSelCity]       = useState<City | null>(null);
+  const [loading,       setLoading]       = useState(true);
+  const [lastUpdate,    setLastUpdate]    = useState<Date | null>(null);
+  const [selected,      setSelected]      = useState<Officer | null>(null);
+  const [dropOpen,      setDropOpen]      = useState(false);
   const [officerVisits, setOfficerVisits] = useState<OfficerVisit[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(false);
 
-  // Load cities
   useEffect(() => {
     fetch("/api/v1/cities").then(r => r.json()).then(d => {
       if (d.success) setCities(d.data ?? []);
@@ -175,7 +244,7 @@ export default function LiveMapClient() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 3_000); // Real-time: every 3 seconds
+    const t = setInterval(load, 5_000); // Every 5 seconds
     return () => clearInterval(t);
   }, [load]);
 
@@ -183,7 +252,6 @@ export default function LiveMapClient() {
   useEffect(() => {
     if (!selected) { setOfficerVisits([]); return; }
     setVisitsLoading(true);
-    const today = new Date(); today.setHours(0,0,0,0);
     fetch(`/api/v1/visits?bookerId=${selected.id}&length=20&today=1`)
       .then(r => r.json())
       .then(d => {
@@ -217,10 +285,9 @@ export default function LiveMapClient() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Live GPS Tracking</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Real-time officer positions · auto-refreshes every 10s</p>
+          <p className="text-sm text-slate-500 mt-0.5">Real-time officer positions · auto-refreshes every 5s</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* City filter */}
           <div className="relative">
             <button onClick={() => setDropOpen(!dropOpen)}
               className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm min-w-[140px] justify-between">
@@ -240,7 +307,7 @@ export default function LiveMapClient() {
                   <button key={c.id} onClick={() => { setSelCity(c); setDropOpen(false); }}
                     className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${selCity?.id === c.id ? "text-teal-600 font-semibold bg-teal-50" : "text-slate-700"}`}>
                     {c.name}
-                    {c.geofenceRadius && <span className="ml-1 text-slate-400">· {c.geofenceRadius >= 1000 ? `${(c.geofenceRadius / 1000).toFixed(0)}km` : `${c.geofenceRadius}m`}</span>}
+                    {c.geofenceRadius && <span className="ml-1 text-slate-400">· {c.geofenceRadius >= 1000 ? `${(c.geofenceRadius/1000).toFixed(0)}km` : `${c.geofenceRadius}m`}</span>}
                   </button>
                 ))}
               </div>
@@ -257,10 +324,10 @@ export default function LiveMapClient() {
       {/* KPI cards */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: "Officers",    value: officers.length,       icon: Users,      cls: "text-slate-600 bg-slate-100" },
-          { label: "Active GPS",  value: active,                icon: Navigation, cls: "text-emerald-600 bg-emerald-50" },
-          { label: "On Map",      value: withLoc.length,        icon: MapPin,     cls: "text-teal-600 bg-teal-50" },
-          { label: "Last Update", value: null,                  icon: Clock,      cls: "text-slate-500 bg-slate-50" },
+          { label: "Officers",    value: officers.length, icon: Users,      cls: "text-slate-600 bg-slate-100" },
+          { label: "Active GPS",  value: active,          icon: Navigation, cls: "text-emerald-600 bg-emerald-50" },
+          { label: "On Map",      value: withLoc.length,  icon: Navigation, cls: "text-teal-600 bg-teal-50" },
+          { label: "Last Update", value: null,            icon: Clock,      cls: "text-slate-500 bg-slate-50" },
         ].map(s => (
           <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${s.cls} mb-2`}>
@@ -292,51 +359,52 @@ export default function LiveMapClient() {
 
         {withLoc.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 bg-slate-50">
-            <MapPin className="h-10 w-10 text-slate-200" />
-            <p className="mt-3 text-sm font-medium text-slate-400">No officers with location data</p>
-            <p className="text-xs text-slate-300 mt-1">Officers appear when they open the app and GPS pings</p>
+            <Navigation className="h-10 w-10 text-slate-200" />
+            <p className="mt-3 text-sm font-medium text-slate-400">No active officers on map</p>
+            <p className="text-xs text-slate-300 mt-1">Officers appear when the app is open and GPS pings</p>
           </div>
         ) : (
-          <div className="w-full h-[440px] relative overflow-hidden bg-gradient-to-br from-blue-50 to-teal-50">
-            <LiveMap officers={withLoc} selected={selected} onSelect={setSelected} />
-            {/* Selected officer detail card */}
+          <div className="relative">
+            <LiveMap officers={withLoc} onSelect={setSelected} />
+
+            {/* Selected officer detail panel */}
             {selected && (() => {
               const lat = Number(selected.lastLatitude), lng = Number(selected.lastLongitude);
-              const done = officerVisits.filter(v => v.status?.toUpperCase() === "COMPLETED").length;
+              const done  = officerVisits.filter(v => v.status?.toUpperCase() === "COMPLETED").length;
               const total = officerVisits.length;
               return (
-                <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden max-h-[calc(100%-32px)] flex flex-col">
+                <div className="absolute bottom-4 right-4 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col z-[2000] max-h-[420px]">
                   {/* Officer header */}
-                  <div className="p-4 border-b border-slate-100">
+                  <div className="p-4 border-b border-slate-100 bg-gradient-to-r from-[#1A3A5C] to-[#0d9488]">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         {selected.profilePhoto ? (
-                          <img src={selected.profilePhoto} alt={selected.name} className="h-10 w-10 rounded-full object-cover border-2 border-teal-200" />
+                          <img src={selected.profilePhoto} alt={selected.name} className="h-11 w-11 rounded-full object-cover border-2 border-white/40" />
                         ) : (
-                          <div className="h-10 w-10 rounded-full bg-teal-500 flex items-center justify-center text-white text-sm font-bold">
+                          <div className="h-11 w-11 rounded-full bg-white/20 flex items-center justify-center text-white text-base font-bold border-2 border-white/40">
                             {stripHtml(selected.name).split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2)}
                           </div>
                         )}
                         <div>
-                          <p className="text-sm font-bold text-slate-900">{stripHtml(selected.name)}</p>
-                          <p className="text-xs text-slate-500">{selected.city?.name ?? "Unknown City"}</p>
+                          <p className="text-sm font-bold text-white">{stripHtml(selected.name)}</p>
+                          <p className="text-xs text-white/70">{selected.city?.name ?? "Unknown City"}</p>
                         </div>
                       </div>
-                      <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600 text-xl leading-none mt-0.5">×</button>
+                      <button onClick={() => setSelected(null)} className="text-white/60 hover:text-white text-xl leading-none mt-0.5">×</button>
                     </div>
-                    <div className="mt-2 flex items-center gap-3">
-                      <div className="flex items-center gap-1.5">
-                        <GpsDot s={selected.gpsStatus} />
-                        <span className="text-xs text-slate-600">{statusLabel(selected.gpsStatus).text}</span>
-                      </div>
-                      <span className="text-xs text-slate-400">{lat.toFixed(4)}, {lng.toFixed(4)}</span>
+                    <div className="mt-3 flex items-center gap-3">
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/20 text-white`}>
+                        {statusLabel(selected.gpsStatus).text}
+                      </span>
+                      <span className="text-[11px] text-white/70">{lat.toFixed(4)}, {lng.toFixed(4)}</span>
                     </div>
                     <a href={`https://maps.google.com/?q=${lat},${lng}`}
                       target="_blank" rel="noreferrer"
-                      className="mt-2 flex items-center gap-1 text-xs font-medium text-teal-600 hover:underline">
+                      className="mt-2 flex items-center gap-1 text-xs text-white/80 hover:text-white">
                       <ExternalLink className="h-3 w-3" /> Open in Google Maps
                     </a>
                   </div>
+
                   {/* Today's visits */}
                   <div className="flex-1 overflow-y-auto">
                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
@@ -345,7 +413,7 @@ export default function LiveMapClient() {
                         <span className="text-xs font-semibold text-slate-700">Today's Schedule</span>
                       </div>
                       {total > 0 && (
-                        <span className="text-xs text-slate-500">{done}/{total} done</span>
+                        <span className="text-xs font-medium text-slate-500">{done}/{total} done</span>
                       )}
                     </div>
                     {visitsLoading ? (
@@ -353,12 +421,12 @@ export default function LiveMapClient() {
                     ) : officerVisits.length === 0 ? (
                       <div className="px-4 py-3 text-xs text-slate-400">No visits planned today</div>
                     ) : (
-                      <div className="divide-y divide-slate-50 max-h-52 overflow-y-auto">
+                      <div className="divide-y divide-slate-50">
                         {officerVisits.slice(0, 15).map(v => {
-                          const isDone = v.status?.toUpperCase() === "COMPLETED";
-                          const isMissed = v.status?.toUpperCase() === "CANCELLED" || v.status?.toUpperCase() === "MISSED";
+                          const isDone   = v.status?.toUpperCase() === "COMPLETED";
+                          const isMissed = ["CANCELLED","MISSED"].includes(v.status?.toUpperCase());
                           return (
-                            <div key={v.id} className="flex items-start gap-2.5 px-4 py-2">
+                            <div key={v.id} className="flex items-start gap-2.5 px-4 py-2.5">
                               {isDone
                                 ? <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
                                 : isMissed
@@ -368,15 +436,11 @@ export default function LiveMapClient() {
                                 <p className={`text-xs font-medium truncate ${isDone ? "text-slate-400 line-through" : "text-slate-700"}`}>
                                   {v.customerName}
                                 </p>
-                                {v.address && (
-                                  <p className="text-[10px] text-slate-400 truncate">{v.address}</p>
-                                )}
+                                {v.address && <p className="text-[10px] text-slate-400 truncate">{v.address}</p>}
                                 {v.latitude && v.longitude && (
                                   <a href={`https://maps.google.com/?q=${v.latitude},${v.longitude}`}
                                     target="_blank" rel="noreferrer"
-                                    className="text-[10px] text-teal-500 hover:underline">
-                                    Navigate ↗
-                                  </a>
+                                    className="text-[10px] text-teal-500 hover:underline">Navigate ↗</a>
                                 )}
                               </div>
                             </div>
@@ -388,9 +452,6 @@ export default function LiveMapClient() {
                 </div>
               );
             })()}
-            <div className="absolute top-2 right-2 bg-white/80 backdrop-blur-sm rounded-lg px-2 py-1 text-[10px] text-slate-400 border border-slate-200">
-              Live map · click officer for details
-            </div>
           </div>
         )}
       </div>
@@ -403,17 +464,17 @@ export default function LiveMapClient() {
           </div>
           <div className="divide-y divide-slate-50">
             {cleanOfficers.map(o => {
-              const lat = Number(o.lastLatitude), lng = Number(o.lastLongitude);
+              const lat   = Number(o.lastLatitude), lng = Number(o.lastLongitude);
               const valid = lat && lng && isValidPakCoord(lat, lng);
               const sl    = statusLabel(o.gpsStatus);
               return (
-                <div key={o.id} onClick={() => valid && setSelected(o)}
+                <div key={o.id} onClick={() => valid && setSelected(o as any)}
                   className={`flex items-center gap-4 px-5 py-3 transition-colors ${valid ? "cursor-pointer hover:bg-slate-50" : ""} ${selected?.id === o.id ? "bg-teal-50 border-l-4 border-teal-500" : ""}`}>
                   <div className="relative">
                     {o.profilePhoto ? (
-                      <img src={o.profilePhoto} alt={o.name} className="h-9 w-9 rounded-full object-cover border-2 border-teal-200" />
+                      <img src={o.profilePhoto} alt={o.name} className="h-10 w-10 rounded-full object-cover border-2 border-teal-200" />
                     ) : (
-                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${valid ? "bg-teal-500" : "bg-slate-300"}`}>
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${valid ? "bg-teal-500" : "bg-slate-300"}`}>
                         {(o.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
                       </div>
                     )}
