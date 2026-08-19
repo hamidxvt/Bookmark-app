@@ -270,6 +270,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         color: AppColors.info,
                         onTap: () => context.go('/profile'),
                       ).animate(delay: 300.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn(),
+
+                      _QuickAction(
+                        icon: Icons.event_available_rounded,
+                        label: 'My Leaves',
+                        color: const Color(0xFF7C3AED),
+                        onTap: () => context.go('/leaves'),
+                      ).animate(delay: 360.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn(),
+
+                      _QuickAction(
+                        icon: Icons.inventory_2_rounded,
+                        label: 'Samples',
+                        color: const Color(0xFF0891B2),
+                        onTap: () => context.go('/samples'),
+                      ).animate(delay: 420.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn(),
                     ],
                   );
                 }),

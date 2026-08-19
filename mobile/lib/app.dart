@@ -8,6 +8,8 @@ import 'features/auth/presentation/auth_notifier.dart';
 import 'features/auth/presentation/login_screen.dart';
 import 'features/customers/presentation/customer_detail_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
+import 'features/leaves/presentation/leaves_screen.dart';
+import 'features/samples/presentation/samples_screen.dart';
 import 'features/visits/presentation/visit_list_screen.dart';
 import 'features/visits/presentation/complete_visit_screen.dart';
 import 'features/visits/presentation/missed_visit_screen.dart';
@@ -50,6 +52,8 @@ final _routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/payroll',  builder: (_, __) => const PayrollScreen()),
       GoRoute(path: '/map',      builder: (_, __) => const RouteMapScreen()),
       GoRoute(path: '/profile',  builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: '/leaves',   builder: (_, __) => const LeavesScreen()),
+      GoRoute(path: '/samples',  builder: (_, __) => const SamplesScreen()),
       GoRoute(
         path: '/customers/:id',
         builder: (_, state) => CustomerDetailScreen(
