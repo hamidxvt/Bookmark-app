@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../data/visit_repository.dart';
@@ -18,6 +20,8 @@ class _MissedVisitScreenState extends ConsumerState<MissedVisitScreen> {
   final _reasonCtrl = TextEditingController();
   bool _isSubmitting = false;
   String _selectedReason = '';
+  final List<XFile> _photos = [];
+  final _picker = ImagePicker();
 
   static const _presetReasons = [
     'Location was closed',
@@ -31,6 +35,13 @@ class _MissedVisitScreenState extends ConsumerState<MissedVisitScreen> {
   void dispose() {
     _reasonCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picked = await _picker.pickImage(source: source, imageQuality: 70, maxWidth: 1200);
+    if (picked != null) {
+      setState(() => _photos.add(picked));
+    }
   }
 
   Future<void> _submit() async {
@@ -202,6 +213,71 @@ class _MissedVisitScreenState extends ConsumerState<MissedVisitScreen> {
             ),
           ).animate(delay: 300.ms).slideY(begin: 0.2).fadeIn(),
 
+          const SizedBox(height: 20),
+
+          // Photo evidence section
+          Text('Add Evidence (Optional)',
+              style: Theme.of(context)
+                  .textTheme
+                  .labelLarge
+                  ?.copyWith(color: AppColors.primary)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _PhotoButton(
+                icon: Icons.camera_alt_rounded,
+                label: 'Camera',
+                onTap: () => _pickImage(ImageSource.camera),
+              ),
+              const SizedBox(width: 10),
+              _PhotoButton(
+                icon: Icons.photo_library_rounded,
+                label: 'Gallery',
+                onTap: () => _pickImage(ImageSource.gallery),
+              ),
+            ],
+          ),
+
+          if (_photos.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 90,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _photos.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(
+                        File(_photos[i].path),
+                        width: 90,
+                        height: 90,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: () => setState(() => _photos.removeAt(i)),
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          padding: const EdgeInsets.all(3),
+                          child: const Icon(Icons.close, color: Colors.white, size: 14),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
           const SizedBox(height: 28),
 
           FilledButton.icon(
@@ -219,6 +295,38 @@ class _MissedVisitScreenState extends ConsumerState<MissedVisitScreen> {
 
           const SizedBox(height: AppSpacing.lg),
         ],
+      ),
+    );
+  }
+}
+
+class _PhotoButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _PhotoButton({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            border: Border.all(color: AppColors.outline),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: AppColors.primary, size: 24),
+              const SizedBox(height: 4),
+              Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -84,7 +84,26 @@ class _VisitTile extends ConsumerWidget {
   const _VisitTile({required this.visit, required this.index});
 
   Future<void> _onTap(BuildContext context, WidgetRef ref) async {
-    // Start visit immediately — no geofencing required
+    // Enforce 1 active visit at a time
+    if (visit.isPlanned) {
+      final visits = ref.read(visitListProvider).valueOrNull ?? [];
+      final hasActiveVisit = visits.any((v) => v.isInProgress);
+      if (hasActiveVisit) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Expanded(child: Text('Please complete your current active visit first!')),
+            ]),
+            backgroundColor: AppColors.warning,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        return;
+      }
+    }
     context.go('/visits/${visit.id}/complete');
   }
 

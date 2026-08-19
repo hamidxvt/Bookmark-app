@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -32,6 +33,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
   String _visitType = 'regular';
   bool _isSubmitting = false;
   bool _prefilled = false;
+  DateTime? _followUpDate;
 
   @override
   void dispose() {
@@ -66,6 +68,8 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
         'contactPhone': _phoneCtrl.text.trim(),
         'notes': _notesCtrl.text.trim(),
         'visitType': _visitType,
+        if (_followUpDate != null)
+          'followUpDate': _followUpDate!.toIso8601String().substring(0, 10),
       });
       await ref.read(visitListProvider.notifier).refresh();
       if (mounted) {
@@ -292,6 +296,77 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
             ),
             validator: (v) => v == null || v.trim().length < 5 ? 'Add at least 5 characters' : null,
           ).animate(delay: 200.ms).slideY(begin: 0.2).fadeIn(),
+
+          const SizedBox(height: 20),
+
+          // ── Follow-up Date ────────────────────────────────────
+          Text('Follow-up Date (Optional)',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.primary)),
+          const SizedBox(height: 10),
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _followUpDate ?? DateTime.now().add(const Duration(days: 7)),
+                firstDate: DateTime.now().add(const Duration(days: 1)),
+                lastDate: DateTime.now().add(const Duration(days: 90)),
+                helpText: 'Select Follow-up Date',
+                builder: (ctx, child) => Theme(
+                  data: Theme.of(ctx).copyWith(
+                    colorScheme: Theme.of(ctx).colorScheme.copyWith(primary: AppColors.primary),
+                  ),
+                  child: child!,
+                ),
+              );
+              if (picked != null) setState(() => _followUpDate = picked);
+            },
+            borderRadius: BorderRadius.circular(AppRadius.md),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: _followUpDate != null
+                    ? AppColors.primary.withOpacity(0.06)
+                    : AppColors.surface,
+                borderRadius: BorderRadius.circular(AppRadius.md),
+                border: Border.all(
+                  color: _followUpDate != null ? AppColors.primary.withOpacity(0.4) : AppColors.outline,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.calendar_today_rounded,
+                      size: 18,
+                      color: _followUpDate != null ? AppColors.primary : AppColors.textMuted),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _followUpDate != null
+                          ? 'Follow-up: ${DateFormat('MMM d, yyyy').format(_followUpDate!)}'
+                          : 'Tap to set follow-up reminder date',
+                      style: TextStyle(
+                        color: _followUpDate != null ? AppColors.primary : AppColors.textMuted,
+                        fontSize: 14,
+                        fontWeight: _followUpDate != null ? FontWeight.w600 : FontWeight.w400,
+                      ),
+                    ),
+                  ),
+                  if (_followUpDate != null)
+                    GestureDetector(
+                      onTap: () => setState(() => _followUpDate = null),
+                      child: Icon(Icons.close_rounded, size: 18, color: AppColors.textMuted),
+                    ),
+                ],
+              ),
+            ),
+          ).animate(delay: 220.ms).fadeIn(),
+          if (_followUpDate != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, left: 4),
+              child: Text(
+                'A visit will be auto-scheduled on this date as a reminder.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.success),
+              ),
+            ),
 
           const SizedBox(height: 28),
 

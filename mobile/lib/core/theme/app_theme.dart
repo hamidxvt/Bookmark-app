@@ -2,36 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 /// Bookmark SFA — Design System
-/// Primary: deep navy #1A3A5C  Accent: teal #0D9488  Error: rose #E11D48
+/// Primary: Bookmark Red #C8102E  Accent: Dark Red #9B0B22  Background: White
 abstract class AppColors {
-  static const primary = Color(0xFF1A3A5C);
-  static const primaryContainer = Color(0xFF2D5F8A);
-  static const secondary = Color(0xFF0D9488);
-  static const secondaryContainer = Color(0xFF14B8A6);
-  static const accent = Color(0xFF0D9488);
-  static const surface = Color(0xFFF8FAFC);
-  static const background = Color(0xFFF1F5F9);
-  static const error = Color(0xFFE11D48);
+  static const primary = Color(0xFFC8102E);
+  static const primaryContainer = Color(0xFF9B0B22);
+  static const secondary = Color(0xFFE63946);
+  static const secondaryContainer = Color(0xFFFF6B7A);
+  static const accent = Color(0xFFC8102E);
+  static const surface = Color(0xFFFFFFFF);
+  static const background = Color(0xFFFFF5F5);
+  static const error = Color(0xFF9B0B22);
   static const onPrimary = Color(0xFFFFFFFF);
   static const onSecondary = Color(0xFFFFFFFF);
-  static const onSurface = Color(0xFF1E293B);
-  static const onBackground = Color(0xFF334155);
-  static const outline = Color(0xFFCBD5E1);
+  static const onSurface = Color(0xFF1A0A0A);
+  static const onBackground = Color(0xFF3D1515);
+  static const outline = Color(0xFFEECCCC);
   static const success = Color(0xFF16A34A);
   static const warning = Color(0xFFD97706);
   static const info = Color(0xFF0EA5E9);
-  static const textMuted = Color(0xFF64748B);
+  static const textMuted = Color(0xFF9B6B6B);
 
   // Status badge colors
   static const planned = Color(0xFF0EA5E9);
   static const inProgress = Color(0xFFD97706);
   static const completed = Color(0xFF16A34A);
-  static const missed = Color(0xFFE11D48);
+  static const missed = Color(0xFFC8102E);
 
   // Gradient pairs
-  static const List<Color> primaryGradient = [Color(0xFF1A3A5C), Color(0xFF2D5F8A)];
-  static const List<Color> accentGradient = [Color(0xFF0D9488), Color(0xFF0F766E)];
-  static const List<Color> cardGradient = [Color(0xFFFFFFFF), Color(0xFFF8FAFC)];
+  static const List<Color> primaryGradient = [Color(0xFFC8102E), Color(0xFF9B0B22)];
+  static const List<Color> accentGradient = [Color(0xFFE63946), Color(0xFFC8102E)];
+  static const List<Color> cardGradient = [Color(0xFFFFFFFF), Color(0xFFFFF5F5)];
 }
 
 abstract class AppSpacing {
@@ -68,12 +68,12 @@ class AppTheme {
         brightness: Brightness.light,
         primary: AppColors.primary,
         onPrimary: AppColors.onPrimary,
-        primaryContainer: Color(0xFFD6E8FF),
-        onPrimaryContainer: Color(0xFF001D36),
+        primaryContainer: Color(0xFFFFDADD),
+        onPrimaryContainer: Color(0xFF40000A),
         secondary: AppColors.secondary,
         onSecondary: AppColors.onSecondary,
-        secondaryContainer: Color(0xFFB2EFEA),
-        onSecondaryContainer: Color(0xFF00201E),
+        secondaryContainer: Color(0xFFFFCDD2),
+        onSecondaryContainer: Color(0xFF5C0011),
         tertiary: Color(0xFF7C3AED),
         onTertiary: AppColors.onPrimary,
         tertiaryContainer: Color(0xFFEDE9FE),
@@ -84,14 +84,14 @@ class AppTheme {
         onErrorContainer: Color(0xFF40000A),
         surface: AppColors.surface,
         onSurface: AppColors.onSurface,
-        surfaceContainerHighest: Color(0xFFE2E8F0),
+        surfaceContainerHighest: Color(0xFFFFEEEE),
         outline: AppColors.outline,
-        outlineVariant: Color(0xFFE2E8F0),
-        shadow: Color(0x1A1E293B),
-        scrim: Color(0x801A3A5C),
-        inverseSurface: Color(0xFF1E293B),
-        onInverseSurface: Color(0xFFF8FAFC),
-        inversePrimary: Color(0xFF9DCAFF),
+        outlineVariant: Color(0xFFFFDDDD),
+        shadow: Color(0x1A200000),
+        scrim: Color(0x80C8102E),
+        inverseSurface: Color(0xFF3D1515),
+        onInverseSurface: Color(0xFFFFF5F5),
+        inversePrimary: Color(0xFFFF8A9B),
       ),
     );
 

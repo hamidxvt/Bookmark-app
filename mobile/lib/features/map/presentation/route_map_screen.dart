@@ -395,11 +395,21 @@ class _MapView extends StatelessWidget {
   }
 
   Future<void> _openMaps(RouteStop stop) async {
-    final uri = Uri.parse(
-        stop.googleMapsUrl.isNotEmpty
-            ? stop.googleMapsUrl
-            : 'https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lng}');
-    if (await canLaunchUrl(uri)) launchUrl(uri, mode: LaunchMode.externalApplication);
+    // Try Google Maps navigation intent (turn-by-turn guidance)
+    final gmapsNavUri = Uri.parse(
+      'google.navigation:q=${stop.lat},${stop.lng}&mode=d',
+    );
+    if (await canLaunchUrl(gmapsNavUri)) {
+      await launchUrl(gmapsNavUri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    // Fallback: open Google Maps with destination
+    final fallbackUri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lng}&travelmode=driving',
+    );
+    if (await canLaunchUrl(fallbackUri)) {
+      await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+    }
   }
 }
 
@@ -470,7 +480,7 @@ class _StopDetailCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF0D9488), Color(0xFF14B8A6)],
+                    colors: [Color(0xFFC8102E), Color(0xFF9B0B22)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),

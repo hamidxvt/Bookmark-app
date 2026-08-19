@@ -16,6 +16,7 @@ class ProfileData {
   final String phone;
   final String city;
   final String jobStatus;
+  final String designation;
   final int totalVisitsThisMonth;
   final int completedVisits;
   final int missedVisits;
@@ -31,6 +32,7 @@ class ProfileData {
     required this.phone,
     required this.city,
     required this.jobStatus,
+    required this.designation,
     required this.totalVisitsThisMonth,
     required this.completedVisits,
     required this.missedVisits,
@@ -49,6 +51,7 @@ class ProfileData {
       phone: j['phone'] ?? '',
       city: j['city'] ?? 'N/A',
       jobStatus: j['jobStatus'] ?? 'ACTIVE',
+      designation: j['designation'] ?? j['role'] ?? 'Sales Officer',
       totalVisitsThisMonth: (j['totalVisitsThisMonth'] ?? 0) as int,
       completedVisits: (j['completedVisits'] ?? 0) as int,
       missedVisits: (j['missedVisits'] ?? 0) as int,
@@ -77,14 +80,14 @@ class ProfileScreen extends ConsumerWidget {
     final auth = ref.watch(authProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: const Color(0xFFFFF5F5),
       body: CustomScrollView(
         slivers: [
           // ── Hero ──────────────────────────────────────────────────────
           SliverAppBar(
             expandedHeight: 220,
             pinned: true,
-            backgroundColor: const Color(0xFF1A3A5C),
+            backgroundColor: const Color(0xFFC8102E),
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
               onPressed: () => context.go('/dashboard'),
@@ -196,7 +199,7 @@ class _ProfileHero extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1A3A5C), Color(0xFF0D9488)],
+          colors: [Color(0xFFC8102E), Color(0xFF9B0B22)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -224,22 +227,30 @@ class _ProfileHero extends StatelessWidget {
               Text(profile.name,
                   style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 4),
+              Text(profile.designation,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 6),
               Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Icon(Icons.email_outlined, color: Colors.white60, size: 13),
+                const SizedBox(width: 4),
+                Text(profile.email,
+                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                const SizedBox(width: 12),
                 const Icon(Icons.location_on_rounded, color: Colors.white60, size: 13),
                 const SizedBox(width: 4),
                 Text(profile.city,
-                    style: const TextStyle(color: Colors.white70, fontSize: 13)),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(profile.jobStatus,
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
-                ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 12)),
               ]),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(profile.jobStatus,
+                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+              ),
             ],
           ),
         ),
