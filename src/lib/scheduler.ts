@@ -52,17 +52,25 @@ export async function planNextDayVisits(forToday = false) {
   const activeBookers = await prisma.booker.findMany({
     where: { adminApproved: "APPROVED", deletedAt: null },
     select: { id: true, cityId: true },
+    orderBy: { id: "asc" }, // Ensure consistent ordering for debugging
   });
+
+  console.log(`[scheduler] Found ${activeBookers.length} approved bookers`);
 
   let planned = 0;
   // Track customers assigned today to avoid duplicates across bookers
   const assignedTodayIds: Set<number> = new Set();
 
   for (const booker of activeBookers) {
+    if (booker.id === 88) console.log(`[scheduler] Processing booker 88...`);
+    
     const existing = await prisma.visit.count({
       where: { bookerId: booker.id, visitDate: target },
     });
-    if (existing >= 7) continue;
+    if (existing >= 7) {
+      if (booker.id === 88) console.log(`[scheduler] Booker 88 already has ${existing} visits`);
+      continue;
+    }
 
     const recentlyVisited = await prisma.visit.findMany({
       where: {
@@ -98,6 +106,10 @@ export async function planNextDayVisits(forToday = false) {
       take: 7 - existing,
     });
 
+    if (booker.id === 88) {
+      console.log(`[scheduler] Booker 88: found ${customers.length} GPS customers, need ${7 - existing}`);
+    }
+
     // Fallback: city customers WITHOUT GPS (still same city, just no map pin)
     if (customers.length < 7 - existing) {
       const needed = 7 - existing - customers.length;
@@ -113,13 +125,17 @@ export async function planNextDayVisits(forToday = false) {
         take: needed,
       });
       customers = [...customers, ...extra];
+      if (booker.id === 88) console.log(`[scheduler] Booker 88: found ${extra.length} non-GPS customers`);
     }
 
     // No customers in city — skip (don't assign random far-away customers)
     if (customers.length === 0) {
       console.log(`[scheduler] No customers in city ${booker.cityId} for booker ${booker.id} — skipping`);
+      if (booker.id === 88) console.log(`[scheduler] Booker 88: NO CUSTOMERS FOUND - skipping`);
       continue;
     }
+
+    if (booker.id === 88) console.log(`[scheduler] Booker 88: assigning ${customers.length} total customers`);
 
     for (const c of customers) {
       await prisma.visit.create({
