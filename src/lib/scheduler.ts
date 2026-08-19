@@ -113,7 +113,7 @@ export async function planNextDayVisits(forToday = false) {
     // Fallback: city customers WITHOUT GPS (still same city, just no map pin)
     if (customers.length < 7 - existing) {
       const needed = 7 - existing - customers.length;
-      const excludeIds = [...customers.map(c => c.id), ...recentIds];
+      const excludeIds = [...customers.map(c => c.id), ...recentIds, ...Array.from(assignedTodayIds)];
       const extra = await prisma.customer.findMany({
         where: {
           approvalStatus: "APPROVED",
