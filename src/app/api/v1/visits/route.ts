@@ -26,7 +26,7 @@ export async function GET(req: Request) {
         orderBy: { visitDate: "desc" },
         include: {
           booker: { select: { id: true, name: true, email: true } },
-          customer: { select: { id: true, name: true, customerType: true, address: true, cityId: true } },
+          customer: { select: { id: true, name: true, customerType: true, address: true, cityId: true, latitude: true, longitude: true } },
         },
       }),
       prisma.visit.count({ where }),

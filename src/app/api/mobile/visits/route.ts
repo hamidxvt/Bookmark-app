@@ -47,10 +47,10 @@ export async function GET(req: Request) {
       include: {
         customer: {
           select: {
-            id: true, name: true, customerType: true, ownerName: true,
-            ownerPhone: true, address: true,
-            latitude: true, longitude: true,
-            workingPriority: true,
+            id: true, name: true, customerType: true, category: true,
+            ownerName: true, ownerPhone: true, email: true,
+            address: true, latitude: true, longitude: true,
+            workingPriority: true, approvalStatus: true,
           },
         },
       },
@@ -65,11 +65,25 @@ export async function GET(req: Request) {
         customerId: v.customerId,
         customerName: v.customer.name,
         customerType: v.customer.customerType,
+        // Flat fields for backward compat
         contact: v.customer.ownerName ?? "",
         phone: v.customer.ownerPhone ?? "",
         address: v.customer.address ?? "",
         latitude: v.customer.latitude ? Number(v.customer.latitude) : null,
         longitude: v.customer.longitude ? Number(v.customer.longitude) : null,
+        // Full customer object for richer UI
+        customer: {
+          id: v.customer.id,
+          name: v.customer.name,
+          type: v.customer.customerType,
+          category: (v.customer as any).category ?? null,
+          ownerName: v.customer.ownerName ?? "",
+          ownerPhone: v.customer.ownerPhone ?? "",
+          email: (v.customer as any).email ?? "",
+          address: v.customer.address ?? "",
+          latitude: v.customer.latitude ? Number(v.customer.latitude) : null,
+          longitude: v.customer.longitude ? Number(v.customer.longitude) : null,
+        },
         priority: v.priority ?? "normal",
         status: v.status.toLowerCase(),
         checkInAt: v.checkInAt,

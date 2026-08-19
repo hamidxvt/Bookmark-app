@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { MapPin, RefreshCw, Users, Clock, Navigation, AlertTriangle, Building2, ChevronDown, ExternalLink } from "lucide-react";
+import { MapPin, RefreshCw, Users, Clock, Navigation, Building2, ChevronDown, ExternalLink, CheckCircle2, Circle, Calendar } from "lucide-react";
 
 interface City {
   id: number; name: string;
@@ -15,6 +15,16 @@ interface Officer {
   lastLatitude: number | null; lastLongitude: number | null;
   lastSeenAt: string | null;
   city: { id: number; name: string } | null;
+}
+
+interface OfficerVisit {
+  id: number;
+  sequence: number;
+  customerName: string;
+  address: string;
+  status: string;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 function stripHtml(s: string): string {
@@ -79,12 +89,12 @@ function LiveMap({ officers, selected, onSelect }: {
   // For multiple officers — show bounding box of all
   const isSingle = pts.length === 1;
 
-  // Build proper OSM URL — using mlat/mlon puts the default OSM marker at exact location
-  // For single officer: center on them with marker
-  // For multiple: fit bbox, no marker (we show cards below)
+  // Use embeddable OSM URL for both single and multiple officers
+  // The non-embed URL (openstreetmap.org/?) blocks iframes via X-Frame-Options
+  const pad = 0.015;
   const osmUrl = isSingle
-    ? `https://www.openstreetmap.org/?mlat=${Number(pts[0].lastLatitude)}&mlon=${Number(pts[0].lastLongitude)}#map=16/${Number(pts[0].lastLatitude)}/${Number(pts[0].lastLongitude)}&layers=N`
-    : `https://www.openstreetmap.org/export/embed.html?bbox=${Math.min(...pts.map(o => Number(o.lastLongitude))) - 0.02},${Math.min(...pts.map(o => Number(o.lastLatitude))) - 0.01},${Math.max(...pts.map(o => Number(o.lastLongitude))) + 0.02},${Math.max(...pts.map(o => Number(o.lastLatitude))) + 0.01}&layer=mapnik`;
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${Number(pts[0].lastLongitude)-pad},${Number(pts[0].lastLatitude)-pad},${Number(pts[0].lastLongitude)+pad},${Number(pts[0].lastLatitude)+pad}&layer=mapnik&marker=${Number(pts[0].lastLatitude)},${Number(pts[0].lastLongitude)}`
+    : `https://www.openstreetmap.org/export/embed.html?bbox=${Math.min(...pts.map(o => Number(o.lastLongitude)))-0.03},${Math.min(...pts.map(o => Number(o.lastLatitude)))-0.02},${Math.max(...pts.map(o => Number(o.lastLongitude)))+0.03},${Math.max(...pts.map(o => Number(o.lastLatitude)))+0.02}&layer=mapnik`;
 
   return (
     <div ref={containerRef} className="relative w-full h-[440px] overflow-hidden rounded-b-2xl">
@@ -133,6 +143,8 @@ export default function LiveMapClient() {
   const [lastUpdate,   setLastUpdate]   = useState<Date | null>(null);
   const [selected,     setSelected]     = useState<Officer | null>(null);
   const [dropOpen,     setDropOpen]     = useState(false);
+  const [officerVisits, setOfficerVisits] = useState<OfficerVisit[]>([]);
+  const [visitsLoading, setVisitsLoading] = useState(false);
 
   // Load cities
   useEffect(() => {
@@ -158,6 +170,31 @@ export default function LiveMapClient() {
     const t = setInterval(load, 10_000);
     return () => clearInterval(t);
   }, [load]);
+
+  // Load today's visits for selected officer
+  useEffect(() => {
+    if (!selected) { setOfficerVisits([]); return; }
+    setVisitsLoading(true);
+    const today = new Date(); today.setHours(0,0,0,0);
+    fetch(`/api/v1/visits?bookerId=${selected.id}&length=20&today=1`)
+      .then(r => r.json())
+      .then(d => {
+        const raw = d.data?.data ?? d.data ?? [];
+        setOfficerVisits(
+          (Array.isArray(raw) ? raw : []).map((v: any) => ({
+            id: v.id,
+            sequence: v.sequence ?? 0,
+            customerName: v.customer?.name ?? v.customerName ?? "Unknown",
+            address: v.customer?.address ?? v.address ?? "",
+            status: v.status ?? "PENDING",
+            latitude: v.customer?.latitude ? Number(v.customer.latitude) : null,
+            longitude: v.customer?.longitude ? Number(v.customer.longitude) : null,
+          }))
+        );
+      })
+      .catch(() => setOfficerVisits([]))
+      .finally(() => setVisitsLoading(false));
+  }, [selected]);
 
   const withLoc = officers.filter(o => {
     const lt = Number(o.lastLatitude), lg = Number(o.lastLongitude);
@@ -257,30 +294,85 @@ export default function LiveMapClient() {
             {/* Selected officer detail card */}
             {selected && (() => {
               const lat = Number(selected.lastLatitude), lng = Number(selected.lastLongitude);
+              const done = officerVisits.filter(v => v.status?.toUpperCase() === "COMPLETED").length;
+              const total = officerVisits.length;
               return (
-                <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-bold text-slate-900">{stripHtml(selected.name)}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">{selected.city?.name ?? "Unknown City"}</p>
+                <div className="absolute bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:w-80 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden max-h-[calc(100%-32px)] flex flex-col">
+                  {/* Officer header */}
+                  <div className="p-4 border-b border-slate-100">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-9 w-9 rounded-full bg-teal-500 flex items-center justify-center text-white text-sm font-bold">
+                          {stripHtml(selected.name).split(" ").map(w => w[0]).join("").toUpperCase().slice(0,2)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{stripHtml(selected.name)}</p>
+                          <p className="text-xs text-slate-500">{selected.city?.name ?? "Unknown City"}</p>
+                        </div>
+                      </div>
+                      <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600 text-xl leading-none mt-0.5">×</button>
                     </div>
-                    <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-600 text-lg leading-none">×</button>
-                  </div>
-                  <div className="mt-3 space-y-1.5">
-                    <div className="flex items-center gap-2">
-                      <GpsDot s={selected.gpsStatus} />
-                      <span className="text-xs text-slate-600">{statusLabel(selected.gpsStatus).text}</span>
+                    <div className="mt-2 flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <GpsDot s={selected.gpsStatus} />
+                        <span className="text-xs text-slate-600">{statusLabel(selected.gpsStatus).text}</span>
+                      </div>
+                      <span className="text-xs text-slate-400">{lat.toFixed(4)}, {lng.toFixed(4)}</span>
                     </div>
-                    <p className="text-xs text-slate-500">{lat.toFixed(5)}, {lng.toFixed(5)}</p>
-                    <p className="text-xs text-slate-400">
-                      Last seen: {selected.lastSeenAt ? new Date(selected.lastSeenAt).toLocaleTimeString() : "Never"}
-                    </p>
+                    <a href={`https://maps.google.com/?q=${lat},${lng}`}
+                      target="_blank" rel="noreferrer"
+                      className="mt-2 flex items-center gap-1 text-xs font-medium text-teal-600 hover:underline">
+                      <ExternalLink className="h-3 w-3" /> Open in Google Maps
+                    </a>
                   </div>
-                  <a href={`https://maps.google.com/?q=${lat},${lng}`}
-                    target="_blank" rel="noreferrer"
-                    className="mt-3 flex items-center gap-1.5 text-xs font-medium text-teal-600 hover:text-teal-700">
-                    <ExternalLink className="h-3 w-3" /> Open exact location in Google Maps
-                  </a>
+                  {/* Today's visits */}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="h-3.5 w-3.5 text-teal-500" />
+                        <span className="text-xs font-semibold text-slate-700">Today's Schedule</span>
+                      </div>
+                      {total > 0 && (
+                        <span className="text-xs text-slate-500">{done}/{total} done</span>
+                      )}
+                    </div>
+                    {visitsLoading ? (
+                      <div className="px-4 py-3 text-xs text-slate-400">Loading visits…</div>
+                    ) : officerVisits.length === 0 ? (
+                      <div className="px-4 py-3 text-xs text-slate-400">No visits planned today</div>
+                    ) : (
+                      <div className="divide-y divide-slate-50 max-h-52 overflow-y-auto">
+                        {officerVisits.slice(0, 15).map(v => {
+                          const isDone = v.status?.toUpperCase() === "COMPLETED";
+                          const isMissed = v.status?.toUpperCase() === "CANCELLED" || v.status?.toUpperCase() === "MISSED";
+                          return (
+                            <div key={v.id} className="flex items-start gap-2.5 px-4 py-2">
+                              {isDone
+                                ? <CheckCircle2 className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                                : isMissed
+                                  ? <Circle className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />
+                                  : <Circle className="h-4 w-4 text-slate-300 mt-0.5 shrink-0" />}
+                              <div className="min-w-0 flex-1">
+                                <p className={`text-xs font-medium truncate ${isDone ? "text-slate-400 line-through" : "text-slate-700"}`}>
+                                  {v.customerName}
+                                </p>
+                                {v.address && (
+                                  <p className="text-[10px] text-slate-400 truncate">{v.address}</p>
+                                )}
+                                {v.latitude && v.longitude && (
+                                  <a href={`https://maps.google.com/?q=${v.latitude},${v.longitude}`}
+                                    target="_blank" rel="noreferrer"
+                                    className="text-[10px] text-teal-500 hover:underline">
+                                    Navigate ↗
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })()}
