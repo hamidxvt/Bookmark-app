@@ -66,8 +66,11 @@ final routeProvider = FutureProvider.autoDispose<List<RouteStop>>((ref) async {
     ].join('&')}',
   );
 
-  final stops = (res.data['stops'] as List? ?? [])
+  // API returns { success, data: { totalStops, stops: [...] } }
+  final responseData = res.data['data'] as Map<String, dynamic>? ?? res.data as Map<String, dynamic>? ?? {};
+  final stops = (responseData['stops'] as List? ?? [])
       .map((e) => RouteStop.fromJson(e as Map<String, dynamic>))
+      .where((s) => s.lat != 0 && s.lng != 0)
       .toList();
   return stops;
 });

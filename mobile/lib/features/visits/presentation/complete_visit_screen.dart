@@ -2,10 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/mock_location_guard.dart';
 import '../data/visit_repository.dart';
+
+// Provider to load single visit details
+final visitDetailProvider = FutureProvider.family<Map<String, dynamic>?, int>(
+  (ref, visitId) async {
+    final repo = ref.read(visitRepositoryProvider);
+    return repo.getVisitDetail(visitId);
+  },
+);
 
 class CompleteVisitScreen extends ConsumerStatefulWidget {
   final int visitId;
@@ -22,6 +31,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
   final _notesCtrl = TextEditingController();
   String _visitType = 'regular';
   bool _isSubmitting = false;
+  bool _prefilled = false;
 
   @override
   void dispose() {
@@ -31,9 +41,22 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
     super.dispose();
   }
 
+  void _prefillFromVisit(Map<String, dynamic>? detail) {
+    if (_prefilled || detail == null) return;
+    _prefilled = true;
+    final customer = detail['customer'] as Map<String, dynamic>? ?? {};
+    _contactCtrl.text = detail['contact'] as String? ??
+        customer['ownerName'] as String? ?? '';
+    _phoneCtrl.text = detail['phone'] as String? ??
+        customer['ownerPhone'] as String? ?? '';
+    _notesCtrl.text = detail['notes'] as String? ?? '';
+    if (detail['visitType'] != null) {
+      setState(() => _visitType = detail['visitType'] as String);
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    // Block if mock GPS is active
     final gpsClean = await MockLocationGuard.check(context, ref);
     if (!gpsClean) return;
     setState(() => _isSubmitting = true);
@@ -48,9 +71,14 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Visit completed successfully!'),
+            content: const Row(children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              SizedBox(width: 8),
+              Text('Visit completed!'),
+            ]),
             backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
         context.go('/visits');
@@ -61,6 +89,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
           SnackBar(
             content: Text('Failed: $e'),
             backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -71,6 +100,8 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final detailAsync = ref.watch(visitDetailProvider(widget.visitId));
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -80,139 +111,218 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
           onPressed: () => context.go('/visits'),
         ),
       ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          children: [
-            // Header card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.secondary.withOpacity(0.1),
-                    AppColors.secondary.withOpacity(0.05),
+      body: detailAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => _buildForm(null),
+        data: (detail) {
+          _prefillFromVisit(detail);
+          return _buildForm(detail);
+        },
+      ),
+    );
+  }
+
+  Widget _buildForm(Map<String, dynamic>? detail) {
+    final customer = detail?['customer'] as Map<String, dynamic>? ?? {};
+    final customerName = detail?['customerName'] as String? ?? customer['name'] as String? ?? 'Customer';
+    final address = detail?['address'] as String? ?? customer['address'] as String? ?? '';
+    final lat = detail?['latitude'];
+    final lng = detail?['longitude'];
+    final hasGps = lat != null && lng != null && lat != 0 && lng != 0;
+
+    return Form(
+      key: _formKey,
+      child: ListView(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        children: [
+
+          // ── Customer Info Card ──────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+              ),
+              borderRadius: BorderRadius.circular(AppRadius.lg),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.store_rounded, color: Colors.white, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            customerName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          if (address.isNotEmpty)
+                            Text(
+                              address,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.8),
+                                fontSize: 12,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                border: Border.all(color: AppColors.secondary.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle_outline_rounded,
-                      color: AppColors.secondary, size: 28),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                if (customer['ownerPhone'] != null && (customer['ownerPhone'] as String).isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(Icons.phone_rounded, color: Colors.white.withOpacity(0.7), size: 14),
+                      const SizedBox(width: 6),
+                      Text(
+                        customer['ownerPhone'] as String,
+                        style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: () => launchUrl(Uri.parse('tel:${customer['ownerPhone']}')),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text('Call', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                if (hasGps) ...[
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => launchUrl(Uri.parse('https://maps.google.com/?q=$lat,$lng')),
+                    child: Row(
                       children: [
-                        Text('Visit #${widget.visitId}',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  color: AppColors.secondary,
-                                )),
+                        Icon(Icons.directions_rounded, color: Colors.white.withOpacity(0.7), size: 14),
+                        const SizedBox(width: 6),
                         Text(
-                          'Fill in the details to mark this visit complete',
-                          style: Theme.of(context).textTheme.bodySmall,
+                          'Navigate to customer',
+                          style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12, decoration: TextDecoration.underline, decorationColor: Colors.white.withOpacity(0.7)),
                         ),
                       ],
                     ),
                   ),
                 ],
+              ],
+            ),
+          ).animate().fadeIn(duration: 300.ms),
+
+          const SizedBox(height: 20),
+
+          // ── Visit Type ────────────────────────────────────────
+          Text('Visit Type', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.primary)),
+          const SizedBox(height: 10),
+          _VisitTypeSelector(
+            selected: _visitType,
+            onChanged: (v) => setState(() => _visitType = v),
+          ).animate(delay: 80.ms).fadeIn(),
+
+          const SizedBox(height: 20),
+
+          // ── Contact Details ───────────────────────────────────
+          Text('Contact Details', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.primary)),
+          const SizedBox(height: 12),
+
+          TextFormField(
+            controller: _contactCtrl,
+            textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(
+              labelText: 'Contact Person *',
+              prefixIcon: Icon(Icons.person_outline_rounded),
+            ),
+            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+          ).animate(delay: 100.ms).slideY(begin: 0.2).fadeIn(),
+
+          const SizedBox(height: 14),
+
+          TextFormField(
+            controller: _phoneCtrl,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+              labelText: 'Phone Number *',
+              prefixIcon: Icon(Icons.phone_outlined),
+            ),
+            validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+          ).animate(delay: 140.ms).slideY(begin: 0.2).fadeIn(),
+
+          const SizedBox(height: 20),
+
+          // ── Notes ─────────────────────────────────────────────
+          Text('Visit Notes', style: Theme.of(context).textTheme.labelLarge?.copyWith(color: AppColors.primary)),
+          const SizedBox(height: 12),
+
+          TextFormField(
+            controller: _notesCtrl,
+            maxLines: 4,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: const InputDecoration(
+              labelText: 'Discussion Notes *',
+              hintText: 'What was discussed? Any orders, feedback, or follow-up needed?',
+              prefixIcon: Padding(
+                padding: EdgeInsets.only(bottom: 60),
+                child: Icon(Icons.notes_rounded),
               ),
-            ).animate().fadeIn(duration: 400.ms),
+              alignLabelWithHint: true,
+            ),
+            validator: (v) => v == null || v.trim().length < 5 ? 'Add at least 5 characters' : null,
+          ).animate(delay: 200.ms).slideY(begin: 0.2).fadeIn(),
 
-            const SizedBox(height: 20),
-            Text('Contact Details',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge
-                    ?.copyWith(color: AppColors.primary)),
-            const SizedBox(height: 12),
+          const SizedBox(height: 28),
 
-            TextFormField(
-              controller: _contactCtrl,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(
-                labelText: 'Contact Person *',
-                prefixIcon: Icon(Icons.person_outline_rounded),
-              ),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Contact person is required' : null,
-            ).animate(delay: 100.ms).slideY(begin: 0.2).fadeIn(),
+          // ── Actions ───────────────────────────────────────────
+          FilledButton.icon(
+            icon: _isSubmitting
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : const Icon(Icons.check_circle_rounded),
+            label: Text(_isSubmitting ? 'Submitting...' : 'Mark as Completed'),
+            onPressed: _isSubmitting ? null : _submit,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.success,
+              minimumSize: const Size.fromHeight(52),
+            ),
+          ).animate(delay: 260.ms).slideY(begin: 0.2).fadeIn(),
 
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _phoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone Number *',
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-              validator: (v) =>
-                  v == null || v.trim().isEmpty ? 'Phone number is required' : null,
-            ).animate(delay: 150.ms).slideY(begin: 0.2).fadeIn(),
+          const SizedBox(height: 12),
 
-            const SizedBox(height: 20),
-            Text('Visit Details',
-                style: Theme.of(context)
-                    .textTheme
-                    .labelLarge
-                    ?.copyWith(color: AppColors.primary)),
-            const SizedBox(height: 12),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.cancel_outlined),
+            label: const Text('Mark as Missed'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.error,
+              side: const BorderSide(color: AppColors.error),
+              minimumSize: const Size.fromHeight(48),
+            ),
+            onPressed: () => context.go('/visits/${widget.visitId}/missed'),
+          ).animate(delay: 300.ms).slideY(begin: 0.2).fadeIn(),
 
-            // Visit type
-            _VisitTypeSelector(
-              selected: _visitType,
-              onChanged: (v) => setState(() => _visitType = v),
-            ).animate(delay: 200.ms).fadeIn(),
-
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _notesCtrl,
-              maxLines: 4,
-              textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Discussion Notes *',
-                hintText: 'What was discussed? Any feedback or follow-up needed?',
-                prefixIcon: Padding(
-                  padding: EdgeInsets.only(bottom: 60),
-                  child: Icon(Icons.notes_rounded),
-                ),
-                alignLabelWithHint: true,
-              ),
-              validator: (v) =>
-                  v == null || v.trim().length < 10 ? 'Please add at least 10 characters' : null,
-            ).animate(delay: 250.ms).slideY(begin: 0.2).fadeIn(),
-
-            const SizedBox(height: 28),
-            FilledButton.icon(
-              icon: _isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child:
-                          CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.check_rounded),
-              label: Text(_isSubmitting ? 'Submitting...' : 'Mark as Completed'),
-              onPressed: _isSubmitting ? null : _submit,
-            ).animate(delay: 300.ms).slideY(begin: 0.2).fadeIn(),
-
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.cancel_outlined),
-              label: const Text('Mark as Missed'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.error,
-                side: const BorderSide(color: AppColors.error),
-              ),
-              onPressed: () => context.go('/visits/${widget.visitId}/missed'),
-            ).animate(delay: 350.ms).slideY(begin: 0.2).fadeIn(),
-
-            const SizedBox(height: AppSpacing.lg),
-          ],
-        ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
       ),
     );
   }
@@ -230,7 +340,7 @@ class _VisitTypeSelector extends StatelessWidget {
       ('regular', 'Regular', Icons.route_rounded),
       ('follow_up', 'Follow-up', Icons.replay_rounded),
       ('priority', 'Priority', Icons.star_rounded),
-      ('adhoc', 'Ad-hoc', Icons.add_location_alt_rounded),
+      ('demo', 'Demo', Icons.present_to_all_rounded),
     ];
 
     return Wrap(
@@ -239,9 +349,7 @@ class _VisitTypeSelector extends StatelessWidget {
       children: types.map((t) {
         final isSelected = selected == t.$1;
         return ChoiceChip(
-          avatar: Icon(t.$3,
-              size: 16,
-              color: isSelected ? AppColors.onPrimary : AppColors.onBackground),
+          avatar: Icon(t.$3, size: 16, color: isSelected ? AppColors.onPrimary : AppColors.onBackground),
           label: Text(t.$2),
           selected: isSelected,
           selectedColor: AppColors.primary,

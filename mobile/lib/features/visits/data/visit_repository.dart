@@ -111,6 +111,20 @@ class VisitRepository {
     }
   }
 
+  Future<Map<String, dynamic>?> getVisitDetail(int id) async {
+    try {
+      final res = await _dio.get('/visits/$id');
+      final data = res.data['data'];
+      if (data is Map<String, dynamic>) return data;
+      // Fallback: search today's visits
+      final listRes = await _dio.get(ApiConstants.todayVisits);
+      final list = listRes.data['data'] as List? ?? [];
+      return list.firstWhere((e) => e['id'] == id, orElse: () => null);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> markMissed(int id, String reason) async {
     final data = {'reason': reason};
     try {
