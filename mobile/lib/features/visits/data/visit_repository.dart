@@ -125,8 +125,11 @@ class VisitRepository {
     }
   }
 
-  Future<void> markMissed(int id, String reason) async {
-    final data = {'reason': reason};
+  Future<void> markMissed(int id, String reason, {List<String>? photoBase64}) async {
+    final data = {
+      'reason': reason,
+      if (photoBase64 != null && photoBase64.isNotEmpty) 'photoUrls': photoBase64,
+    };
     try {
       await _dio.post(ApiConstants.visitMiss(id), data: data);
     } on DioException catch (e) {

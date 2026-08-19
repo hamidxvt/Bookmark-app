@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -56,7 +57,18 @@ class _MissedVisitScreenState extends ConsumerState<MissedVisitScreen> {
     }
     setState(() => _isSubmitting = true);
     try {
-      await ref.read(visitRepositoryProvider).markMissed(widget.visitId, reason);
+      // Encode photos to base64 strings for database storage
+      final List<String> photoBase64 = [];
+      for (final xFile in _photos) {
+        final bytes = await File(xFile.path).readAsBytes();
+        photoBase64.add('data:image/jpeg;base64,${base64Encode(bytes)}');
+      }
+
+      await ref.read(visitRepositoryProvider).markMissed(
+            widget.visitId,
+            reason,
+            photoBase64: photoBase64.isEmpty ? null : photoBase64,
+          );
       await ref.read(visitListProvider.notifier).refresh();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
