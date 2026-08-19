@@ -140,8 +140,12 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
 
-          // ── Customer Info Card ──────────────────────────────────
-          Container(
+          // ── Customer Info Card (tappable to open full detail) ──
+          GestureDetector(
+            onTap: customer['id'] != null
+                ? () => context.push('/customers/${customer['id']}')
+                : null,
+            child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -233,8 +237,20 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
                     ),
                   ),
                 ],
+                // "View full profile" hint
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.touch_app_rounded, size: 12, color: Colors.white.withOpacity(0.5)),
+                    const SizedBox(width: 4),
+                    Text('Tap to view / edit customer info',
+                        style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 11)),
+                  ],
+                ),
               ],
             ),
+          ),
           ).animate().fadeIn(duration: 300.ms),
 
           const SizedBox(height: 20),

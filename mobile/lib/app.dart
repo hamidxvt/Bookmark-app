@@ -6,6 +6,7 @@ import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_notifier.dart';
 import 'features/auth/presentation/login_screen.dart';
+import 'features/customers/presentation/customer_detail_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/visits/presentation/visit_list_screen.dart';
 import 'features/visits/presentation/complete_visit_screen.dart';
@@ -49,6 +50,11 @@ final _routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/payroll',  builder: (_, __) => const PayrollScreen()),
       GoRoute(path: '/map',      builder: (_, __) => const RouteMapScreen()),
       GoRoute(path: '/profile',  builder: (_, __) => const ProfileScreen()),
+      GoRoute(
+        path: '/customers/:id',
+        builder: (_, state) => CustomerDetailScreen(
+            customerId: int.parse(state.pathParameters['id']!)),
+      ),
     ],
   );
 });
@@ -72,7 +78,7 @@ class BookmarkSFAApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         home: const Scaffold(
-          backgroundColor: Color(0xFF1A3A5C),
+          backgroundColor: Color(0xFFC8102E),
           body: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
