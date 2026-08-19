@@ -11,11 +11,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params;
     const visitId = parseInt(id);
     const body = await req.json();
-    const { contactPerson, phone, visitType, notes, lat, lng } = body;
+    const { contactPerson, phone, visitType, notes, lat, lng, followUpDate, contactPhone } = body;
 
     const visit = await prisma.visit.findUnique({
       where: { id: visitId },
-      select: { id: true, bookerId: true, status: true, isAdhoc: true },
+      select: { id: true, bookerId: true, status: true, isAdhoc: true, customerId: true },
     });
 
     if (!visit) {
@@ -40,7 +40,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         notes: notes ?? "",
         visitReport: [
           contactPerson ? `Contact: ${contactPerson}` : "",
-          phone ? `Phone: ${phone}` : "",
+          (phone || contactPhone) ? `Phone: ${phone ?? contactPhone}` : "",
           visitType ? `Type: ${visitType}` : "",
           notes ?? "",
         ].filter(Boolean).join("\n"),
@@ -50,18 +50,45 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // Award reward points for completing an ad-hoc (new discovery) visit
     let rewardPointsEarned = 0;
     if (visit.isAdhoc) {
-      rewardPointsEarned = 5; // 5 points per ad-hoc discovery
+      rewardPointsEarned = 5;
       await prisma.booker.update({
         where: { id: user.id },
         data: { rewardPoints: { increment: rewardPointsEarned } },
       }).catch(() => {});
     }
 
+    // Create a follow-up visit if a follow-up date was specified
+    let followUpCreated = false;
+    if (followUpDate && visit.customerId) {
+      try {
+        const fuDate = new Date(followUpDate);
+        fuDate.setHours(9, 0, 0, 0); // schedule for 9am on that day
+        await prisma.visit.create({
+          data: {
+            bookerId: user.id,
+            customerId: visit.customerId,
+            scheduledDate: fuDate,
+            status: "PENDING",
+            dailySequence: 99,
+            visitType: "follow_up",
+            notes: `Follow-up from visit #${visitId} on ${new Date().toLocaleDateString()}`,
+            isAdhoc: false,
+          },
+        });
+        followUpCreated = true;
+      } catch (e) {
+        console.error("[follow-up visit creation]", e);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: updated,
-      message: "Visit completed",
+      message: followUpCreated
+        ? "Visit completed! Follow-up scheduled."
+        : "Visit completed",
       rewardPointsEarned,
+      followUpCreated,
     });
   } catch (err) {
     console.error("[mobile/visits/complete]", err);

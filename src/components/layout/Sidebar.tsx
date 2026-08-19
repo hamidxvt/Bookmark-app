@@ -118,14 +118,14 @@ function NavItem({
         className={cn(
           "group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 cursor-pointer",
           isActive
-            ? "bg-teal-500/15 text-teal-400 shadow-sm"
-            : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+            ? "bg-white/20 text-white shadow-sm"
+            : "text-red-200 hover:bg-white/10 hover:text-white"
         )}
       >
-        <Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", isActive ? "text-teal-400" : "text-slate-500 group-hover:text-slate-300")} />
+        <Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", isActive ? "text-white" : "text-red-300 group-hover:text-white")} />
         {!collapsed && <span className="flex-1 truncate">{label}</span>}
         {!collapsed && isActive && (
-          <span className="h-1.5 w-1.5 rounded-full bg-teal-400 shadow-teal-400/50 shadow-sm" />
+          <span className="h-1.5 w-1.5 rounded-full bg-white shadow-white/50 shadow-sm" />
         )}
         {/* Tooltip when collapsed */}
         {collapsed && (
@@ -146,10 +146,10 @@ function NavItem({
         title={collapsed ? label : undefined}
         className={cn(
           "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150 cursor-pointer",
-          isActive ? "text-slate-200 bg-white/5" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+          isActive ? "text-white bg-white/10" : "text-red-200 hover:bg-white/10 hover:text-white"
         )}
       >
-        <Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", isActive ? "text-teal-400" : "text-slate-500 group-hover:text-slate-300")} />
+        <Icon className={cn("h-[18px] w-[18px] shrink-0 transition-colors", isActive ? "text-white" : "text-red-300 group-hover:text-white")} />
         {!collapsed && (
           <>
             <span className="flex-1 text-left truncate">{label}</span>
@@ -202,14 +202,14 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
         "flex h-16 shrink-0 items-center border-b border-white/5 transition-all duration-300",
         collapsed ? "justify-center px-3" : "gap-3 px-5"
       )}>
-        <div className="h-9 w-9 shrink-0 rounded-lg overflow-hidden shadow-lg shadow-teal-500/25 flex items-center justify-center">
+        <div className="h-9 w-9 shrink-0 rounded-lg overflow-hidden shadow-lg shadow-red-900/40 flex items-center justify-center bg-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/bookmark-logo.png" alt="Bookmark" className="h-full w-full object-cover" />
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold text-white leading-none truncate">Bookmark</p>
-            <p className="text-[10px] text-[#0D9488] font-semibold mt-0.5">Field Force Manager</p>
+            <p className="text-[10px] text-red-300 font-semibold mt-0.5">Field Force Manager</p>
           </div>
         )}
       </div>
@@ -219,7 +219,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
         {NAV.map((s) => (
           <div key={s.section}>
             {!collapsed && (
-              <p className="mb-1.5 px-3 text-[9px] font-bold uppercase tracking-widest text-slate-600">
+              <p className="mb-1.5 px-3 text-[9px] font-bold uppercase tracking-widest text-red-200/60">
                 {s.section}
               </p>
             )}
@@ -237,7 +237,7 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
       <div className="shrink-0 border-t border-white/5 p-2.5 space-y-1">
         {!collapsed && (
           <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 mb-1">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#1A3A5C] to-[#2D5F8A] text-xs font-bold text-white">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20 text-xs font-bold text-white">
               {session?.user?.name?.[0]?.toUpperCase() ?? "A"}
             </div>
             <div className="min-w-0">
@@ -286,13 +286,13 @@ export default function Sidebar() {
 
       {/* Mobile drawer */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#0F1E3C] border-r border-white/5 shadow-2xl shadow-black/50 transition-transform duration-300 ease-in-out lg:hidden",
+        "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-[#9B0B22] border-r border-white/10 shadow-2xl shadow-black/50 transition-transform duration-300 ease-in-out lg:hidden",
         open ? "translate-x-0" : "-translate-x-full"
       )}>
         {/* Mobile close button */}
         <button
           onClick={closeDrawer}
-          className="absolute top-4 right-4 flex h-7 w-7 items-center justify-center rounded-lg text-slate-500 hover:bg-white/10 hover:text-slate-300 transition-colors z-10"
+          className="absolute top-4 right-4 flex h-7 w-7 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors z-10"
         >
           <X className="h-4 w-4" />
         </button>
@@ -301,13 +301,13 @@ export default function Sidebar() {
 
       {/* Desktop sidebar */}
       <aside className={cn(
-        "hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 bg-[#0F1E3C] border-r border-white/5 transition-all duration-300 ease-in-out",
+        "hidden lg:flex flex-col fixed inset-y-0 left-0 z-40 bg-[#9B0B22] border-r border-white/10 transition-all duration-300 ease-in-out",
         sidebarWidth
       )}>
         {/* Collapse toggle */}
         <button
           onClick={toggleCollapsed}
-          className="absolute -right-3 top-20 z-50 flex h-6 w-6 items-center justify-center rounded-full border border-slate-700 bg-[#0F1E3C] text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-all shadow-md cursor-pointer"
+          className="absolute -right-3 top-20 z-50 flex h-6 w-6 items-center justify-center rounded-full border border-red-300/30 bg-[#9B0B22] text-white/60 hover:text-white hover:border-red-200/50 transition-all shadow-md cursor-pointer"
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed

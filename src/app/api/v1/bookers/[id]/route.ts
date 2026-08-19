@@ -14,7 +14,7 @@ export async function GET(
     const booker = await prisma.booker.findUnique({
       where: { id: parseInt(id) },
       select: {
-        id: true, name: true, email: true, phone: true, gender: true,
+        id: true, name: true, email: true, phone: true, gender: true, designation: true,
         jobStatus: true, adminApproved: true, cityId: true,
         visitTargets: true, ratesPerVisit: true,
         basicSalary: true, securityDepositPct: true,
@@ -44,7 +44,7 @@ export async function PATCH(
   try {
     const body = await req.json();
     const {
-      name, email, phone, cityId,
+      name, email, phone, cityId, designation,
       jobStatus, adminApproved,
       visitTargets, ratesPerVisit,
       basicSalary, securityDepositPct, sampleBudget,
@@ -55,6 +55,7 @@ export async function PATCH(
     if (name !== undefined)              data.name = name;
     if (email !== undefined)             data.email = email;
     if (phone !== undefined)             data.phone = phone;
+    if (designation !== undefined)       data.designation = designation;
     if (cityId !== undefined)            data.cityId = cityId ? Number(cityId) : null;
     if (jobStatus !== undefined)         data.jobStatus = jobStatus;
     if (adminApproved !== undefined)     data.adminApproved = adminApproved;

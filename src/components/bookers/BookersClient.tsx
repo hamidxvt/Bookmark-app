@@ -8,6 +8,7 @@ import {
 
 interface Booker {
   id: number; name: string; email: string; phone: string; gender: string;
+  designation?: string | null;
   jobStatus: string; adminApproved: string; gpsStatus: string;
   lastSeenAt: string | null; lastLatitude: number | null; lastLongitude: number | null;
   visitTargets: number | null; ratesPerVisit: number | null;
@@ -45,6 +46,7 @@ function OfficerModal({
   const [form, setForm] = useState({
     name: booker?.name ?? "", email: booker?.email ?? "",
     password: "", phone: booker?.phone ?? "",
+    designation: booker?.designation ?? "",
     basicSalary: booker?.basicSalary ?? "", ratesPerVisit: booker?.ratesPerVisit ?? "",
     visitTargets: booker?.visitTargets ?? "", sampleBudget: booker?.sampleBudget ?? 300000,
     adminApproved: booker?.adminApproved ?? "PENDING",
@@ -70,6 +72,7 @@ function OfficerModal({
       const method = isEdit ? "PATCH" : "POST";
       const body: Record<string, unknown> = {
         name: form.name, email: form.email, phone: form.phone,
+        designation: form.designation || null,
         basicSalary: form.basicSalary || null,
         ratesPerVisit: form.ratesPerVisit || null,
         visitTargets: form.visitTargets || null,
@@ -102,12 +105,15 @@ function OfficerModal({
               { label: "Full Name", key: "name", type: "text", full: true },
               { label: "Email", key: "email", type: "email" },
               { label: "Phone", key: "phone", type: "text" },
+              { label: "Designation", key: "designation", type: "text", placeholder: "e.g. Sales Officer" },
             ].map(f => (
-              <div key={f.key} className={f.full ? "col-span-2" : ""}>
+              <div key={f.key} className={(f as any).full ? "col-span-2" : ""}>
                 <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>
-                <input type={f.type} value={(form as any)[f.key]} required
+                <input type={f.type} value={(form as any)[f.key]}
+                  required={f.key !== "designation"}
+                  placeholder={(f as any).placeholder}
                   onChange={e => set(f.key, e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" />
               </div>
             ))}
 

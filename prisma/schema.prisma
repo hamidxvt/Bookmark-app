@@ -95,6 +95,7 @@ model Booker {
   phone         String
   email         String        @unique
   password      String
+  designation   String?       @map("designation") @db.VarChar(100)
   profilePhoto  String?       @map("profile_photo")
   jobStatus     JobStatus     @default(NOT_ACTIVE) @map("job_status")
   adminApproved ApprovalStatus @default(PENDING) @map("admin_approved")
