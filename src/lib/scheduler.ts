@@ -55,6 +55,9 @@ export async function planNextDayVisits(forToday = false) {
   });
 
   let planned = 0;
+  // Track customers assigned today to avoid duplicates across bookers
+  const assignedTodayIds: Set<number> = new Set();
+
   for (const booker of activeBookers) {
     const existing = await prisma.visit.count({
       where: { bookerId: booker.id, visitDate: target },
@@ -77,7 +80,9 @@ export async function planNextDayVisits(forToday = false) {
       continue;
     }
 
-    const excludeFilter = recentIds.length > 0 ? { id: { notIn: recentIds } } : {};
+    // Exclude recently visited AND customers already assigned today
+    const allExcludeIds = [...recentIds, ...Array.from(assignedTodayIds)];
+    const excludeFilter = allExcludeIds.length > 0 ? { id: { notIn: allExcludeIds } } : {};
 
     // Primary: city customers WITH GPS coordinates (needed for route map)
     let customers = await prisma.customer.findMany({
@@ -125,6 +130,7 @@ export async function planNextDayVisits(forToday = false) {
           status: "PENDING",
         },
       });
+      assignedTodayIds.add(c.id);
       planned++;
     }
   }
