@@ -480,6 +480,7 @@ model MissedVisitReason {
   visitId   Int      @unique @map("visit_id")
   bookerId  Int      @map("booker_id")
   reason    String   @db.Text
+  photoUrls String?  @map("photo_urls") @db.Text  // JSON array of uploaded photo paths
   status    String   @default("pending") // pending, approved, rejected
   adminNote String?  @map("admin_note") @db.Text
   createdAt DateTime @default(now()) @map("created_at")

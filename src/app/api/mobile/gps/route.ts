@@ -14,7 +14,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Missing lat/lng" }, { status: 400 });
     }
 
-    // updateMany silently does nothing if booker not found (avoids P2025 crash)
+    // Update booker's last-seen location (for Live Map)
     await prisma.booker.updateMany({
       where: { id: user.id, deletedAt: null },
       data: {
@@ -24,6 +24,16 @@ export async function POST(req: Request) {
         lastSeenAt: new Date(),
       },
     });
+
+    // Record every ping in gps_pings for full-day trail tracking
+    await prisma.gpsPing.create({
+      data: {
+        bookerId: user.id,
+        latitude: lat,
+        longitude: lng,
+        accuracy: accuracy ?? null,
+      },
+    }).catch(() => {}); // non-fatal
 
     return NextResponse.json({ success: true, message: "GPS ping recorded" });
   } catch (err) {

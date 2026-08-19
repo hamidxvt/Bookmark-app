@@ -42,7 +42,7 @@ export async function GET(
                 id: true,
                 quantity: true,
                 unitPrice: true,
-                product: { select: { id: true, title: true, retailPrice: true } },
+                product: { select: { id: true, name: true, retailPrice: true } },
               },
             },
           },
@@ -54,7 +54,6 @@ export async function GET(
           select: {
             id: true,
             visitDate: true,
-            visitType: true,
             notes: true,
             visitReport: true,
           },

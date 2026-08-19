@@ -11,11 +11,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const { id } = await params;
     const visitId = parseInt(id);
     const body = await req.json();
-    const { reason } = body;
+    const { reason, photoUrls } = body;
 
     if (!reason?.trim()) {
       return NextResponse.json({ success: false, error: "Reason is required" }, { status: 400 });
     }
+
+    // photoUrls is an optional array of base64 strings or URLs from the mobile app
+    const photoUrlsJson = photoUrls && Array.isArray(photoUrls) && photoUrls.length > 0
+      ? JSON.stringify(photoUrls)
+      : null;
 
     const visit = await prisma.visit.findUnique({
       where: { id: visitId },
@@ -35,10 +40,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         where: { id: visitId },
         data: { status: "CANCELLED" },
       }),
-      prisma.missedVisitReason.upsert({
+        prisma.missedVisitReason.upsert({
         where: { visitId },
-        create: { visitId, bookerId: user.id, reason, status: "pending" },
-        update: { reason, status: "pending" },
+        create: { visitId, bookerId: user.id, reason, photoUrls: photoUrlsJson, status: "pending" },
+        update: { reason, photoUrls: photoUrlsJson, status: "pending" },
       }),
     ]);
 
