@@ -112,28 +112,35 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   Widget build(BuildContext context) {
     final asyncData = ref.watch(customerDetailProvider(widget.customerId));
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Customer Details'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.pop(),
+    return WillPopScope(
+      onWillPop: () async {
+        context.pop();
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Customer Details'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () {
+              if (_editMode) {
+                setState(() { _editMode = false; _prefilled = false; });
+              } else {
+                context.pop();
+              }
+            },
+            tooltip: _editMode ? 'Cancel editing' : 'Back',
+          ),
+          actions: [
+            if (!_editMode)
+              IconButton(
+                icon: const Icon(Icons.edit_rounded),
+                tooltip: 'Suggest changes',
+                onPressed: () => setState(() => _editMode = true),
+              ),
+          ],
         ),
-        actions: [
-          if (!_editMode)
-            IconButton(
-              icon: const Icon(Icons.edit_rounded),
-              tooltip: 'Suggest changes',
-              onPressed: () => setState(() => _editMode = true),
-            ),
-          if (_editMode)
-            TextButton(
-              onPressed: () => setState(() { _editMode = false; _prefilled = false; }),
-              child: const Text('Cancel'),
-            ),
-        ],
-      ),
       body: asyncData.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -168,6 +175,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
                 )
               : _DetailView(customer: customer);
         },
+      ),
       ),
     );
   }
