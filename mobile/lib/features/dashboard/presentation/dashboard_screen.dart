@@ -36,7 +36,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         : 'OF';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F4F8),
+      backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
           // ── Hero ──────────────────────────────────────────────────────────
@@ -44,18 +44,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             expandedHeight: 200,
             pinned: true,
             stretch: true,
-            backgroundColor: const Color(0xFF1A3A5C),
+            backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             flexibleSpace: FlexibleSpaceBar(
               collapseMode: CollapseMode.parallax,
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // Mesh gradient background
+                  // Red brand gradient
                   Container(
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Color(0xFF1A3A5C), Color(0xFF0D9488)],
+                        colors: AppColors.primaryGradient,
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),

@@ -109,7 +109,7 @@ class ProfileScreen extends ConsumerWidget {
                 profileAsync.when(
                   loading: () => [const Center(child: Padding(
                     padding: EdgeInsets.all(40),
-                    child: CircularProgressIndicator(color: Color(0xFF0D9488)),
+                    child: CircularProgressIndicator(color: AppColors.primary),
                   ))],
                   error: (e, _) => [
                     Center(child: Column(children: [
@@ -265,7 +265,7 @@ class _ProfileHeroLoading extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1A3A5C), Color(0xFF0D9488)],
+          colors: AppColors.primaryGradient,
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -294,7 +294,7 @@ class _SalaryCard extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE2E8F0), width: 0.8),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0D9488).withOpacity(0.06),
+            color: AppColors.primary.withOpacity(0.06),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -326,14 +326,14 @@ class _SalaryRow extends StatelessWidget {
         Text(label,
             style: TextStyle(
               fontSize: 13.5,
-              color: isHighlight ? const Color(0xFF1A3A5C) : const Color(0xFF64748B),
+              color: isHighlight ? AppColors.primary : const Color(0xFF64748B),
               fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
             )),
         Text(value,
             style: TextStyle(
               fontSize: isHighlight ? 17 : 13.5,
               fontWeight: isHighlight ? FontWeight.w800 : FontWeight.w600,
-              color: isHighlight ? const Color(0xFF0D9488) : const Color(0xFF1E293B),
+              color: isHighlight ? AppColors.primary : const Color(0xFF1E293B),
             )),
       ],
     );

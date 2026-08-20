@@ -92,13 +92,13 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
     final routeAsync = ref.watch(routeProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF1A0A0A),
       body: routeAsync.when(
         loading: () => const Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(color: Color(0xFF0D9488)),
+              CircularProgressIndicator(color: AppColors.primary),
               SizedBox(height: 16),
               Text('Calculating optimal route...', style: TextStyle(color: Colors.white70)),
             ],
@@ -159,7 +159,7 @@ class _MapView extends StatelessWidget {
                   Polyline(
                     points: validStops.map((s) => LatLng(s.lat, s.lng)).toList(),
                     strokeWidth: 4,
-                    color: const Color(0xFF0D9488),
+                    color: AppColors.primary,
                   ),
                 ],
               ),
@@ -186,10 +186,10 @@ class _MapView extends StatelessWidget {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: isDone
-                            ? const Color(0xFF16A34A)
+                            ? AppColors.success
                             : isSelected
-                                ? const Color(0xFF0D9488)
-                                : const Color(0xFF1A3A5C),
+                                ? AppColors.primary
+                                : AppColors.primaryContainer,
                         border: Border.all(
                           color: Colors.white,
                           width: isSelected ? 3 : 2,
@@ -197,7 +197,7 @@ class _MapView extends StatelessWidget {
                         boxShadow: [
                           BoxShadow(
                             color: (isSelected
-                                    ? const Color(0xFF0D9488)
+                                    ? AppColors.primary
                                     : Colors.black)
                                 .withOpacity(0.4),
                             blurRadius: isSelected ? 16 : 6,
@@ -253,7 +253,7 @@ class _MapView extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Text('Optimized Route',
-                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Color(0xFF1A3A5C))),
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.primary)),
                             Text('${validStops.length} visits · Today',
                                 style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
                           ],
@@ -263,7 +263,7 @@ class _MapView extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0D9488),
+                            color: AppColors.primary,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -325,7 +325,7 @@ class _MapView extends StatelessWidget {
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? const Color(0xFF0D9488)
+                                ? AppColors.primary
                                 : Colors.white.withOpacity(0.92),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
@@ -346,14 +346,14 @@ class _MapView extends StatelessWidget {
                                     shape: BoxShape.circle,
                                     color: isSelected
                                         ? Colors.white.withOpacity(0.3)
-                                        : const Color(0xFF1A3A5C).withOpacity(0.1),
+                                        : AppColors.primary.withOpacity(0.1),
                                   ),
                                   child: Center(
                                     child: Text('${s.sequence}',
                                         style: TextStyle(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w800,
-                                          color: isSelected ? Colors.white : const Color(0xFF1A3A5C),
+                                          color: isSelected ? Colors.white : AppColors.primary,
                                         )),
                                   ),
                                 ),
@@ -445,14 +445,14 @@ class _StopDetailCard extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                color: const Color(0xFF0D9488).withOpacity(0.12),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text('${stop.sequence}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0D9488),
+              color: AppColors.primary.withOpacity(0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text('${stop.sequence}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.primary,
                       fontSize: 18,
                     )),
               ),
@@ -521,7 +521,7 @@ class _ErrorView extends StatelessWidget {
           onPressed: onRetry,
           icon: const Icon(Icons.refresh_rounded),
           label: const Text('Retry'),
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0D9488)),
+          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
         ),
       ]),
     );
