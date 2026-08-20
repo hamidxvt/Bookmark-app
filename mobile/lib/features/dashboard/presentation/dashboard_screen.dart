@@ -265,13 +265,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ).animate(delay: 240.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn(),
 
                       _QuickAction(
-                        icon: Icons.person_pin_circle_rounded,
-                        label: 'Profile',
-                        color: AppColors.info,
-                        onTap: () => context.go('/profile'),
-                      ).animate(delay: 300.ms).scale(begin: const Offset(0.85, 0.85)).fadeIn(),
-
-                      _QuickAction(
                         icon: Icons.event_available_rounded,
                         label: 'My Leaves',
                         color: const Color(0xFF7C3AED),

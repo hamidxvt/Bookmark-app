@@ -141,20 +141,24 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
         children: [
 
           // ── Customer Info Card (tappable to open full detail) ──
-          GestureDetector(
-            onTap: customer['id'] != null
-                ? () => context.push('/customers/${customer['id']}')
-                : null,
-            child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
-              ),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: customer['id'] != null
+                  ? () => context.go('/customers/${customer['id']}')
+                  : null,
               borderRadius: BorderRadius.circular(AppRadius.lg),
-            ),
+              splashColor: Colors.white24,
+              child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+                ),
+                borderRadius: BorderRadius.circular(AppRadius.lg),
+              ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -250,6 +254,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
                 ),
               ],
             ),
+          ),
           ),
           ).animate().fadeIn(duration: 300.ms),
 

@@ -1,5 +1,6 @@
 class Visit {
   final int id;
+  final int? customerId;
   final String locationName;
   final String locationType;
   final String status;
@@ -18,6 +19,7 @@ class Visit {
 
   const Visit({
     required this.id,
+    this.customerId,
     required this.locationName,
     required this.locationType,
     required this.status,
@@ -38,6 +40,7 @@ class Visit {
   factory Visit.fromJson(Map<String, dynamic> json) {
     return Visit(
       id: json['id'] as int,
+      customerId: json['customerId'] as int? ?? (json['customer'] as Map?)?['id'] as int?,
       // API returns flat fields: customerName, customerType
       locationName: json['customerName'] as String? ??
           (json['location'] as Map?)?['name'] as String? ?? 'Unknown',

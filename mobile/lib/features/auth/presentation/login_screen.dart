@@ -285,7 +285,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                 ).animate().shakeX(duration: 400.ms, hz: 3, amount: 4),
                               ],
 
-                              const SizedBox(height: 28),
+                              const SizedBox(height: 12),
+
+                              // Forgot password
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () => context.push('/forgot-password'),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: Text(
+                                    'Forgot Password?',
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 20),
 
                               // Sign in button
                               FilledButton(

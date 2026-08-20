@@ -166,16 +166,23 @@ class _VisitTile extends ConsumerWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(
-                            visit.locationName,
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  decoration: visit.isCompleted
-                                      ? TextDecoration.lineThrough
-                                      : null,
-                                  color: visit.isCompleted
-                                      ? AppColors.onBackground
-                                      : AppColors.onSurface,
-                                ),
+                          child: GestureDetector(
+                            onTap: visit.customerId != null
+                                ? () => context.go('/customers/${visit.customerId}')
+                                : null,
+                            child: Text(
+                              visit.locationName,
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    decoration: visit.isCompleted
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                    color: visit.customerId != null && !visit.isCompleted
+                                        ? AppColors.primary
+                                        : visit.isCompleted
+                                            ? AppColors.onBackground
+                                            : AppColors.onSurface,
+                                  ),
+                            ),
                           ),
                         ),
                         StatusBadge(status: visit.status),

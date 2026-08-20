@@ -6,6 +6,7 @@ import 'core/constants/app_constants.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_notifier.dart';
 import 'features/auth/presentation/login_screen.dart';
+import 'features/auth/presentation/forgot_password_screen.dart';
 import 'features/customers/presentation/customer_detail_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/leaves/presentation/leaves_screen.dart';
@@ -35,6 +36,7 @@ final _routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/login',     builder: (_, __) => const LoginScreen()),
+      GoRoute(path: '/forgot-password', builder: (_, __) => const ForgotPasswordScreen()),
       GoRoute(path: '/dashboard', builder: (_, __) => const DashboardScreen()),
       GoRoute(path: '/day-start', builder: (_, __) => const DayStartScreen()),
       GoRoute(path: '/day-end',   builder: (_, __) => const DayEndScreen()),
