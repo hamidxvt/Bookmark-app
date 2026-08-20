@@ -110,6 +110,8 @@ model Booker {
   lastSeenAt    DateTime?     @map("last_seen_at")
   gpsStatus     GpsStatus     @default(OFFLINE) @map("gps_status")
   fcmToken      String?       @map("fcm_token") @db.VarChar(500)
+  resetOtp      String?       @map("reset_otp") @db.VarChar(6)
+  resetOtpExpiry DateTime?    @map("reset_otp_expiry")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
   deletedAt     DateTime?     @map("deleted_at")
