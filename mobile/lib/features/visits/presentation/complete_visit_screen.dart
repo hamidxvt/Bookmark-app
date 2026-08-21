@@ -85,7 +85,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
-        context.go('/visits');
+        context.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -112,7 +112,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
         title: const Text('Complete Visit'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.go('/visits'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: detailAsync.when(

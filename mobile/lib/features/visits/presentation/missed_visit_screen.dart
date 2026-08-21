@@ -77,7 +77,7 @@ class _MissedVisitScreenState extends ConsumerState<MissedVisitScreen> {
             backgroundColor: AppColors.warning,
           ),
         );
-        context.go('/visits');
+        context.pop();
       }
     } catch (e) {
       if (mounted) {
@@ -101,7 +101,7 @@ class _MissedVisitScreenState extends ConsumerState<MissedVisitScreen> {
         title: const Text('Miss Visit'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.go('/visits/${widget.visitId}/complete'),
+          onPressed: () => context.pop(),
         ),
       ),
       body: ListView(

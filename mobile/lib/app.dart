@@ -40,16 +40,21 @@ final _routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/dashboard', builder: (_, __) => const DashboardScreen()),
       GoRoute(path: '/day-start', builder: (_, __) => const DayStartScreen()),
       GoRoute(path: '/day-end',   builder: (_, __) => const DayEndScreen()),
-      GoRoute(path: '/visits',    builder: (_, __) => const VisitListScreen()),
       GoRoute(
-        path: '/visits/:id/complete',
-        builder: (_, state) => CompleteVisitScreen(
-            visitId: int.parse(state.pathParameters['id']!)),
-      ),
-      GoRoute(
-        path: '/visits/:id/missed',
-        builder: (_, state) => MissedVisitScreen(
-            visitId: int.parse(state.pathParameters['id']!)),
+        path: '/visits',
+        builder: (_, __) => const VisitListScreen(),
+        routes: [
+          GoRoute(
+            path: ':id/complete',
+            builder: (_, state) => CompleteVisitScreen(
+                visitId: int.parse(state.pathParameters['id']!)),
+          ),
+          GoRoute(
+            path: ':id/missed',
+            builder: (_, state) => MissedVisitScreen(
+                visitId: int.parse(state.pathParameters['id']!)),
+          ),
+        ],
       ),
       GoRoute(path: '/payroll',  builder: (_, __) => const PayrollScreen()),
       GoRoute(path: '/map',      builder: (_, __) => const RouteMapScreen()),
