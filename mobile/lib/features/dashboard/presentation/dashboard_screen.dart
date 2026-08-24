@@ -128,57 +128,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
-
-                        // Progress bar + date
-                        Consumer(
-                          builder: (_, ref, __) {
-                            final ws = ref.watch(workdayStatusProvider);
-                            final s = ws.valueOrNull;
-                            final progress = s?.dayStarted == true ? (s?.dayEnded == true ? 1.0 : 0.6) : 0.0;
-                            final progressText = s?.dayEnded == true ? '100%' : s?.dayStarted == true ? '60%' : '0%';
-                            
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Today\'s Progress',
-                                      style: TextStyle(
-                                        color: Colors.white.withOpacity(0.75),
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    Text(
-                                      progressText,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: LinearProgressIndicator(
-                                    value: progress,
-                                    minHeight: 6,
-                                    backgroundColor: Colors.white.withOpacity(0.2),
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white.withOpacity(0.95),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
 
                         // Date + logo
                         Row(
@@ -229,49 +179,60 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       ),
                       const SizedBox(height: 14),
 
-                      // ── Stats (moved here) ─────────────────────────────────
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _StatTile(
-                              icon: Icons.school_outlined,
-                              label: 'Planned',
-                              value: '—',
-                              color: AppColors.info,
-                            ),
+                      // ── Stats (RED background) ─────────────────────────────────
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFC8102E), Color(0xFFA01028)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _StatTile(
-                              icon: Icons.check_circle_outline_rounded,
-                              label: 'Completed',
-                              value: '—',
-                              color: AppColors.success,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _RedStatTile(
+                                    icon: Icons.school_outlined,
+                                    label: 'Planned',
+                                    value: '—',
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _RedStatTile(
+                                    icon: Icons.check_circle_outline_rounded,
+                                    label: 'Completed',
+                                    value: '—',
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _StatTile(
-                              icon: Icons.attach_money_rounded,
-                              label: 'Earned (PKR)',
-                              value: 'Rs. 0',
-                              color: AppColors.warning,
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _RedStatTile(
+                                    icon: Icons.attach_money_rounded,
+                                    label: 'Earned (PKR)',
+                                    value: 'Rs. 0',
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _RedStatTile(
+                                    icon: Icons.gps_fixed_rounded,
+                                    label: 'GPS',
+                                    value: 'Live',
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _StatTile(
-                              icon: Icons.gps_fixed_rounded,
-                              label: 'GPS',
-                              value: 'Live',
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 20),
 
@@ -537,65 +498,57 @@ class _QuickActionTile extends StatelessWidget {
   }
 }
 
-class _StatTile extends StatelessWidget {
+class _RedStatTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final Color color;
 
-  const _StatTile({
+  const _RedStatTile({
     required this.icon,
     required this.label,
     required this.value,
-    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEEF0F2)),
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.2)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(7),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(7),
             ),
-            child: Icon(icon, color: color, size: 16),
+            child: Icon(icon, color: Colors.white, size: 16),
           ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: color,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 9.5,
-                    color: Color(0xFF94A3B8),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.3,
             ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9,
+              color: Colors.white.withOpacity(0.75),
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

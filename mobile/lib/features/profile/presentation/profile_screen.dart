@@ -312,9 +312,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
                 // Salary
                 _Section(title: 'This Month Earnings', icon: Icons.account_balance_wallet_rounded, children: [
-                  _InfoRow(icon: Icons.currency_rupee_rounded, label: 'Basic Salary',  value: '₨${_fmt(p.basicSalary)}'),
-                  _InfoRow(icon: Icons.trending_up_rounded,    label: 'Visit Earnings', value: '₨${_fmt(p.runningPay)}'),
-                  _InfoRow(icon: Icons.payments_rounded,       label: 'Net Salary',    value: '₨${_fmt(p.netSalary)}',  highlight: true),
+                  _InfoRow(icon: Icons.attach_money_rounded,   label: 'Basic Salary',  value: 'Rs ${_fmt(p.basicSalary)}'),
+                  _InfoRow(icon: Icons.trending_up_rounded,    label: 'Visit Earnings', value: 'Rs ${_fmt(p.runningPay)}'),
+                  _InfoRow(icon: Icons.payments_rounded,       label: 'Net Salary',    value: 'Rs ${_fmt(p.netSalary)}',  highlight: true),
                   _InfoRow(icon: Icons.star_rounded,           label: 'Reward Points', value: '${p.rewardPoints} pts'),
                 ]),
                 const SizedBox(height: 28),
