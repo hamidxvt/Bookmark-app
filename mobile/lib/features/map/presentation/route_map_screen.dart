@@ -88,6 +88,44 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
   final MapController _mapController = MapController();
   int _selectedStop = 0;
 
+  Future<void> _sendETA(RouteStop stop) async {
+    try {
+      final gps = ref.read(gpsServiceProvider);
+      final currentPos = await gps.getCurrentPosition();
+
+      if (currentPos != null) {
+        final etaMinutes = _calculateETA(
+          currentPos.latitude,
+          currentPos.longitude,
+          stop.lat,
+          stop.lng,
+        );
+
+        // Send ETA to admin dashboard
+        final dio = ref.read(dioClientProvider);
+        await dio.post(
+          '/visits/${stop.visitId}/eta',
+          data: {
+            'visitId': stop.visitId,
+            'customerName': stop.customerName,
+            'eta_minutes': etaMinutes,
+            'eta_timestamp': DateTime.now().add(Duration(minutes: etaMinutes)).toIso8601String(),
+            'lat': currentPos.latitude,
+            'lng': currentPos.longitude,
+            'destination_lat': stop.lat,
+            'destination_lng': stop.lng,
+            'distance_km': stop.distanceKm,
+          },
+        ).catchError((e) => null);
+      }
+    } catch (e) {
+      // Silently handle
+    }
+
+    // Open maps after sending ETA
+    _openMaps(stop);
+  }
+
   @override
   Widget build(BuildContext context) {
     final routeAsync = ref.watch(routeProvider);
@@ -111,6 +149,7 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
           selectedStop: _selectedStop,
           onSelectStop: (i) => setState(() => _selectedStop = i),
           mapController: _mapController,
+          onNavigate: (stop) => _sendETA(stop),
         ),
       ),
     );
@@ -122,12 +161,14 @@ class _MapView extends StatelessWidget {
   final int selectedStop;
   final ValueChanged<int> onSelectStop;
   final MapController mapController;
+  final Function(RouteStop) onNavigate;
 
   const _MapView({
     required this.stops,
     required this.selectedStop,
     required this.onSelectStop,
     required this.mapController,
+    required this.onNavigate,
   });
 
   @override
@@ -299,7 +340,7 @@ class _MapView extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
                     child: _StopDetailCard(
                       stop: validStops[selectedStop],
-                      onDirections: () => _openMaps(validStops[selectedStop]),
+                      onDirections: () => onNavigate(validStops[selectedStop]),
                     ),
                   ),
                 ],
@@ -396,40 +437,6 @@ class _MapView extends StatelessWidget {
   }
 
   Future<void> _openMaps(RouteStop stop) async {
-    try {
-      // Calculate ETA using Google Maps API
-      final gps = ref.read(gpsServiceProvider);
-      final currentPos = await gps.getCurrentPosition();
-      
-      if (currentPos != null) {
-        final etaMinutes = _calculateETA(
-          currentPos.latitude,
-          currentPos.longitude,
-          stop.lat,
-          stop.lng,
-        );
-
-        // Send ETA to admin dashboard
-        final dio = ref.read(dioClientProvider);
-        await dio.post(
-          '/visits/${stop.visitId}/eta',
-          data: {
-            'visitId': stop.visitId,
-            'customerName': stop.customerName,
-            'eta_minutes': etaMinutes,
-            'eta_timestamp': DateTime.now().add(Duration(minutes: etaMinutes)).toIso8601String(),
-            'lat': currentPos.latitude,
-            'lng': currentPos.longitude,
-            'destination_lat': stop.lat,
-            'destination_lng': stop.lng,
-            'distance_km': stop.distanceKm,
-          },
-        ).catchError((e) => null); // Silently fail if API unreachable
-      }
-    } catch (e) {
-      // Silently handle errors
-    }
-
     // Try Google Maps navigation intent (turn-by-turn guidance)
     final gmapsNavUri = Uri.parse(
       'google.navigation:q=${stop.lat},${stop.lng}&mode=d',
