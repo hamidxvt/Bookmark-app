@@ -33,18 +33,18 @@ export async function POST(req: Request) {
 
     const booker = await prisma.booker.create({
       data: {
-        name:          String(name),
-        email:         String(email),
-        password:      hash,
-        phone:         String(phone),
-        designation:   designation ? String(designation) : null,
-        basicSalary:   basicSalary   ? parseFloat(String(basicSalary))   : null,
+        name: String(name),
+        email: String(email),
+        password: hash,
+        phone: String(phone),
+        designation: designation ? String(designation) : null,
+        basicSalary: basicSalary ? parseFloat(String(basicSalary)) : null,
         ratesPerVisit: ratesPerVisit ? parseFloat(String(ratesPerVisit)) : null,
-        visitTargets:  visitTargets  ? parseInt(String(visitTargets))    : 7,
-        sampleBudget:  sampleBudget  ? parseFloat(String(sampleBudget))  : null,
-        adminApproved: (adminApproved as string) ?? "APPROVED",
-        jobStatus:     (jobStatus as string)     ?? "ACTIVE",
-        cityId:        resolvedCityId,
+        visitTargets: visitTargets ? parseInt(String(visitTargets)) : 7,
+        sampleBudget: sampleBudget ? parseFloat(String(sampleBudget)) : null,
+        adminApproved: String(adminApproved ?? "APPROVED"),
+        jobStatus: String(jobStatus ?? "ACTIVE"),
+        cityId: resolvedCityId,
       },
     });
 
