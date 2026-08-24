@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_theme.dart';
-import '../../../core/services/api_service.dart';
 import '../presentation/auth_notifier.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -17,8 +16,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   late TextEditingController emailCtrl;
   late TextEditingController passCtrl;
   bool obscure = true;
-  bool loading = false;
-  String? error;
 
   @override
   void initState() {
@@ -36,43 +33,40 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _login() async {
     if (emailCtrl.text.isEmpty || passCtrl.text.isEmpty) {
-      setState(() => error = 'Please enter email and password');
+      _showError('Please enter email and password');
       return;
     }
 
-    setState(() {
-      loading = true;
-      error = null;
-    });
+    await ref.read(authProvider.notifier).login(
+          emailCtrl.text.trim(),
+          passCtrl.text,
+        );
 
-    try {
-      final api = ref.read(apiServiceProvider);
-      final res = await api.post('/api/mobile/auth/login', {
-        'email': emailCtrl.text.trim(),
-        'password': passCtrl.text,
-      });
-
-      if (res['success'] == true && res['data'] != null) {
-        if (mounted) {
-          ref.read(authProvider.notifier).login(
-                token: res['data']['token'],
-                user: res['data']['user'],
-              );
-          context.go('/dashboard');
-        }
-      } else {
-        setState(() => error = res['error']?['message'] ?? 'Login failed');
+    final auth = ref.read(authProvider);
+    if (mounted) {
+      if (auth.user != null) {
+        context.go('/dashboard');
+      } else if (auth.error != null) {
+        _showError(auth.error!);
       }
-    } catch (e) {
-      setState(() => error = 'Network error. Try again.');
-    } finally {
-      if (mounted) setState(() => loading = false);
     }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.error,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final h = MediaQuery.of(context).size.height;
+    final auth = ref.watch(authProvider);
+    final loading = auth.isLoading;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6F8),
@@ -154,36 +148,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-
-                      // Error message
-                      if (error != null)
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(10),
-                            border:
-                                Border.all(color: AppColors.error.withOpacity(0.3)),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.error_outline_rounded,
-                                  size: 18, color: AppColors.error),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  error!,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: AppColors.error,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      if (error != null) const SizedBox(height: 16),
 
                       // Email field
                       Column(
