@@ -200,6 +200,24 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
     );
   }
 
+  Future<void> _openMaps(RouteStop stop) async {
+    // Try Google Maps navigation intent (turn-by-turn guidance)
+    final gmapsNavUri = Uri.parse(
+      'google.navigation:q=${stop.lat},${stop.lng}&mode=d',
+    );
+    if (await canLaunchUrl(gmapsNavUri)) {
+      await launchUrl(gmapsNavUri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    // Fallback: open Google Maps with destination
+    final fallbackUri = Uri.parse(
+      'https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lng}&travelmode=driving',
+    );
+    if (await canLaunchUrl(fallbackUri)) {
+      await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final routeAsync = ref.watch(routeProvider);
@@ -508,24 +526,6 @@ class _MapView extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  Future<void> _openMaps(RouteStop stop) async {
-    // Try Google Maps navigation intent (turn-by-turn guidance)
-    final gmapsNavUri = Uri.parse(
-      'google.navigation:q=${stop.lat},${stop.lng}&mode=d',
-    );
-    if (await canLaunchUrl(gmapsNavUri)) {
-      await launchUrl(gmapsNavUri, mode: LaunchMode.externalApplication);
-      return;
-    }
-    // Fallback: open Google Maps with destination
-    final fallbackUri = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=${stop.lat},${stop.lng}&travelmode=driving',
-    );
-    if (await canLaunchUrl(fallbackUri)) {
-      await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
-    }
   }
 
   double _toRadian(double degree) => degree * (math.pi / 180);
