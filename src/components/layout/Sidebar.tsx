@@ -62,6 +62,7 @@ const NAV = [
     items: [
       { icon: Clock,         label: "Attendance",    href: "/attendance"   },
       { icon: AlertTriangle, label: "Missed Visits", href: "/missed-visits" },
+      { icon: Navigation,    label: "Ad-hoc Visits", href: "/adhoc-visits"  },
       { icon: Package,       label: "Samples",       href: "/samples"      },
       { icon: Banknote,      label: "Payroll",       href: "/payroll"      },
     ],
