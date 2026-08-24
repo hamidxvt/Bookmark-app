@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -395,6 +396,40 @@ class _MapView extends StatelessWidget {
   }
 
   Future<void> _openMaps(RouteStop stop) async {
+    try {
+      // Calculate ETA using Google Maps API
+      final gps = ref.read(gpsServiceProvider);
+      final currentPos = await gps.getCurrentPosition();
+      
+      if (currentPos != null) {
+        final etaMinutes = _calculateETA(
+          currentPos.latitude,
+          currentPos.longitude,
+          stop.lat,
+          stop.lng,
+        );
+
+        // Send ETA to admin dashboard
+        final dio = ref.read(dioClientProvider);
+        await dio.post(
+          '/visits/${stop.visitId}/eta',
+          data: {
+            'visitId': stop.visitId,
+            'customerName': stop.customerName,
+            'eta_minutes': etaMinutes,
+            'eta_timestamp': DateTime.now().add(Duration(minutes: etaMinutes)).toIso8601String(),
+            'lat': currentPos.latitude,
+            'lng': currentPos.longitude,
+            'destination_lat': stop.lat,
+            'destination_lng': stop.lng,
+            'distance_km': stop.distanceKm,
+          },
+        ).catchError((e) => null); // Silently fail if API unreachable
+      }
+    } catch (e) {
+      // Silently handle errors
+    }
+
     // Try Google Maps navigation intent (turn-by-turn guidance)
     final gmapsNavUri = Uri.parse(
       'google.navigation:q=${stop.lat},${stop.lng}&mode=d',
@@ -411,6 +446,29 @@ class _MapView extends StatelessWidget {
       await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
     }
   }
+
+  // Calculate ETA using Haversine distance + average speed
+  int _calculateETA(double fromLat, double fromLng, double toLat, double toLng) {
+    const double earthRadiusKm = 6371;
+    
+    final dLat = _toRadian(toLat - fromLat);
+    final dLng = _toRadian(toLng - fromLng);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_toRadian(fromLat)) * math.cos(_toRadian(toLat)) *
+            math.sin(dLng / 2) * math.sin(dLng / 2);
+    final c = 2 * math.asin(math.sqrt(a));
+    final distanceKm = earthRadiusKm * c;
+    
+    // Estimate: 40 km/h average speed in city (account for traffic, stops)
+    final avgSpeedKmh = 40.0;
+    final timeHours = distanceKm / avgSpeedKmh;
+    final timeMinutes = (timeHours * 60).ceil();
+    
+    return timeMinutes;
+  }
+
+  double _toRadian(double degree) => degree * (3.14159265359 / 180);
+}
 }
 
 // ── Stop detail card (glassmorphism) ─────────────────────────────────────────
