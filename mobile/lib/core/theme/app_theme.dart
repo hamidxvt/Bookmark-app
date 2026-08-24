@@ -10,7 +10,7 @@ abstract class AppColors {
   static const secondaryContainer = Color(0xFFFF6B7A);
   static const accent = Color(0xFFC8102E);
   static const surface = Color(0xFFFFFFFF);
-  static const background = Color(0xFFFFF5F5);
+  static const background = Color(0xFFF5F6F8);
   static const error = Color(0xFF9B0B22);
   static const onPrimary = Color(0xFFFFFFFF);
   static const onSecondary = Color(0xFFFFFFFF);
