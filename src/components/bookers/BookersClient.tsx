@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Search, Eye, MapPin, RefreshCw, CheckCircle, Clock, XCircle,
-  Plus, Trash2, X, Navigation, KeyRound, Pencil,
+  Plus, Trash2, X, Navigation, KeyRound, Pencil, Filter, ChevronDown,
 } from "lucide-react";
 
 interface Booker {
@@ -307,6 +307,8 @@ export default function BookersClient() {
   const [total, setTotal]       = useState(0);
   const [loading, setLoading]   = useState(true);
   const [search, setSearch]     = useState("");
+  const [gpsFilter, setGpsFilter]       = useState("all");
+  const [approvalFilter, setApprovalFilter] = useState("all");
   const [approving, setApproving] = useState<number | null>(null);
   const [deleting, setDeleting]   = useState<number | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -340,10 +342,17 @@ export default function BookersClient() {
 
   useEffect(() => { load(); }, []);
 
-  const filtered = rows.filter(r =>
-    !search || r.name?.toLowerCase().includes(search.toLowerCase()) ||
-    r.email?.toLowerCase().includes(search.toLowerCase()) || r.phone?.includes(search)
-  );
+  const filtered = rows.filter(r => {
+    const matchSearch = !search ||
+      r.name?.toLowerCase().includes(search.toLowerCase()) ||
+      r.email?.toLowerCase().includes(search.toLowerCase()) ||
+      r.phone?.includes(search) ||
+      (r.city?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      (r.designation ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchGps = gpsFilter === "all" || r.gpsStatus === gpsFilter;
+    const matchApproval = approvalFilter === "all" || r.adminApproved === approvalFilter;
+    return matchSearch && matchGps && matchApproval;
+  });
 
   const active  = rows.filter(r => r.gpsStatus === "ACTIVE").length;
   const pending = rows.filter(r => r.adminApproved === "PENDING").length;
@@ -355,11 +364,32 @@ export default function BookersClient() {
       {resetting  && <ResetPasswordModal booker={resetting} onClose={() => setResetting(null)} />}
       {tracking   && <TrackModal booker={tracking} onClose={() => setTracking(null)} />}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between flex-wrap">
+        <div className="relative flex-1 min-w-56">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, email, phone…"
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, email, phone, city…"
             className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition" />
+        </div>
+        <div className="relative">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <select value={gpsFilter} onChange={e => setGpsFilter(e.target.value)}
+            className="pl-9 pr-7 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none appearance-none cursor-pointer">
+            <option value="all">All GPS</option>
+            <option value="ACTIVE">Active</option>
+            <option value="IDLE">Idle</option>
+            <option value="OFFLINE">Offline</option>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+        </div>
+        <div className="relative">
+          <select value={approvalFilter} onChange={e => setApprovalFilter(e.target.value)}
+            className="px-3 pr-7 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none appearance-none cursor-pointer">
+            <option value="all">All Status</option>
+            <option value="APPROVED">Approved</option>
+            <option value="PENDING">Pending</option>
+            <option value="NOT_APPROVED">Not Approved</option>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
         </div>
         <div className="flex gap-2">
           <button onClick={load} disabled={loading} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">

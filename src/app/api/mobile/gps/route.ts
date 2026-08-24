@@ -8,10 +8,16 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { lat, lng, accuracy, isMock } = body;
+    const { lat, lng, accuracy, isMock, speed_kmh, altitude, timestamp } = body;
 
     if (lat === undefined || lng === undefined) {
       return NextResponse.json({ success: false, error: "Missing lat/lng" }, { status: 400 });
+    }
+
+    // Determine activity based on speed
+    let activity = "STATIONARY";
+    if (speed_kmh && speed_kmh > 0) {
+      activity = speed_kmh < 5 ? "MOVING_SLOW" : speed_kmh < 20 ? "MOVING" : "MOVING_FAST";
     }
 
     // Update booker's last-seen location (for Live Map)
@@ -25,17 +31,25 @@ export async function POST(req: Request) {
       },
     });
 
-    // Record every ping in gps_pings for full-day trail tracking
+    // Record every ping in gps_pings with speed and activity for real-time tracking
     await prisma.gpsPing.create({
       data: {
         bookerId: user.id,
         latitude: lat,
         longitude: lng,
         accuracy: accuracy ?? null,
+        speed_kmh: speed_kmh ?? 0,
+        activity: activity,
+        altitude: altitude ?? null,
+        timestamp: timestamp ? new Date(timestamp) : new Date(),
       },
     }).catch(() => {}); // non-fatal
 
-    return NextResponse.json({ success: true, message: "GPS ping recorded" });
+    return NextResponse.json({
+      success: true,
+      message: "GPS ping recorded",
+      data: { activity, speed_kmh },
+    });
   } catch (err) {
     console.error("[gps]", err);
     return NextResponse.json({ success: false, error: "Failed to record GPS" }, { status: 500 });

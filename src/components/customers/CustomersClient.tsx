@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Search, Download, Eye, Pencil, RefreshCw } from "lucide-react";
+import { Plus, Search, Download, Eye, Pencil, RefreshCw, Filter, ChevronDown } from "lucide-react";
 
 function stripHtml(s: string | null | undefined) {
   if (!s) return "";
@@ -27,6 +27,8 @@ export default function CustomersClient() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(0);
   const PER_PAGE = 50;
 
@@ -46,22 +48,57 @@ export default function CustomersClient() {
 
   const filtered = rows.filter(r => {
     const name = (r.name ?? "").toLowerCase();
-    return !search || name.includes(search.toLowerCase());
+    const matchSearch = !search || name.includes(search.toLowerCase()) ||
+      (r.city?.name ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchType = typeFilter === "all" || r.customerType === typeFilter;
+    const matchStatus = statusFilter === "all" ||
+      (statusFilter === "approved" && (r.approvalStatus ?? "").toLowerCase().includes("approved") && !(r.approvalStatus ?? "").toLowerCase().includes("not")) ||
+      (statusFilter === "pending" && (r.approvalStatus ?? "").toLowerCase().includes("pending")) ||
+      (statusFilter === "not_approved" && (r.approvalStatus ?? "").toLowerCase().includes("not"));
+    return matchSearch && matchType && matchStatus;
   });
 
   const totalPages = Math.ceil(total / PER_PAGE);
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between flex-wrap">
+        <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search customers…"
+            placeholder="Search by name or city…"
             className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition"
           />
+        </div>
+        <div className="relative">
+          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <select
+            value={typeFilter}
+            onChange={e => setTypeFilter(e.target.value)}
+            className="pl-9 pr-7 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 appearance-none cursor-pointer"
+          >
+            <option value="all">All Types</option>
+            <option value="SCHOOL">School</option>
+            <option value="COLLEGE">College</option>
+            <option value="BOOKSHOP">Bookshop</option>
+            <option value="UNIVERSITY">University</option>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+        </div>
+        <div className="relative">
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            className="px-3 pr-7 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 appearance-none cursor-pointer"
+          >
+            <option value="all">All Status</option>
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="not_approved">Not Approved</option>
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
         </div>
         <div className="flex gap-2">
           <button onClick={() => load(page)} disabled={loading} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">

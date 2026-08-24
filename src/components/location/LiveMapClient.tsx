@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { RefreshCw, Users, Clock, Navigation, Building2, ChevronDown, ExternalLink, CheckCircle2, Circle, Calendar } from "lucide-react";
+import { RefreshCw, Users, Clock, Navigation, Building2, ChevronDown, ExternalLink, CheckCircle2, Circle, Calendar, Gauge, Timer, Route } from "lucide-react";
 
 interface City {
   id: number; name: string;
@@ -16,6 +16,18 @@ interface Officer {
   lastLatitude: number | null; lastLongitude: number | null;
   lastSeenAt: string | null;
   city: { id: number; name: string } | null;
+  // GPS ping enriched data
+  lastSpeedKmh?: number | null;
+  lastActivity?: string | null;
+}
+
+interface ETAData {
+  visitId: number;
+  customerName: string | null;
+  eta_minutes: number;
+  eta_walk_minutes: number | null;
+  distance_km: number | null;
+  navigating_since: string | null;
 }
 
 interface OfficerVisit {
@@ -223,6 +235,7 @@ export default function LiveMapClient() {
   const [dropOpen,      setDropOpen]      = useState(false);
   const [officerVisits, setOfficerVisits] = useState<OfficerVisit[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(false);
+  const [etaData,       setEtaData]       = useState<ETAData | null>(null);
 
   useEffect(() => {
     fetch("/api/v1/cities").then(r => r.json()).then(d => {
@@ -248,28 +261,31 @@ export default function LiveMapClient() {
     return () => clearInterval(t);
   }, [load]);
 
-  // Load today's visits for selected officer
+  // Load today's visits + ETA for selected officer
   useEffect(() => {
-    if (!selected) { setOfficerVisits([]); return; }
+    if (!selected) { setOfficerVisits([]); setEtaData(null); return; }
     setVisitsLoading(true);
-    fetch(`/api/v1/visits?bookerId=${selected.id}&length=20&today=1`)
-      .then(r => r.json())
-      .then(d => {
-        const raw = d.data?.data ?? d.data ?? [];
-        setOfficerVisits(
-          (Array.isArray(raw) ? raw : []).map((v: any) => ({
-            id: v.id,
-            sequence: v.sequence ?? 0,
-            customerName: v.customer?.name ?? v.customerName ?? "Unknown",
-            address: v.customer?.address ?? v.address ?? "",
-            status: v.status ?? "PENDING",
-            latitude: v.customer?.latitude ? Number(v.customer.latitude) : null,
-            longitude: v.customer?.longitude ? Number(v.customer.longitude) : null,
-          }))
-        );
-      })
-      .catch(() => setOfficerVisits([]))
-      .finally(() => setVisitsLoading(false));
+    Promise.all([
+      fetch(`/api/v1/visits?bookerId=${selected.id}&length=20&today=1`).then(r => r.json()),
+      fetch(`/api/v1/officers/${selected.id}/eta`).then(r => r.json()).catch(() => null),
+    ]).then(([visitsRes, etaRes]) => {
+      const raw = visitsRes.data?.data ?? visitsRes.data ?? [];
+      setOfficerVisits(
+        (Array.isArray(raw) ? raw : []).map((v: any) => ({
+          id: v.id,
+          sequence: v.sequence ?? 0,
+          customerName: v.customer?.name ?? v.customerName ?? "Unknown",
+          address: v.customer?.address ?? v.address ?? "",
+          status: v.status ?? "PENDING",
+          latitude: v.customer?.latitude ? Number(v.customer.latitude) : null,
+          longitude: v.customer?.longitude ? Number(v.customer.longitude) : null,
+        }))
+      );
+      if (etaRes?.success && etaRes.data) setEtaData(etaRes.data);
+      else setEtaData(null);
+    })
+    .catch(() => { setOfficerVisits([]); setEtaData(null); })
+    .finally(() => setVisitsLoading(false));
   }, [selected]);
 
   const withLoc = officers.filter(o => {
@@ -404,6 +420,43 @@ export default function LiveMapClient() {
                       <ExternalLink className="h-3 w-3" /> Open in Google Maps
                     </a>
                   </div>
+
+                  {/* ETA + Speed panel */}
+                  {(etaData || selected.lastSpeedKmh !== undefined) && (
+                    <div className="px-4 py-3 bg-amber-50 border-b border-amber-100">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Route className="h-3.5 w-3.5 text-amber-600" />
+                        <span className="text-xs font-semibold text-amber-800">Live Tracking</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {selected.lastSpeedKmh != null && (
+                          <div className="flex items-center gap-1.5">
+                            <Gauge className="h-3 w-3 text-slate-500" />
+                            <span className="text-xs text-slate-600">
+                              {Number(selected.lastSpeedKmh).toFixed(1)} km/h
+                              {selected.lastActivity ? ` · ${selected.lastActivity}` : ""}
+                            </span>
+                          </div>
+                        )}
+                        {etaData && (
+                          <>
+                            <div className="flex items-center gap-1.5">
+                              <Timer className="h-3 w-3 text-[#C8102E]" />
+                              <span className="text-xs text-slate-700 font-medium">
+                                ETA: {etaData.eta_minutes} min
+                                {etaData.distance_km ? ` · ${Number(etaData.distance_km).toFixed(1)} km` : ""}
+                              </span>
+                            </div>
+                            {etaData.customerName && (
+                              <div className="col-span-2 text-xs text-slate-500 truncate">
+                                → {etaData.customerName}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Today's visits */}
                   <div className="flex-1 overflow-y-auto">

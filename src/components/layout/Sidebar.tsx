@@ -60,9 +60,10 @@ const NAV = [
   {
     section: "FIELD OPS",
     items: [
-      { icon: Clock,    label: "Attendance",   href: "/attendance"   },
+      { icon: Clock,         label: "Attendance",    href: "/attendance"   },
       { icon: AlertTriangle, label: "Missed Visits", href: "/missed-visits" },
-      { icon: Banknote, label: "Payroll",      href: "/payroll"      },
+      { icon: Package,       label: "Samples",       href: "/samples"      },
+      { icon: Banknote,      label: "Payroll",       href: "/payroll"      },
     ],
   },
   {
