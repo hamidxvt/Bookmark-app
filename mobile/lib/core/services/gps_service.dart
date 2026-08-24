@@ -85,11 +85,17 @@ class GpsService {
       final pos = await getCurrentPosition();
       if (pos == null) return;
 
+      // Speed is in m/s, convert to km/h
+      final speedKmh = (pos.speed * 3.6).toStringAsFixed(2);
+
       await _dio.post(ApiConstants.gpsPing, data: {
         'lat': pos.latitude,
         'lng': pos.longitude,
         'accuracy': pos.accuracy,
         'isMock': pos.isMocked,
+        'speed_kmh': double.parse(speedKmh),
+        'altitude': pos.altitude,
+        'timestamp': DateTime.now().toIso8601String(),
       });
     } on DioException {
       // Silently ignore — network may not be available
