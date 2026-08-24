@@ -192,6 +192,52 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           );
                         },
                       ),
+                      const SizedBox(height: 14),
+
+                      // ── Stats (moved here) ─────────────────────────────────
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _StatTile(
+                              icon: Icons.school_outlined,
+                              label: 'Planned',
+                              value: '—',
+                              color: AppColors.info,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _StatTile(
+                              icon: Icons.check_circle_outline_rounded,
+                              label: 'Completed',
+                              value: '—',
+                              color: AppColors.success,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _StatTile(
+                              icon: Icons.attach_money_rounded,
+                              label: 'Earned (PKR)',
+                              value: 'Rs. 0',
+                              color: AppColors.warning,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _StatTile(
+                              icon: Icons.gps_fixed_rounded,
+                              label: 'GPS',
+                              value: 'Live',
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 20),
 
                       // Quick Actions header
@@ -294,68 +340,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                           );
                         },
                       ),
-                      const SizedBox(height: 20),
-
-                      // Today's Stats
-                      Row(
-                        children: [
-                          const Icon(Icons.bar_chart_rounded,
-                              size: 16, color: AppColors.primary),
-                          const SizedBox(width: 6),
-                          const Text(
-                            "Today's Stats",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF1E293B),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _StatTile(
-                              icon: Icons.school_outlined,
-                              label: 'Planned',
-                              value: '—',
-                              color: AppColors.info,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _StatTile(
-                              icon: Icons.check_circle_outline_rounded,
-                              label: 'Completed',
-                              value: '—',
-                              color: AppColors.success,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _StatTile(
-                              icon: Icons.currency_rupee_rounded,
-                              label: 'Earned (PKR)',
-                              value: '₨0',
-                              color: AppColors.warning,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _StatTile(
-                              icon: Icons.gps_fixed_rounded,
-                              label: 'GPS',
-                              value: 'Live',
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
-                      ),
                       const SizedBox(height: 100), // Space for bottom nav
                     ],
                   ),
@@ -384,10 +368,23 @@ class _DayStatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color color = ended ? AppColors.success : started ? AppColors.warning : const Color(0xFF64748B);
-    final String title = ended ? 'Day Completed' : started ? 'Day In Progress' : 'Day Not Started';
-    final String sub = ended ? 'Great work today! See you tomorrow.' : started ? 'GPS tracking active — visit your assigned customers' : 'Tap Start Day to begin GPS tracking';
-    final IconData icon = ended ? Icons.check_circle_rounded : started ? Icons.gps_fixed_rounded : Icons.play_circle_rounded;
+    final Color color =
+        ended ? AppColors.success : started ? AppColors.warning : const Color(0xFF64748B);
+    final String title = ended
+        ? 'Day Completed'
+        : started
+            ? 'Day In Progress'
+            : 'Day Not Started';
+    final String sub = ended
+        ? 'Great work today! See you tomorrow.'
+        : started
+            ? 'GPS tracking active — visit your assigned customers'
+            : 'Tap Start Day to begin GPS tracking';
+    final IconData icon = ended
+        ? Icons.check_circle_rounded
+        : started
+            ? Icons.gps_fixed_rounded
+            : Icons.play_circle_rounded;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -401,7 +398,8 @@ class _DayStatusCard extends StatelessWidget {
           Container(
             width: 42,
             height: 42,
-            decoration: BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
+            decoration:
+                BoxDecoration(color: color.withOpacity(0.12), shape: BoxShape.circle),
             child: Icon(icon, color: color, size: 21),
           ),
           const SizedBox(width: 12),
@@ -520,44 +518,49 @@ class _StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFEEF0F2)),
       ),
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
               color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(9),
+              borderRadius: BorderRadius.circular(8),
             ),
-            child: Icon(icon, color: color, size: 17),
+            child: Icon(icon, color: color, size: 16),
           ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w800,
-                  color: color,
-                  letterSpacing: -0.5,
+          const SizedBox(width: 9),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                    letterSpacing: -0.4,
+                  ),
                 ),
-              ),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 10.5,
-                  color: Color(0xFF94A3B8),
-                  fontWeight: FontWeight.w500,
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    color: Color(0xFF94A3B8),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
