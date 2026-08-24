@@ -43,7 +43,7 @@ type Notif = {
 const typeIcon = {
   leave: <CalendarOff className="h-3.5 w-3.5 text-amber-500" />,
   missed: <FileQuestion className="h-3.5 w-3.5 text-rose-500" />,
-  request: <Bell className="h-3.5 w-3.5 text-teal-500" />,
+  request: <Bell className="h-3.5 w-3.5 text-[#C8102E]" />,
 };
 
 export default function Header() {
@@ -171,7 +171,7 @@ export default function Header() {
                   <Link
                     href="/missed-visits"
                     onClick={() => setBellOpen(false)}
-                    className="text-xs text-teal-600 hover:text-teal-700 font-medium"
+                    className="text-xs text-[#C8102E] hover:text-[#C8102E] font-medium"
                   >
                     View all pending →
                   </Link>
@@ -187,7 +187,7 @@ export default function Header() {
             onClick={() => setUserOpen(!userOpen)}
             className="flex items-center gap-2.5 rounded-xl border border-slate-200 pl-1.5 pr-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#1A3A5C] to-[#2D5F8A] text-xs font-bold text-white shadow-sm">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#C8102E] to-[#9B0B22] text-xs font-bold text-white shadow-sm">
               {session?.user?.name?.[0]?.toUpperCase() ?? "A"}
             </div>
             <div className="hidden sm:block text-left">

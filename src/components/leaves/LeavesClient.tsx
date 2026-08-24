@@ -207,7 +207,7 @@ export default function LeavesClient() {
               onChange={e => setNote(e.target.value)}
               placeholder="Optional admin note..."
               rows={3}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
             />
             <div className="flex justify-end gap-2 mt-4">
               <button

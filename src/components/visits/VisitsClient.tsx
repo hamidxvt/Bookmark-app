@@ -59,7 +59,7 @@ export default function VisitsClient() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by customer or booker…"
-            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition" />
+            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition" />
         </div>
         <button onClick={load} disabled={loading} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
           <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
@@ -110,7 +110,7 @@ export default function VisitsClient() {
                 <td className="px-4 py-3"><VisitBadge status={r.status} /></td>
                 <td className="px-4 py-3 text-xs text-slate-400 max-w-[140px] truncate">{r.notes ?? r.visitReport ?? "—"}</td>
                 <td className="px-4 py-3">
-                  <button className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"><Eye className="h-4 w-4" /></button>
+                  <button className="p-1.5 rounded-lg text-slate-400 hover:text-[#C8102E] hover:bg-red-50 transition-colors"><Eye className="h-4 w-4" /></button>
                 </td>
               </tr>
             ))}

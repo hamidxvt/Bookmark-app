@@ -178,11 +178,11 @@ function NavItem({
                 className={cn(
                   "flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150 cursor-pointer",
                   childActive
-                    ? "bg-teal-500/10 text-teal-400"
-                    : "text-slate-500 hover:bg-white/5 hover:text-slate-300"
+                    ? "bg-white/15 text-white font-semibold"
+                    : "text-red-200/70 hover:bg-white/10 hover:text-white"
                 )}
               >
-                <span className={cn("h-1 w-1 rounded-full shrink-0", childActive ? "bg-teal-400" : "bg-slate-600")} />
+                <span className={cn("h-1 w-1 rounded-full shrink-0", childActive ? "bg-white" : "bg-red-300/40")} />
                 {c.label}
               </Link>
             );
@@ -203,14 +203,14 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
         "flex h-16 shrink-0 items-center border-b border-white/5 transition-all duration-300",
         collapsed ? "justify-center px-3" : "gap-3 px-5"
       )}>
-        <div className="h-9 w-9 shrink-0 rounded-lg overflow-hidden shadow-lg shadow-red-900/40 flex items-center justify-center bg-white/10">
+        <div className="h-9 w-9 shrink-0 rounded-lg overflow-hidden shadow-md flex items-center justify-center bg-white p-1">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/bookmark-logo.png" alt="Bookmark" className="h-full w-full object-cover" />
+          <img src="/bookmark-logo.png" alt="Bookmark" className="h-full w-full object-contain" />
         </div>
         {!collapsed && (
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-white leading-none truncate">Bookmark</p>
-            <p className="text-[10px] text-red-300 font-semibold mt-0.5">Field Force Manager</p>
+            <p className="text-sm font-black text-white leading-none truncate tracking-widest">BOOKMARK</p>
+            <p className="text-[9px] text-red-200/70 font-semibold mt-0.5 tracking-wider uppercase">Field Force Manager</p>
           </div>
         )}
       </div>

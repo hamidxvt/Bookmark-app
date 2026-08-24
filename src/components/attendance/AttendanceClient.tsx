@@ -63,7 +63,7 @@ export default function AttendanceClient() {
             type="date"
             value={date}
             onChange={e => setDate(e.target.value)}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
           />
           <button onClick={load} disabled={loading}
             className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
@@ -157,7 +157,7 @@ export default function AttendanceClient() {
                           href={`https://maps.google.com/?q=${r.startLat},${r.startLng}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="hover:text-teal-600 underline"
+                          className="hover:text-[#C8102E] underline"
                         >
                           View Map
                         </a>

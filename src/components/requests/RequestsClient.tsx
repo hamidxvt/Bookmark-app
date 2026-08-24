@@ -100,7 +100,7 @@ export default function RequestsClient() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-semibold text-teal-600">#{i + 1}</span>
+                        <span className="text-xs font-semibold text-[#C8102E]">#{i + 1}</span>
                         <span className="text-xs text-slate-400">·</span>
                         <span className="text-xs text-slate-500">{booker}</span>
                         {category && <><span className="text-xs text-slate-400">·</span><span className="text-xs text-slate-400">{category}</span></>}

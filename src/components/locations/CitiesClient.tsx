@@ -14,7 +14,7 @@ interface City {
 }
 
 const PALETTE = [
-  "from-teal-400 to-cyan-500",
+  "from-[#C8102E] to-cyan-500",
   "from-blue-400 to-indigo-500",
   "from-violet-400 to-purple-500",
   "from-amber-400 to-orange-500",
@@ -65,7 +65,7 @@ function EditModal({ city, onClose, onSaved }: { city: City | null; onClose: () 
           <div>
             <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">City Name *</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
               placeholder="e.g. LAHORE" />
           </div>
 
@@ -74,13 +74,13 @@ function EditModal({ city, onClose, onSaved }: { city: City | null; onClose: () 
             <div>
               <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Latitude</label>
               <input value={form.latitude} onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
                 placeholder="e.g. 31.5204" type="number" step="any" />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Longitude</label>
               <input value={form.longitude} onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
                 placeholder="e.g. 74.3587" type="number" step="any" />
             </div>
           </div>
@@ -91,7 +91,7 @@ function EditModal({ city, onClose, onSaved }: { city: City | null; onClose: () 
               Geofence Radius (metres)
             </label>
             <input value={form.geofenceRadius} onChange={e => setForm(f => ({ ...f, geofenceRadius: e.target.value }))}
-              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
               placeholder="5000" type="number" />
             <p className="mt-1 text-[10px] text-slate-400">
               Officers are considered &quot;within city&quot; if GPS is within this radius
@@ -102,7 +102,7 @@ function EditModal({ city, onClose, onSaved }: { city: City | null; onClose: () 
           {form.latitude && form.longitude && (
             <a href={`https://maps.google.com/?q=${form.latitude},${form.longitude}`}
               target="_blank" rel="noreferrer"
-              className="flex items-center gap-1.5 text-xs text-teal-600 hover:underline">
+              className="flex items-center gap-1.5 text-xs text-[#C8102E] hover:underline">
               <MapPin className="h-3 w-3" /> Preview on Google Maps ↗
             </a>
           )}
@@ -184,8 +184,8 @@ export default function CitiesClient() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100">
-              <Building2 className="h-4 w-4 text-teal-600" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#C8102E]">
+              <Building2 className="h-4 w-4 text-[#C8102E]" />
             </div>
             <h1 className="text-xl font-bold text-slate-900">City Management</h1>
           </div>
@@ -193,7 +193,7 @@ export default function CitiesClient() {
         </div>
         <div className="flex gap-2">
           <button onClick={runSetup} disabled={seeding}
-            className="flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm font-semibold text-teal-700 hover:bg-teal-100 transition-colors cursor-pointer disabled:opacity-60">
+            className="flex items-center gap-2 rounded-xl border border-[#C8102E] bg-[#C8102E] px-4 py-2.5 text-sm font-semibold text-[#C8102E] hover:bg-[#C8102E] transition-colors cursor-pointer disabled:opacity-60">
             {seeding ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
             {seeding ? "Running Setup…" : "Run Setup & Seed"}
           </button>
@@ -216,7 +216,7 @@ export default function CitiesClient() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total Cities",    value: cities.length,   icon: Building2, color: "text-teal-600 bg-teal-50"   },
+          { label: "Total Cities",    value: cities.length,   icon: Building2, color: "text-[#C8102E] bg-[#C8102E]"   },
           { label: "Total Officers",  value: totalOfficers,   icon: Users,     color: "text-blue-600 bg-blue-50"   },
           { label: "Total Customers", value: totalCustomers,  icon: MapPin,    color: "text-violet-600 bg-violet-50"},
         ].map(s => (
@@ -256,7 +256,7 @@ export default function CitiesClient() {
                     </div>
                     <div className="flex gap-1.5">
                       <button onClick={() => setModal(city)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-teal-600 hover:border-teal-200 transition-colors">
+                        className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:text-[#C8102E] hover:border-[#C8102E] transition-colors">
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
                       <button onClick={() => deleteCity(city.id, city.name)}
@@ -273,7 +273,7 @@ export default function CitiesClient() {
                   {city.latitude && city.longitude ? (
                     <a href={`https://maps.google.com/?q=${city.latitude},${city.longitude}`}
                       target="_blank" rel="noreferrer"
-                      className="flex items-center gap-1 text-[10px] text-teal-600 hover:underline mb-3">
+                      className="flex items-center gap-1 text-[10px] text-[#C8102E] hover:underline mb-3">
                       <MapPin className="h-3 w-3" />
                       {city.latitude.toFixed(4)}, {city.longitude.toFixed(4)} ↗
                     </a>
@@ -284,8 +284,8 @@ export default function CitiesClient() {
                   {/* Geofence badge */}
                   {city.geofenceRadius && (
                     <div className="flex items-center gap-1.5 mb-3">
-                      <Shield className="h-3 w-3 text-teal-500" />
-                      <span className="text-[10px] text-teal-700 bg-teal-50 rounded-full px-2 py-0.5 border border-teal-200 font-semibold">
+                      <Shield className="h-3 w-3 text-[#C8102E]" />
+                      <span className="text-[10px] text-[#C8102E] bg-[#C8102E] rounded-full px-2 py-0.5 border border-[#C8102E] font-semibold">
                         Geofence: {city.geofenceRadius >= 1000
                           ? `${(city.geofenceRadius / 1000).toFixed(1)} km`
                           : `${city.geofenceRadius} m`}

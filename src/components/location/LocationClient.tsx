@@ -147,7 +147,7 @@ export default function LocationClient({ defaultCity }: { defaultCity?: string }
             const isSelected = selected === b.id;
             return (
               <button key={b.id} onClick={() => setSelected(b.id === selected ? null : b.id)}
-                className={`w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 ${isSelected ? "bg-teal-50" : ""}`}>
+                className={`w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 ${isSelected ? "bg-red-50" : ""}`}>
                 <div className="relative shrink-0">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold text-white"
                     style={{ backgroundColor: gps.hex }}>

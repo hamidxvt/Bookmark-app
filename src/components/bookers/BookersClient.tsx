@@ -122,7 +122,7 @@ function OfficerModal({
                 <label className="block text-xs font-medium text-slate-600 mb-1">Password</label>
                 <input type="password" value={form.password} required={!isEdit}
                   onChange={e => set("password", e.target.value)} placeholder="Min 6 characters"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]" />
               </div>
             )}
           </div>
@@ -140,7 +140,7 @@ function OfficerModal({
                   <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>
                   <input type="number" value={(form as any)[f.key]}
                     onChange={e => set(f.key, e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]" />
                 </div>
               ))}
             </div>
@@ -179,7 +179,7 @@ function OfficerModal({
 
           <div className="flex gap-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-            <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-[#0f1e3c] py-2.5 text-sm font-medium text-white hover:bg-[#1a3060] disabled:opacity-50">
+            <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-[#C8102E] py-2.5 text-sm font-medium text-white hover:bg-[#9B0B22] disabled:opacity-50 transition-colors">
               {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Officer"}
             </button>
           </div>
@@ -239,13 +239,13 @@ function ResetPasswordModal({ booker, onClose }: { booker: Booker; onClose: () =
                 <label className="block text-xs font-medium text-slate-600 mb-1">New Password</label>
                 <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
                   placeholder="Min 6 characters"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]" />
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 mb-1">Confirm Password</label>
                 <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required
                   placeholder="Repeat password"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500" />
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]" />
               </div>
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
@@ -291,7 +291,7 @@ function TrackModal({ booker, onClose }: { booker: Booker; onClose: () => void }
           )}
           {hasCoords && (
             <a href={`https://www.openstreetmap.org/?mlat=${booker.lastLatitude}&mlon=${booker.lastLongitude}`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full rounded-lg bg-teal-600 py-2 text-sm font-medium text-white hover:bg-teal-700">
+              className="flex items-center justify-center gap-2 w-full rounded-lg bg-[#C8102E] py-2 text-sm font-medium text-white hover:bg-[#C8102E]">
               <Navigation className="h-4 w-4" /> Open in Maps
             </a>
           )}
@@ -359,7 +359,7 @@ export default function BookersClient() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, email, phone…"
-            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition" />
+            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition" />
         </div>
         <div className="flex gap-2">
           <button onClick={load} disabled={loading} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
@@ -401,7 +401,7 @@ export default function BookersClient() {
             ))}
             {!loading && filtered.length === 0 && (
               <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">
-                No officers found · <button onClick={() => setShowCreate(true)} className="text-teal-600 underline">Add one</button>
+                No officers found · <button onClick={() => setShowCreate(true)} className="text-[#C8102E] underline">Add one</button>
               </td></tr>
             )}
             {!loading && filtered.map((r, i) => (
@@ -425,7 +425,7 @@ export default function BookersClient() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
                     <button onClick={() => setTracking(r)} title="Track GPS"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors">
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-[#C8102E] hover:bg-[#C8102E] transition-colors">
                       <MapPin className="h-3.5 w-3.5" />
                     </button>
                     <button onClick={() => setEditing(r)} title="Edit Officer"
@@ -454,7 +454,7 @@ export default function BookersClient() {
         </table>
         <div className="border-t border-slate-100 px-4 py-3 flex items-center justify-between">
           <p className="text-xs text-slate-500">Showing {filtered.length} of {total} officers</p>
-          <button onClick={() => setShowCreate(true)} className="text-xs font-medium text-teal-600 hover:text-teal-700">+ Add New Officer</button>
+          <button onClick={() => setShowCreate(true)} className="text-xs font-medium text-[#C8102E] hover:text-[#C8102E]">+ Add New Officer</button>
         </div>
       </div>
     </div>

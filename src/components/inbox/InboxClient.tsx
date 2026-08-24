@@ -72,10 +72,10 @@ export default function InboxClient() {
             <button
               key={t.id}
               onClick={() => setActiveThread(t.id)}
-              className={`w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 ${activeThread === t.id ? "bg-teal-50 border-r-2 border-teal-500" : ""}`}
+              className={`w-full flex items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-50 ${activeThread === t.id ? "bg-red-50 border-r-2 border-[#C8102E]" : ""}`}
             >
               <div className="relative shrink-0">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 text-xs font-bold text-white">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#C8102E] text-xs font-bold text-white">
                   {t.name[0]}
                 </div>
                 {t.online && <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />}
@@ -88,7 +88,7 @@ export default function InboxClient() {
                 <p className="text-xs text-slate-400 truncate">{t.lastMessage}</p>
               </div>
               {t.unread > 0 && (
-                <span className="shrink-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-teal-500 px-1 text-[10px] font-bold text-white">
+                <span className="shrink-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#C8102E] px-1 text-[10px] font-bold text-white">
                   {t.unread}
                 </span>
               )}
@@ -102,7 +102,7 @@ export default function InboxClient() {
         {/* Chat header */}
         <div className="flex items-center gap-3 border-b border-slate-200 bg-white px-5 py-3">
           <div className="relative">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 text-xs font-bold text-white">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#C8102E] text-xs font-bold text-white">
               {thread.name[0]}
             </div>
             {thread.online && <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />}
@@ -140,12 +140,12 @@ export default function InboxClient() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === "Enter" && !e.shiftKey && send()}
               placeholder={`Message ${thread.name}…`}
-              className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition"
+              className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition"
             />
             <button
               onClick={send}
               disabled={!input.trim()}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-teal-500 text-white hover:bg-teal-600 disabled:opacity-40 transition-colors"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-[#C8102E] text-white hover:bg-[#C8102E] disabled:opacity-40 transition-colors"
             >
               <Send className="h-4 w-4" />
             </button>

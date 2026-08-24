@@ -60,7 +60,7 @@ export default function CustomersClient() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search customers…"
-            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition"
+            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition"
           />
         </div>
         <div className="flex gap-2">
@@ -114,7 +114,7 @@ export default function CustomersClient() {
                 <td className="px-4 py-3 text-slate-500 text-xs">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
-                    <button className="p-1.5 rounded-lg text-slate-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"><Eye className="h-4 w-4" /></button>
+                    <button className="p-1.5 rounded-lg text-slate-400 hover:text-[#C8102E] hover:bg-red-50 transition-colors"><Eye className="h-4 w-4" /></button>
                     <button className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"><Pencil className="h-4 w-4" /></button>
                   </div>
                 </td>
@@ -128,7 +128,7 @@ export default function CustomersClient() {
           </p>
           <div className="flex items-center gap-1 text-xs text-slate-500">
             <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-40">← Prev</button>
-            <span className="rounded bg-teal-600 px-2 py-1 text-white font-medium">{page + 1}</span>
+            <span className="rounded bg-[#C8102E] px-2 py-1 text-white font-medium">{page + 1}</span>
             <span className="px-1">of {totalPages}</span>
             <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-40">Next →</button>
           </div>

@@ -292,7 +292,7 @@ export default function LiveMapClient() {
             <button onClick={() => setDropOpen(!dropOpen)}
               className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-colors shadow-sm min-w-[140px] justify-between">
               <span className="flex items-center gap-1.5">
-                <Building2 className="h-3.5 w-3.5 text-teal-500" />
+                <Building2 className="h-3.5 w-3.5 text-[#C8102E]" />
                 {selCity ? selCity.name : "All Cities"}
               </span>
               <ChevronDown className={`h-3.5 w-3.5 text-slate-400 transition-transform ${dropOpen ? "rotate-180" : ""}`} />
@@ -300,12 +300,12 @@ export default function LiveMapClient() {
             {dropOpen && (
               <div className="absolute right-0 mt-1 w-52 rounded-xl border border-slate-200 bg-white shadow-lg z-50 overflow-hidden max-h-60 overflow-y-auto">
                 <button onClick={() => { setSelCity(null); setDropOpen(false); }}
-                  className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${!selCity ? "text-teal-600 font-semibold bg-teal-50" : "text-slate-700"}`}>
+                  className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${!selCity ? "text-[#C8102E] font-semibold bg-[#C8102E]" : "text-slate-700"}`}>
                   All Cities
                 </button>
                 {cities.map(c => (
                   <button key={c.id} onClick={() => { setSelCity(c); setDropOpen(false); }}
-                    className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${selCity?.id === c.id ? "text-teal-600 font-semibold bg-teal-50" : "text-slate-700"}`}>
+                    className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${selCity?.id === c.id ? "text-[#C8102E] font-semibold bg-[#C8102E]" : "text-slate-700"}`}>
                     {c.name}
                     {c.geofenceRadius && <span className="ml-1 text-slate-400">· {c.geofenceRadius >= 1000 ? `${(c.geofenceRadius/1000).toFixed(0)}km` : `${c.geofenceRadius}m`}</span>}
                   </button>
@@ -326,7 +326,7 @@ export default function LiveMapClient() {
         {[
           { label: "Officers",    value: officers.length, icon: Users,      cls: "text-slate-600 bg-slate-100" },
           { label: "Active GPS",  value: active,          icon: Navigation, cls: "text-emerald-600 bg-emerald-50" },
-          { label: "On Map",      value: withLoc.length,  icon: Navigation, cls: "text-teal-600 bg-teal-50" },
+          { label: "On Map",      value: withLoc.length,  icon: Navigation, cls: "text-[#C8102E] bg-[#C8102E]" },
           { label: "Last Update", value: null,            icon: Clock,      cls: "text-slate-500 bg-slate-50" },
         ].map(s => (
           <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -351,7 +351,7 @@ export default function LiveMapClient() {
           {withLoc.length > 0 && (
             <a href={`https://maps.google.com/?q=${Number(withLoc[0]?.lastLatitude)},${Number(withLoc[0]?.lastLongitude)}`}
               target="_blank" rel="noreferrer"
-              className="flex items-center gap-1 text-xs text-teal-600 hover:underline">
+              className="flex items-center gap-1 text-xs text-[#C8102E] hover:underline">
               <ExternalLink className="h-3 w-3" /> Open in Google Maps
             </a>
           )}
@@ -409,7 +409,7 @@ export default function LiveMapClient() {
                   <div className="flex-1 overflow-y-auto">
                     <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-teal-500" />
+                        <Calendar className="h-3.5 w-3.5 text-[#C8102E]" />
                         <span className="text-xs font-semibold text-slate-700">Today's Schedule</span>
                       </div>
                       {total > 0 && (
@@ -440,7 +440,7 @@ export default function LiveMapClient() {
                                 {v.latitude && v.longitude && (
                                   <a href={`https://maps.google.com/?q=${v.latitude},${v.longitude}`}
                                     target="_blank" rel="noreferrer"
-                                    className="text-[10px] text-teal-500 hover:underline">Navigate ↗</a>
+                                    className="text-[10px] text-[#C8102E] hover:underline">Navigate ↗</a>
                                 )}
                               </div>
                             </div>
@@ -469,12 +469,12 @@ export default function LiveMapClient() {
               const sl    = statusLabel(o.gpsStatus);
               return (
                 <div key={o.id} onClick={() => valid && setSelected(o as any)}
-                  className={`flex items-center gap-4 px-5 py-3 transition-colors ${valid ? "cursor-pointer hover:bg-slate-50" : ""} ${selected?.id === o.id ? "bg-teal-50 border-l-4 border-teal-500" : ""}`}>
+                  className={`flex items-center gap-4 px-5 py-3 transition-colors ${valid ? "cursor-pointer hover:bg-slate-50" : ""} ${selected?.id === o.id ? "bg-[#C8102E] border-l-4 border-[#C8102E]" : ""}`}>
                   <div className="relative">
                     {o.profilePhoto ? (
-                      <img src={o.profilePhoto} alt={o.name} className="h-10 w-10 rounded-full object-cover border-2 border-teal-200" />
+                      <img src={o.profilePhoto} alt={o.name} className="h-10 w-10 rounded-full object-cover border-2 border-[#C8102E]" />
                     ) : (
-                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${valid ? "bg-teal-500" : "bg-slate-300"}`}>
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${valid ? "bg-[#C8102E]" : "bg-slate-300"}`}>
                         {(o.name || "?").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2)}
                       </div>
                     )}
@@ -494,7 +494,7 @@ export default function LiveMapClient() {
                     </p>
                     {valid && (
                       <a href={`https://maps.google.com/?q=${lat},${lng}`} target="_blank" rel="noreferrer"
-                        onClick={e => e.stopPropagation()} className="text-xs text-teal-600 hover:underline">
+                        onClick={e => e.stopPropagation()} className="text-xs text-[#C8102E] hover:underline">
                         Maps ↗
                       </a>
                     )}

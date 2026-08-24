@@ -1,7 +1,7 @@
 "use client";
 
 const inputClass =
-  "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-xs outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20 transition";
+  "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-xs outline-none focus:border-[#C8102E] focus:ring-2 focus:ring-[#C8102E]/20 transition";
 const labelClass = "block text-sm font-medium text-slate-700 mb-1.5";
 
 export default function AddCustomerPage() {

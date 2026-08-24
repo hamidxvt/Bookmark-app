@@ -80,7 +80,7 @@ export default function PayrollClient() {
           <select
             value={month}
             onChange={e => setMonth(parseInt(e.target.value))}
-            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
           >
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>
@@ -92,14 +92,14 @@ export default function PayrollClient() {
             type="number"
             value={year}
             onChange={e => setYear(parseInt(e.target.value))}
-            className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500"
+            className="w-24 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
           />
           <button onClick={load} disabled={loading}
             className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
           <button onClick={finalize} disabled={finalizing || loading}
-            className="flex items-center gap-2 rounded-lg bg-teal-600 px-4 py-2 text-xs font-medium text-white hover:bg-teal-700 transition-colors disabled:opacity-50">
+            className="flex items-center gap-2 rounded-lg bg-[#C8102E] px-4 py-2 text-xs font-medium text-white hover:bg-[#C8102E] transition-colors disabled:opacity-50">
             <Calculator className="h-3.5 w-3.5" />
             {finalizing ? "Finalizing..." : "Finalize & Save"}
           </button>
@@ -110,8 +110,8 @@ export default function PayrollClient() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <div className="flex items-center gap-3 mb-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-100">
-              <DollarSign className="h-4.5 w-4.5 text-teal-600" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#C8102E]">
+              <DollarSign className="h-4.5 w-4.5 text-[#C8102E]" />
             </div>
             <p className="text-sm text-slate-500">Total Net Payable</p>
           </div>
@@ -177,7 +177,7 @@ export default function PayrollClient() {
                   <tr key={r.bookerId} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-bold text-teal-700">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#C8102E] text-xs font-bold text-[#C8102E]">
                           {r.bookerName[0]}
                         </div>
                         <span className="font-medium text-slate-800">{r.bookerName}</span>
