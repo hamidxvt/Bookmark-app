@@ -402,7 +402,7 @@ class _SampleRequestSheetState extends ConsumerState<_SampleRequestSheet> {
         if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
       });
       if (res.data['success'] == true) {
-        if (mounted) Navigator.pop(context);
+        if (mounted) context.pop();
         widget.onSubmitted();
       } else {
         setState(() => _error = res.data['error'] ?? 'Failed');

@@ -373,7 +373,7 @@ class _AdhocVisitSheetState extends ConsumerState<_AdhocVisitSheet> {
       });
       final data = res.data as Map<String, dynamic>;
       if (data['success'] == true) {
-        if (mounted) Navigator.pop(context);
+        if (mounted) context.pop();
         widget.onCreated();
       } else {
         setState(() => _error = data['error'] ?? 'Failed to create visit');

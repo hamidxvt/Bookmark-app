@@ -90,11 +90,11 @@ class _DayEndScreenState extends ConsumerState<DayEndScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
+                onPressed: () => context.pop(false),
                 child: const Text('Not Yet'),
               ),
               FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
+                onPressed: () => context.pop(true),
                 child: const Text('End Day'),
               ),
             ],

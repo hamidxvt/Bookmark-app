@@ -417,7 +417,7 @@ class _ApplyLeaveSheetState extends ConsumerState<_ApplyLeaveSheet> {
         'reason': _reasonCtrl.text.trim(),
       });
       if (res.data['success'] == true) {
-        if (mounted) Navigator.pop(context);
+        if (mounted) context.pop();
         widget.onSubmitted();
       } else {
         setState(() => _error = res.data['error'] ?? 'Failed');
