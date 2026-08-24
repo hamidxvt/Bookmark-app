@@ -14,6 +14,8 @@ interface SampleRequest {
   status: string;
   adminNotes: string | null;
   customerName: string | null;
+  signatureBase64: string | null;
+  pdfUrl: string | null;
   deliveredAt: string | null;
   createdAt: string;
   booker: { id: number; name: string; email: string };
