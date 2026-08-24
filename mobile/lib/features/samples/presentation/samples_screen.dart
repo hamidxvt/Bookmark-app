@@ -67,7 +67,7 @@ final samplesListProvider = FutureProvider.autoDispose<List<SampleRequest>>((ref
 final customersSearchProvider = FutureProvider.family.autoDispose<List<Map<String, dynamic>>, String>(
   (ref, query) async {
     final dio = ref.watch(dioClientProvider);
-    final res = await dio.get('/customers', queryParameters: {'search': query, 'length': 30});
+    final res = await dio.get('/customers', params: {'search': query, 'length': 30});
     final d = res.data['data'];
     if (d is Map && d['data'] is List) {
       return (d['data'] as List).cast<Map<String, dynamic>>();
