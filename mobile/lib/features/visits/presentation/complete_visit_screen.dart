@@ -145,7 +145,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
             color: Colors.transparent,
             child: InkWell(
               onTap: customer['id'] != null
-                  ? () => context.go('/customers/${customer['id']}')
+                  ? () => context.push('/customers/\${customer["id"]}')
                   : null,
               borderRadius: BorderRadius.circular(AppRadius.lg),
               splashColor: Colors.white24,
@@ -414,7 +414,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
               side: const BorderSide(color: AppColors.error),
               minimumSize: const Size.fromHeight(48),
             ),
-            onPressed: () => context.go('/visits/${widget.visitId}/missed'),
+            onPressed: () => context.push('/visits/\${widget.visitId}/missed'),
           ).animate(delay: 300.ms).slideY(begin: 0.2).fadeIn(),
 
           const SizedBox(height: AppSpacing.lg),

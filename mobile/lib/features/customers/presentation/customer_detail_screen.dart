@@ -112,10 +112,16 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   Widget build(BuildContext context) {
     final asyncData = ref.watch(customerDetailProvider(widget.customerId));
 
-    return WillPopScope(
-      onWillPop: () async {
-        context.pop();
-        return false;
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          if (_editMode) {
+            setState(() { _editMode = false; _prefilled = false; });
+          } else {
+            context.pop();
+          }
+        }
       },
       child: Scaffold(
         backgroundColor: AppColors.background,

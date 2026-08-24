@@ -88,18 +88,27 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
   final MapController _mapController = MapController();
   int _selectedStop = 0;
 
+  // car: 40 km/h city average, walk: 5 km/h
+  ({int car, int walk, double distKm}) _etaInfo(double fromLat, double fromLng, double toLat, double toLng) {
+    const double earthR = 6371;
+    final dLat = _toRadian(toLat - fromLat);
+    final dLng = _toRadian(toLng - fromLng);
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_toRadian(fromLat)) * math.cos(_toRadian(toLat)) *
+            math.sin(dLng / 2) * math.sin(dLng / 2);
+    final distKm = earthR * 2 * math.asin(math.sqrt(a));
+    final carMin = (distKm / 40.0 * 60).ceil();
+    final walkMin = (distKm / 5.0 * 60).ceil();
+    return (car: carMin, walk: walkMin, distKm: distKm);
+  }
+
   Future<void> _sendETA(RouteStop stop) async {
     try {
       final gps = ref.read(gpsServiceProvider);
       final currentPos = await gps.getCurrentPosition();
 
       if (currentPos != null) {
-        final etaMinutes = _calculateETA(
-          currentPos.latitude,
-          currentPos.longitude,
-          stop.lat,
-          stop.lng,
-        );
+        final info = _etaInfo(currentPos.latitude, currentPos.longitude, stop.lat, stop.lng);
 
         // Send ETA to admin dashboard
         final dio = ref.read(dioClientProvider);
@@ -108,22 +117,87 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
           data: {
             'visitId': stop.visitId,
             'customerName': stop.customerName,
-            'eta_minutes': etaMinutes,
-            'eta_timestamp': DateTime.now().add(Duration(minutes: etaMinutes)).toIso8601String(),
+            'eta_minutes': info.car,
+            'eta_walk_minutes': info.walk,
+            'eta_timestamp': DateTime.now().add(Duration(minutes: info.car)).toIso8601String(),
             'lat': currentPos.latitude,
             'lng': currentPos.longitude,
             'destination_lat': stop.lat,
             'destination_lng': stop.lng,
-            'distance_km': stop.distanceKm,
+            'distance_km': info.distKm,
           },
         ).catchError((e) => null);
+
+        // Check if officer is running late — notify admin via mobile endpoint
+        dio.post(
+          '/mobile/notify-late',
+          data: {
+            'visitId': stop.visitId,
+            'etaMinutes': info.car,
+            'customerName': stop.customerName,
+          },
+        ).catchError((e) => null);
+
+        // Show ETA bottom sheet before opening maps
+        if (mounted) {
+          await _showETASheet(stop, info.car, info.walk, info.distKm);
+        }
       }
     } catch (e) {
-      // Silently handle
+      // Still open maps even if ETA send fails
     }
 
-    // Open maps after sending ETA
     _openMaps(stop);
+  }
+
+  Future<void> _showETASheet(RouteStop stop, int carMin, int walkMin, double distKm) async {
+    await showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      backgroundColor: Colors.white,
+      builder: (_) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4))),
+          const SizedBox(height: 20),
+          Text(stop.customerName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text('${distKm.toStringAsFixed(2)} km away', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+          const SizedBox(height: 24),
+          Row(children: [
+            Expanded(child: _ETATile(icon: Icons.directions_car_rounded, label: 'By Car', minutes: carMin, color: AppColors.primary)),
+            const SizedBox(width: 12),
+            Expanded(child: _ETATile(icon: Icons.directions_walk_rounded, label: 'Walking', minutes: walkMin, color: Colors.blue.shade700)),
+          ]),
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: Colors.amber.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.amber.shade200)),
+            child: Row(children: [
+              Icon(Icons.info_outline_rounded, color: Colors.amber.shade700, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('ETA sent to admin dashboard. Opening navigation…',
+                    style: TextStyle(fontSize: 12, color: Colors.amber.shade800)),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity, height: 50,
+            child: ElevatedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.navigation_rounded),
+              label: const Text('Start Navigation', style: TextStyle(fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary, foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+        ]),
+      ),
+    );
   }
 
   @override
@@ -285,7 +359,7 @@ class _MapView extends StatelessWidget {
                   child: Row(
                     children: [
                       IconButton(
-                        onPressed: () => context.go('/dashboard'),
+                        onPressed: () => context.pop(),
                         icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
                         visualDensity: VisualDensity.compact,
                       ),
@@ -454,27 +528,7 @@ class _MapView extends StatelessWidget {
     }
   }
 
-  // Calculate ETA using Haversine distance + average speed
-  int _calculateETA(double fromLat, double fromLng, double toLat, double toLng) {
-    const double earthRadiusKm = 6371;
-    
-    final dLat = _toRadian(toLat - fromLat);
-    final dLng = _toRadian(toLng - fromLng);
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_toRadian(fromLat)) * math.cos(_toRadian(toLat)) *
-            math.sin(dLng / 2) * math.sin(dLng / 2);
-    final c = 2 * math.asin(math.sqrt(a));
-    final distanceKm = earthRadiusKm * c;
-    
-    // Estimate: 40 km/h average speed in city (account for traffic, stops)
-    final avgSpeedKmh = 40.0;
-    final timeHours = distanceKm / avgSpeedKmh;
-    final timeMinutes = (timeHours * 60).ceil();
-    
-    return timeMinutes;
-  }
-
-  double _toRadian(double degree) => degree * (3.14159265359 / 180);
+  double _toRadian(double degree) => degree * (math.pi / 180);
 }
 
 // ── Stop detail card (glassmorphism) ─────────────────────────────────────────
@@ -565,6 +619,38 @@ class _StopDetailCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ETATile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int minutes;
+  final Color color;
+  const _ETATile({required this.icon, required this.label, required this.minutes, required this.color});
+
+  String _format(int m) {
+    if (m < 60) return '$m min';
+    final h = m ~/ 60;
+    final rem = m % 60;
+    return rem == 0 ? '${h}h' : '${h}h ${rem}m';
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: color.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: color.withOpacity(0.2)),
+    ),
+    child: Column(children: [
+      Icon(icon, color: color, size: 28),
+      const SizedBox(height: 8),
+      Text(_format(minutes), style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: color)),
+      const SizedBox(height: 2),
+      Text(label, style: TextStyle(fontSize: 11, color: color.withOpacity(0.7), fontWeight: FontWeight.w500)),
+    ]),
+  );
 }
 
 class _ErrorView extends StatelessWidget {

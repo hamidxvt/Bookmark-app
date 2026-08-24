@@ -148,7 +148,7 @@ class _Header extends ConsumerWidget {
                   // Profile button
                   _HeaderBtn(
                     icon: Icons.person_outline_rounded,
-                    onTap: () => context.go('/profile'),
+                    onTap: () => context.push('/profile'),
                   ),
                   const SizedBox(width: 8),
                   // Logout
@@ -452,7 +452,7 @@ class _ActionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: action.route != null ? () => context.go(action.route!) : null,
+      onTap: action.route != null ? () => context.push(action.route!) : null,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,

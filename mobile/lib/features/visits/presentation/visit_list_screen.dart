@@ -24,7 +24,7 @@ class VisitListScreen extends ConsumerWidget {
         title: const Text('Today\'s Visits'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.go('/dashboard'),
+          onPressed: () => context.pop(),
         ),
         actions: [
           IconButton(
@@ -104,7 +104,7 @@ class _VisitTile extends ConsumerWidget {
         return;
       }
     }
-    context.go('/visits/${visit.id}/complete');
+    context.push('/visits/${visit.id}/complete');
   }
 
   @override
@@ -168,7 +168,7 @@ class _VisitTile extends ConsumerWidget {
                         Expanded(
                           child: GestureDetector(
                             onTap: visit.customerId != null
-                                ? () => context.go('/customers/${visit.customerId}')
+                                ? () => context.push('/customers/${visit.customerId}')
                                 : null,
                             child: Text(
                               visit.locationName,

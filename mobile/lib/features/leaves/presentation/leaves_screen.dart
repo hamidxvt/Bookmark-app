@@ -83,7 +83,7 @@ class LeavesScreen extends ConsumerWidget {
         title: const Text('Leave Management'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.go('/dashboard'),
+          onPressed: () => context.pop(),
         ),
         actions: [
           IconButton(

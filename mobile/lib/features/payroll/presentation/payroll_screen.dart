@@ -30,7 +30,7 @@ class PayrollScreen extends ConsumerWidget {
         title: const Text('My Earnings'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.go('/dashboard'),
+          onPressed: () => context.pop(),
         ),
         actions: [
           IconButton(
