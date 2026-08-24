@@ -49,9 +49,16 @@ export async function POST(req: NextRequest) {
     const isLate = etaMinutes > 25 && pendingCount >= 3;
     if (!isLate) return NextResponse.json({ success: true, data: { notified: false } });
 
+    // Fetch officer name from DB
+    const booker = await (prisma as any).booker.findUnique({
+      where: { id: officer.id },
+      select: { name: true },
+    });
+    const officerName = booker?.name ?? officer.email;
+
     const adminTokens = (process.env.ADMIN_FCM_TOKENS ?? '').split(',').filter(Boolean);
     const title = `⚠️ Officer May Run Late`;
-    const body = `${officer.name} — ETA ${etaMinutes} min to ${customerName ?? 'next stop'} with ${pendingCount} visits remaining today.`;
+    const body = `${officerName} — ETA ${etaMinutes} min to ${customerName ?? 'next stop'} with ${pendingCount} visits remaining today.`;
 
     for (const token of adminTokens) {
       await sendFcmNotification(token.trim(), title, body);
