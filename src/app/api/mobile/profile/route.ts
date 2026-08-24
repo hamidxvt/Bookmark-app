@@ -92,3 +92,23 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
   }
 }
+
+// PATCH /api/mobile/profile — update profile photo (base64 data URL)
+export async function PATCH(req: Request) {
+  const user = getMobileUser(req);
+  if (!user) return unauthorized();
+  try {
+    const { profilePhoto } = await req.json();
+    if (!profilePhoto) {
+      return NextResponse.json({ success: false, error: "profilePhoto required" }, { status: 400 });
+    }
+    await prisma.booker.update({
+      where: { id: user.id },
+      data: { profilePhoto: String(profilePhoto) },
+    });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("[mobile/profile PATCH]", err);
+    return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+  }
+}
