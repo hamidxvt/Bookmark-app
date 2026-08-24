@@ -5,7 +5,7 @@
  * and sends an FCM push notification to admin devices.
  */
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // Simple FCM push via Google REST API
@@ -27,7 +27,7 @@ async function sendFcmNotification(token: string, title: string, body: string) {
   }).catch(() => null);
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const { bookerId, visitId, etaMinutes, customerName } = await req.json();
 

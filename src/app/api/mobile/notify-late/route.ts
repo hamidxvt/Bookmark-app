@@ -3,7 +3,7 @@
  * Called by the mobile app when navigating starts.
  * If ETA is high and many visits pending, notifies admin.
  */
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getMobileUser, unauthorized } from '@/lib/mobile-auth';
 
@@ -24,7 +24,7 @@ async function sendFcmNotification(token: string, title: string, body: string) {
   }).catch(() => null);
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const officer = getMobileUser(req);
   if (!officer) return unauthorized();
 

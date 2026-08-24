@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getMobileUser, unauthorized } from '@/lib/mobile-auth';
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const booker = getMobileUser(req);
   if (!booker) return unauthorized();
 
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   return NextResponse.json({ success: true, data: samples });
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   const booker = getMobileUser(req);
   if (!booker) return unauthorized();
 
