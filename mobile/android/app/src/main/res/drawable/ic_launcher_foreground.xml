@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bookmark "V" logo shape — matches logo.jpeg -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-  <!-- Left wing of V -->
-  <path
-      android:pathData="M20,16 L54,72 L38,72 L12,22 Z"
-      android:fillColor="#C8102E"/>
-  <!-- Right wing of V -->
-  <path
-      android:pathData="M88,16 L54,72 L70,72 L96,22 Z"
-      android:fillColor="#C8102E"/>
-  <!-- Center stem -->
-  <path
-      android:pathData="M54,72 L46,88 L62,88 Z"
-      android:fillColor="#C8102E"/>
+    <!-- Red bookmark shape -->
+    <path
+        android:pathData="M36,18C35.4477,18 35,18.4477 35,19L35,85C35,86.1046 35.8954,87 37,87C38.1046,87 39,86.1046 39,85L39,50L69,70L69,19C69,18.4477 68.5523,18 68,18L36,18Z"
+        android:fillColor="#C8102E" />
+    <!-- White accent leaf -->
+    <path
+        android:pathData="M50,35L50,60C50,62.2091 48.2091,64 46,64L42,64C40.8954,64 40,63.1046 40,62L40,35C40,33.8954 40.8954,33 42,33L46,33C48.2091,33 50,34.7909 50,35Z"
+        android:fillColor="#FFFFFF"
+        android:opacity="0.8" />
+    <path
+        android:pathData="M65,35L65,60C65,62.2091 63.2091,64 61,64L57,64C55.8954,64 55,63.1046 55,62L55,35C55,33.8954 55.8954,33 57,33L61,33C63.2091,33 65,34.7909 65,35Z"
+        android:fillColor="#FFFFFF"
+        android:opacity="0.8" />
 </vector>
