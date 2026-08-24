@@ -320,9 +320,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   );
 
   String _greeting(int hour) {
-    if (hour < 12) return 'Good Morning 👋';
-    if (hour < 17) return 'Good Afternoon 👋';
-    return 'Good Evening 👋';
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
   }
 }
 
