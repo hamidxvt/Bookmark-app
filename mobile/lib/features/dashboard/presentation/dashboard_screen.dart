@@ -46,7 +46,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 // ── Hero AppBar section ────────────────────────────────────
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       colors: AppColors.primaryGradient,
@@ -58,32 +58,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Top row: avatar + greeting + logout
+                        // Greeting + name section
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withOpacity(0.18),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.35),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  initials,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,16 +69,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                                   Text(
                                     _greeting(now.hour),
                                     style: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontSize: 11.5,
+                                      color: Colors.white.withOpacity(0.8),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                      letterSpacing: 0.3,
                                     ),
                                   ),
+                                  const SizedBox(height: 4),
                                   Text(
                                     user?.name ?? 'Officer',
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w700,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.5,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
@@ -111,40 +93,92 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                             GestureDetector(
                               onTap: () => context.go('/profile'),
                               child: Container(
-                                padding: const EdgeInsets.all(8),
+                                width: 44,
+                                height: 44,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: Colors.white.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
                                   Icons.person_outline_rounded,
                                   color: Colors.white,
-                                  size: 19,
+                                  size: 20,
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 8),
                             GestureDetector(
                               onTap: () {
                                 ref.read(authProvider.notifier).logout();
                                 context.go('/login');
                               },
                               child: Container(
-                                padding: const EdgeInsets.all(8),
+                                width: 44,
+                                height: 44,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.10),
-                                  borderRadius: BorderRadius.circular(10),
+                                  color: Colors.white.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Icon(
                                   Icons.logout_rounded,
                                   color: Colors.white.withOpacity(0.8),
-                                  size: 19,
+                                  size: 20,
                                 ),
                               ),
                             ),
                           ],
                         ),
                         const SizedBox(height: 16),
+
+                        // Progress bar + date
+                        Consumer(
+                          builder: (_, ref, __) {
+                            final ws = ref.watch(workdayStatusProvider);
+                            final s = ws.valueOrNull;
+                            final progress = s?.dayStarted == true ? (s?.dayEnded == true ? 1.0 : 0.6) : 0.0;
+                            final progressText = s?.dayEnded == true ? '100%' : s?.dayStarted == true ? '60%' : '0%';
+                            
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Today\'s Progress',
+                                      style: TextStyle(
+                                        color: Colors.white.withOpacity(0.75),
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    Text(
+                                      progressText,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: LinearProgressIndicator(
+                                    value: progress,
+                                    minHeight: 6,
+                                    backgroundColor: Colors.white.withOpacity(0.2),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white.withOpacity(0.95),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 14),
 
                         // Date + logo
                         Row(
@@ -153,11 +187,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               borderRadius: BorderRadius.circular(6),
                               child: Image.asset(
                                 'assets/images/logo.png',
-                                width: 24,
-                                height: 24,
+                                width: 20,
+                                height: 20,
                                 fit: BoxFit.contain,
                                 errorBuilder: (_, __, ___) =>
-                                    const SizedBox(width: 24, height: 24),
+                                    const SizedBox(width: 20, height: 20),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -165,7 +199,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                               DateFormat('EEEE, d MMM').format(now),
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.65),
-                                fontSize: 12,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                           ],
