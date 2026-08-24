@@ -218,6 +218,8 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
     }
   }
 
+  double _toRadian(double degree) => degree * (math.pi / 180);
+
   @override
   Widget build(BuildContext context) {
     final routeAsync = ref.watch(routeProvider);
@@ -528,7 +530,6 @@ class _MapView extends StatelessWidget {
     );
   }
 
-  double _toRadian(double degree) => degree * (math.pi / 180);
 }
 
 // ── Stop detail card (glassmorphism) ─────────────────────────────────────────
