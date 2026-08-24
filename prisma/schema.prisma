@@ -450,7 +450,7 @@ model GpsPing {
   activity     String?  @db.VarChar(20) // STATIONARY, MOVING_SLOW, MOVING, MOVING_FAST
   altitude     Float?
   batteryLevel Int?     @map("battery_level") @db.SmallInt
-  timestamp    DateTime @map("timestamp")
+  timestamp    DateTime @default(now()) @map("timestamp")
   createdAt    DateTime @default(now()) @map("created_at")
 
   booker       Booker   @relation(fields: [bookerId], references: [id])
