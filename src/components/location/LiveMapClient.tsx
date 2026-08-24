@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { RefreshCw, Users, Clock, Navigation, Building2, ChevronDown, ExternalLink, CheckCircle2, Circle, Calendar, Gauge, Timer, Route } from "lucide-react";
+import { RefreshCw, Users, Clock, Navigation, Building2, ChevronDown, ExternalLink, CheckCircle2, Circle, Calendar, Activity, AlertCircle } from "lucide-react";
 
 interface City {
   id: number; name: string;
@@ -425,13 +425,13 @@ export default function LiveMapClient() {
                   {(etaData || selected.lastSpeedKmh !== undefined) && (
                     <div className="px-4 py-3 bg-amber-50 border-b border-amber-100">
                       <div className="flex items-center gap-1.5 mb-2">
-                        <Route className="h-3.5 w-3.5 text-amber-600" />
+                        <Activity className="h-3.5 w-3.5 text-amber-600" />
                         <span className="text-xs font-semibold text-amber-800">Live Tracking</span>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         {selected.lastSpeedKmh != null && (
                           <div className="flex items-center gap-1.5">
-                            <Gauge className="h-3 w-3 text-slate-500" />
+                            <Activity className="h-3 w-3 text-slate-500" />
                             <span className="text-xs text-slate-600">
                               {Number(selected.lastSpeedKmh).toFixed(1)} km/h
                               {selected.lastActivity ? ` · ${selected.lastActivity}` : ""}
@@ -441,7 +441,7 @@ export default function LiveMapClient() {
                         {etaData && (
                           <>
                             <div className="flex items-center gap-1.5">
-                              <Timer className="h-3 w-3 text-[#C8102E]" />
+                              <Clock className="h-3 w-3 text-[#C8102E]" />
                               <span className="text-xs text-slate-700 font-medium">
                                 ETA: {etaData.eta_minutes} min
                                 {etaData.distance_km ? ` · ${Number(etaData.distance_km).toFixed(1)} km` : ""}
