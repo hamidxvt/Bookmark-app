@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       where: {
         bookerId,
         status: { in: ['PENDING', 'IN_PROGRESS'] },
-        scheduledAt: { gte: today, lt: tomorrow },
+        visitDate: { gte: today, lt: tomorrow },
       },
     });
 
