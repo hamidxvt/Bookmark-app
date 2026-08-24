@@ -7,23 +7,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getMobileUser, unauthorized } from '@/lib/mobile-auth';
 
-async function sendFcmNotification(token: string, title: string, body: string) {
-  const fcmKey = process.env.FCM_SERVER_KEY;
-  if (!fcmKey) return;
-  await fetch('https://fcm.googleapis.com/fcm/send', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `key=${fcmKey}`,
-    },
-    body: JSON.stringify({
-      to: token,
-      notification: { title, body, sound: 'default', click_action: 'FLUTTER_NOTIFICATION_CLICK' },
-      data: { type: 'officer_late' },
-    }),
-  }).catch(() => null);
-}
-
 export async function POST(req: NextRequest) {
   const officer = getMobileUser(req);
   if (!officer) return unauthorized();
@@ -49,22 +32,10 @@ export async function POST(req: NextRequest) {
     const isLate = etaMinutes > 25 && pendingCount >= 3;
     if (!isLate) return NextResponse.json({ success: true, data: { notified: false } });
 
-    // Fetch officer name from DB
-    const booker = await (prisma as any).booker.findUnique({
-      where: { id: officer.id },
-      select: { name: true },
-    });
-    const officerName = booker?.name ?? officer.email;
+    // Log late officer for admin (FCM notifications can be enabled later with ADMIN_FCM_TOKENS env var)
+    console.log(`[Late Officer] ${officer.email} - ETA ${etaMinutes}min, ${pendingCount} pending visits, to ${customerName ?? 'next stop'}`);
 
-    const adminTokens = (process.env.ADMIN_FCM_TOKENS ?? '').split(',').filter(Boolean);
-    const title = `⚠️ Officer May Run Late`;
-    const body = `${officerName} — ETA ${etaMinutes} min to ${customerName ?? 'next stop'} with ${pendingCount} visits remaining today.`;
-
-    for (const token of adminTokens) {
-      await sendFcmNotification(token.trim(), title, body);
-    }
-
-    return NextResponse.json({ success: true, data: { notified: adminTokens.length, isLate, pendingCount } });
+    return NextResponse.json({ success: true, data: { notified: 0, isLate, pendingCount, logged: true } });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: { message: err.message } }, { status: 500 });
   }
