@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const id = parseInt(params.id);
+    const { id } = await params;
+    const parsedId = parseInt(id);
     const { status, adminNotes } = await req.json();
 
     const updated = await (prisma as any).sampleRequest.update({
-      where: { id },
+      where: { id: parsedId },
       data: {
         status,
         adminNotes: adminNotes || null,

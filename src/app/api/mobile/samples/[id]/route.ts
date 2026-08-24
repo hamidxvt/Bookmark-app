@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getMobileUser, unauthorized } from '@/lib/mobile-auth';
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const booker = getMobileUser(req);
   if (!booker) return unauthorized();
 
   try {
-    const id = parseInt(params.id);
+    const { id } = await params;
+    const parsedId = parseInt(id);
     const { customerName, signatureBase64, pdfUrl, notes, quantity, customerId } = await req.json();
 
     const updated = await (prisma as any).sampleRequest.update({
-      where: { id, bookerId: booker.id },
+      where: { id: parsedId, bookerId: booker.id },
       data: {
         customerName: customerName || null,
         signatureBase64: signatureBase64 || null,

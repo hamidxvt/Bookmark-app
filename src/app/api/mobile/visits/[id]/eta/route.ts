@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getMobileUser, unauthorized } from '@/lib/mobile-auth';
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const officer = getMobileUser(req);
   if (!officer) return unauthorized();
 
   try {
-    const visitId = parseInt(params.id);
+    const { id } = await params;
+    const visitId = parseInt(id);
     const body = await req.json();
 
     const {

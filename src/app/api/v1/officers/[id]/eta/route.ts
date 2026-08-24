@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // GET /api/v1/officers/:id/eta — latest ETA for a specific officer
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const bookerId = parseInt(params.id);
+    const { id } = await params;
+    const bookerId = parseInt(id);
 
     // Find the most recent navigating visit for this officer
     const latestETA = await (prisma as any).visitETA.findFirst({
