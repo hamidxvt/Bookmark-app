@@ -9,6 +9,7 @@ import 'features/auth/presentation/login_screen.dart';
 import 'features/auth/presentation/forgot_password_screen.dart';
 import 'features/customers/presentation/customer_detail_screen.dart';
 import 'features/dashboard/presentation/dashboard_screen.dart';
+import 'features/visits/presentation/add_customer_screen.dart';
 import 'features/leaves/presentation/leaves_screen.dart';
 import 'features/samples/presentation/samples_screen.dart';
 import 'features/visits/presentation/visit_list_screen.dart';
@@ -65,6 +66,11 @@ final _routerProvider = Provider<GoRouter>((ref) {
         path: '/customers/:id',
         builder: (_, state) => CustomerDetailScreen(
             customerId: int.parse(state.pathParameters['id']!)),
+      ),
+      GoRoute(
+        path: '/visits/:id/add-customer',
+        builder: (_, state) => AddCustomerScreen(
+            visitId: int.parse(state.pathParameters['id']!)),
       ),
     ],
   );

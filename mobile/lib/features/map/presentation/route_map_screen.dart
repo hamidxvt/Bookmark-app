@@ -476,7 +476,6 @@ class _MapView extends StatelessWidget {
 
   double _toRadian(double degree) => degree * (3.14159265359 / 180);
 }
-}
 
 // ── Stop detail card (glassmorphism) ─────────────────────────────────────────
 class _StopDetailCard extends StatelessWidget {
