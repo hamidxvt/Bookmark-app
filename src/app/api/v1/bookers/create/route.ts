@@ -31,21 +31,26 @@ export async function POST(req: Request) {
 
     const hash = await bcrypt.hash(String(password), 10);
 
+    // Build data object with proper null handling
+    const createData: any = {
+      name: String(name),
+      email: String(email),
+      password: hash,
+      phone: String(phone),
+      adminApproved: adminApproved || "APPROVED",
+      jobStatus: jobStatus || "ACTIVE",
+      visitTargets: visitTargets ? parseInt(String(visitTargets)) : 7,
+      cityId: resolvedCityId,
+    };
+
+    // Only add optional fields if provided
+    if (designation) createData.designation = String(designation);
+    if (basicSalary) createData.basicSalary = parseFloat(String(basicSalary));
+    if (ratesPerVisit) createData.ratesPerVisit = parseFloat(String(ratesPerVisit));
+    if (sampleBudget) createData.sampleBudget = parseFloat(String(sampleBudget));
+
     const booker = await prisma.booker.create({
-      data: {
-        name: String(name),
-        email: String(email),
-        password: hash,
-        phone: String(phone),
-        designation: designation ? String(designation) : null,
-        basicSalary: basicSalary ? parseFloat(String(basicSalary)) : null,
-        ratesPerVisit: ratesPerVisit ? parseFloat(String(ratesPerVisit)) : null,
-        visitTargets: visitTargets ? parseInt(String(visitTargets)) : 7,
-        sampleBudget: sampleBudget ? parseFloat(String(sampleBudget)) : null,
-        adminApproved: String(adminApproved ?? "APPROVED"),
-        jobStatus: String(jobStatus ?? "ACTIVE"),
-        cityId: resolvedCityId,
-      },
+      data: createData,
     });
 
     return NextResponse.json({
