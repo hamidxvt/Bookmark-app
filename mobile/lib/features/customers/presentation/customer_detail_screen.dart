@@ -12,8 +12,15 @@ final customerDetailProvider =
     FutureProvider.autoDispose.family<Map<String, dynamic>, int>((ref, customerId) async {
   final dio = ref.watch(dioClientProvider);
   final res = await dio.get('/customers/$customerId');
-  if (res.data['success'] == true) return res.data['data'] as Map<String, dynamic>;
-  throw Exception(res.data['error'] ?? 'Failed to load customer');
+  final body = res.data;
+  if (body == null) throw Exception('No response from server');
+  if (body['success'] == true) {
+    final data = body['data'];
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw Exception('Unexpected data format');
+  }
+  throw Exception(body['error']?['message'] ?? body['error'] ?? 'Failed to load customer');
 });
 
 // ── Screen ────────────────────────────────────────────────────────────────────

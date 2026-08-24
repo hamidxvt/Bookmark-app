@@ -60,7 +60,8 @@ final samplesListProvider = FutureProvider.autoDispose<List<SampleRequest>>((ref
   final dio = ref.watch(dioClientProvider);
   final res = await dio.get('/samples');
   final raw = res.data;
-  final list = raw['data'] as List? ?? [];
+  final data = raw['data'];
+  final list = data is List ? data : <dynamic>[];
   return list.cast<Map<String, dynamic>>().map(SampleRequest.fromJson).toList();
 });
 

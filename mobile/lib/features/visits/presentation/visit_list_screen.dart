@@ -466,13 +466,45 @@ class _AdhocVisitSheetState extends ConsumerState<_AdhocVisitSheet> {
                       onConfirm: _createVisit,
                       onClear: () => setState(() => _selected = null),
                     )
-                  : ListView.builder(
-                      controller: scrollCtrl,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: _results.length,
-                      itemBuilder: (_, i) {
-                        final c = _results[i];
-                        return ListTile(
+                  : Column(children: [
+                      // Add new customer banner
+                      GestureDetector(
+                        onTap: () async {
+                          context.pop();
+                          final result = await context.push<int?>('/visits/0/add-customer');
+                          if (result != null) widget.onCreated();
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.07),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+                          ),
+                          child: Row(children: [
+                            Container(
+                              width: 36, height: 36,
+                              decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
+                              child: const Icon(Icons.person_add_rounded, color: Colors.white, size: 18),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Text('Add New Customer', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                              Text('New school/shop not in the system', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                            ])),
+                            Icon(Icons.arrow_forward_ios_rounded, size: 14, color: AppColors.primary),
+                          ]),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          controller: scrollCtrl,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          itemCount: _results.length,
+                          itemBuilder: (_, i) {
+                            final c = _results[i];
+                            return ListTile(
                           leading: CircleAvatar(
                             backgroundColor: AppColors.primary.withOpacity(0.1),
                             child: Text(
@@ -492,6 +524,8 @@ class _AdhocVisitSheetState extends ConsumerState<_AdhocVisitSheet> {
                         );
                       },
                     ),
+                      ),
+                    ]),
             ),
           ],
         ),
