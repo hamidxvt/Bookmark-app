@@ -534,6 +534,7 @@ model SampleRequest {
   productId       Int?      @map("product_id")
   productName     String    @map("product_name")
   quantity        Int       @default(1)
+  price           Decimal?  @db.Decimal(10, 2) // Price per unit or total cost
   notes           String?   @db.Text
   status          String    @default("pending") // pending, approved, rejected, delivered
   adminNotes      String?   @map("admin_notes") @db.Text

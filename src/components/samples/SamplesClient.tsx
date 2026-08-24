@@ -10,6 +10,7 @@ interface SampleRequest {
   id: number;
   productName: string;
   quantity: number;
+  price: number | null;
   notes: string | null;
   status: string;
   adminNotes: string | null;
@@ -18,7 +19,7 @@ interface SampleRequest {
   pdfUrl: string | null;
   deliveredAt: string | null;
   createdAt: string;
-  booker: { id: number; name: string; email: string };
+  booker: { id: number; name: string; email: string; sampleBudget?: number };
   customer: { id: number; name: string } | null;
 }
 
@@ -303,7 +304,7 @@ export default function SamplesClient() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  {["#", "Officer", "Product", "Qty", "Customer", "Status", "Submitted", "Actions"].map(h => (
+                  {["#", "Officer", "Product", "Qty", "Price", "Customer", "Status", "Submitted", "Actions"].map(h => (
                     <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">{h}</th>
                   ))}
                 </tr>
@@ -318,6 +319,9 @@ export default function SamplesClient() {
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-800">{s.productName}</td>
                     <td className="px-4 py-3 text-gray-600">{s.quantity}</td>
+                    <td className="px-4 py-3 text-gray-600 font-medium">
+                      {s.price ? `Rs. ${(parseFloat(s.price.toString()) * s.quantity).toLocaleString()}` : '—'}
+                    </td>
                     <td className="px-4 py-3 text-gray-600">
                       {s.customer?.name ?? s.customerName ?? <span className="text-gray-300">—</span>}
                     </td>

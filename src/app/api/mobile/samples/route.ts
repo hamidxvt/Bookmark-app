@@ -20,13 +20,14 @@ export async function POST(req: NextRequest) {
   if (!booker) return unauthorized();
 
   try {
-    const { productName, quantity, notes, customerId, customerName } = await req.json();
+    const { productName, quantity, price, notes, customerId, customerName } = await req.json();
 
     const sample = await (prisma as any).sampleRequest.create({
       data: {
         bookerId: booker.id,
         productName,
         quantity: quantity ?? 1,
+        price: price ? parseFloat(price.toString()) : null,
         notes: notes || null,
         customerId: customerId || null,
         customerName: customerName || null,
