@@ -6,7 +6,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const id = parseInt(params.id);
     const { status, adminNotes } = await req.json();
 
-    const updated = await prisma.sampleRequest.update({
+    const updated = await (prisma as any).sampleRequest.update({
       where: { id },
       data: {
         status,

@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     if (status) where.status = status;
     if (bookerId) where.bookerId = parseInt(bookerId);
 
-    const samples = await prisma.sampleRequest.findMany({
+    const samples = await (prisma as any).sampleRequest.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: 100,

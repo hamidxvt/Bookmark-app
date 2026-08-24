@@ -10,7 +10,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const id = parseInt(params.id);
     const { customerName, signatureBase64, pdfUrl, notes, quantity, customerId } = await req.json();
 
-    const updated = await prisma.sampleRequest.update({
+    const updated = await (prisma as any).sampleRequest.update({
       where: { id, bookerId: booker.id },
       data: {
         customerName: customerName || null,

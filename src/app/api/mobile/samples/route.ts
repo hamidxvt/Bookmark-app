@@ -6,7 +6,7 @@ export async function GET(req: Request) {
   const booker = getMobileUser(req);
   if (!booker) return unauthorized();
 
-  const samples = await prisma.sampleRequest.findMany({
+  const samples = await (prisma as any).sampleRequest.findMany({
     where: { bookerId: booker.id },
     orderBy: { createdAt: 'desc' },
     include: { customer: { select: { id: true, name: true } } },
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   try {
     const { productName, quantity, notes, customerId, customerName } = await req.json();
 
-    const sample = await prisma.sampleRequest.create({
+    const sample = await (prisma as any).sampleRequest.create({
       data: {
         bookerId: booker.id,
         productName,
