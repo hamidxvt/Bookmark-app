@@ -2,187 +2,234 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, Package } from "lucide-react";
+import { ArrowLeft, Package, Upload, X, Loader2 } from "lucide-react";
 
-const GRADES = ["KG", "Grade 1", "Grade 2", "Grade 3", "Grade 4", "Grade 5", "Grade 6", "Grade 7", "Grade 8", "O-Level", "A-Level", "Other"];
-const SEGMENTS = ["Primary", "Middle", "Secondary", "Higher Secondary", "University", "General"];
+const SEGMENTS = ["Early Years", "Primary", "Lower Secondary", "O Level", "A Level", "Higher Secondary", "University"];
+const GRADES   = Array.from({ length: 14 }, (_, i) => String(i + 1));
 
-const inputCls = "w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition bg-white";
-const selectCls = `${inputCls} appearance-none cursor-pointer`;
-
-function Field({ label, required = false, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-        {label} {required && <span className="text-red-500">*</span>}
+      <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+        {label} {required && <span className="text-[#C8102E]">*</span>}
       </label>
       {children}
     </div>
   );
 }
 
-function SelectField({ label, required, value, onChange, children }: {
-  label: string; required?: boolean; value: string; onChange: (v: string) => void; children: React.ReactNode;
-}) {
-  return (
-    <Field label={label} required={required}>
-      <div className="relative">
-        <select value={value} onChange={e => onChange(e.target.value)} className={selectCls}>
-          {children}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-      </div>
-    </Field>
-  );
-}
+const INPUT = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition-all";
+const SELECT = INPUT + " appearance-none cursor-pointer";
 
 export default function AddProductPage() {
   const router = useRouter();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [brands, setBrands] = useState<Array<{ id: number; name: string }>>([]);
-  const [subjects, setSubjects] = useState<Array<{ id: number; name: string }>>([]);
-  const [seriesList, setSeriesList] = useState<Array<{ id: number; name: string }>>([]);
+  const [brands,   setBrands]   = useState<{ id: number; name: string }[]>([]);
+  const [subjects, setSubjects] = useState<{ id: number; name: string }[]>([]);
+  const [series,   setSeries]   = useState<{ id: number; name: string }[]>([]);
+  const [saving, setSaving]     = useState(false);
+  const [error,  setError]      = useState("");
+  const [imgPreview, setImgPreview] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    name: "", brandId: "", subjectId: "", seriesId: "",
-    isbn: "", segment: "", grade: "",
-    description: "", retailPrice: "", image: "",
+    brandId:     "",
+    subjectId:   "",
+    seriesId:    "",
+    name:        "",
+    isbn:        "",
+    segment:     "",
+    grade:       "",
+    description: "",
+    retailPrice: "",
+    image:       "",
   });
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/v1/products?type=brands&length=200").then(r => r.json()),
-      fetch("/api/v1/products?type=subjects&length=200").then(r => r.json()),
-      fetch("/api/v1/products?type=series&length=200").then(r => r.json()),
-    ]).then(([b, su, se]) => {
-      if (b.success) setBrands(b.data?.data ?? []);
-      if (su.success) setSubjects(su.data?.data ?? []);
-      if (se.success) setSeriesList(se.data?.data ?? []);
-    }).catch(() => {});
+      fetch("/api/v1/products?type=brands").then(r => r.json()),
+      fetch("/api/v1/products?type=subjects").then(r => r.json()),
+      fetch("/api/v1/products?type=series").then(r => r.json()),
+    ]).then(([b, s, sr]) => {
+      if (b.success) setBrands(b.data);
+      if (s.success) setSubjects(s.data);
+      if (sr.success) setSeries(sr.data);
+    });
   }, []);
 
-  const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
+  function set(k: keyof typeof form, v: string) {
+    setForm(f => ({ ...f, [k]: v }));
+  }
+
+  function handleImage(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      setImgPreview(base64);
+      set("image", base64);
+    };
+    reader.readAsDataURL(file);
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setError("Product name is required"); return; }
-    if (!form.brandId) { setError("Please select a brand"); return; }
-
-    setSaving(true); setError("");
+    setError("");
+    if (!form.brandId || !form.name || !form.retailPrice) {
+      setError("Brand, Product Name, and Retail Price are required.");
+      return;
+    }
+    setSaving(true);
     try {
       const res = await fetch("/api/v1/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: form.name.trim(),
-          brandId: form.brandId,
-          subjectId: form.subjectId || null,
-          seriesId: form.seriesId || null,
-          isbn: form.isbn.trim() || null,
-          segment: form.segment || null,
-          grade: form.grade || null,
+          brandId:     parseInt(form.brandId),
+          subjectId:   form.subjectId   ? parseInt(form.subjectId)   : null,
+          seriesId:    form.seriesId    ? parseInt(form.seriesId)    : null,
+          name:        form.name.trim(),
+          isbn:        form.isbn.trim()  || null,
+          segment:     form.segment      || null,
+          grade:       form.grade        || null,
           description: form.description.trim() || null,
-          retailPrice: form.retailPrice ? parseFloat(form.retailPrice) : 0,
-          image: form.image.trim() || null,
+          retailPrice: parseFloat(form.retailPrice),
+          image:       form.image        || null,
         }),
       }).then(r => r.json());
 
       if (res.success) {
         router.push("/products");
       } else {
-        setError(res.error?.message ?? res.error ?? "Failed to add product");
+        setError(res.error ?? "Failed to add product");
       }
-    } catch (err: any) {
-      setError(err.message ?? "Network error");
+    } catch (e: any) {
+      setError(e.message);
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => router.back()} className="p-2 rounded-xl hover:bg-slate-100 transition">
-          <ArrowLeft className="h-5 w-5 text-slate-500" />
+        <button onClick={() => router.back()}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+          <ArrowLeft className="h-4 w-4" />
         </button>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Add Product</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Register a new book or educational product</p>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#C8102E]">
+            <Package className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 leading-none">Product Profile</h1>
+            <p className="text-xs text-slate-500 mt-0.5">Add a new product to the catalogue</p>
+          </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
-        )}
+      <form onSubmit={handleSubmit} className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
+        {/* 1. Brand — dropdown */}
+        <Field label="Brand" required>
+          <select value={form.brandId} onChange={e => set("brandId", e.target.value)} className={SELECT} required>
+            <option value="">Select brand…</option>
+            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </Field>
 
-        {/* Product Identity */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-          <div className="flex items-center gap-2 mb-1">
-            <Package className="h-4 w-4 text-red-600" />
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Product Profile</p>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <SelectField label="Brand" required value={form.brandId} onChange={v => set("brandId", v)}>
-              <option value="">Select brand…</option>
-              {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </SelectField>
+        {/* 2. Subject — dropdown */}
+        <Field label="Subject">
+          <select value={form.subjectId} onChange={e => set("subjectId", e.target.value)} className={SELECT}>
+            <option value="">Select subject…</option>
+            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </Field>
 
-            <SelectField label="Subject" value={form.subjectId} onChange={v => set("subjectId", v)}>
-              <option value="">Select subject…</option>
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </SelectField>
+        {/* 3. Series — dropdown */}
+        <Field label="Series">
+          <select value={form.seriesId} onChange={e => set("seriesId", e.target.value)} className={SELECT}>
+            <option value="">Select series…</option>
+            {series.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </Field>
 
-            <SelectField label="Series" value={form.seriesId} onChange={v => set("seriesId", v)}>
-              <option value="">Select series…</option>
-              {seriesList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </SelectField>
+        {/* 4. Product Name */}
+        <Field label="Product Name" required>
+          <input value={form.name} onChange={e => set("name", e.target.value)}
+            placeholder="e.g. ASTA - THE WEAVER'S DAUGHTER" className={INPUT} required />
+        </Field>
 
-            <div className="col-span-2">
-              <Field label="Product Name" required>
-                <input value={form.name} onChange={e => set("name", e.target.value)} required className={inputCls} placeholder="Full product / book title" />
-              </Field>
-            </div>
+        {/* 5. ISBN Number */}
+        <Field label="ISBN Number">
+          <input value={form.isbn} onChange={e => set("isbn", e.target.value)}
+            placeholder="e.g. 978-969-123-456-7" className={INPUT} maxLength={20} />
+        </Field>
 
-            <Field label="ISBN Number">
-              <input value={form.isbn} onChange={e => set("isbn", e.target.value)} className={inputCls} placeholder="978-3-16-148410-0" />
-            </Field>
-
-            <SelectField label="Segment" value={form.segment} onChange={v => set("segment", v)}>
+        {/* 6 & 7. Segment + Grade — side by side */}
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Segment">
+            <select value={form.segment} onChange={e => set("segment", e.target.value)} className={SELECT}>
               <option value="">Select segment…</option>
               {SEGMENTS.map(s => <option key={s} value={s}>{s}</option>)}
-            </SelectField>
-
-            <SelectField label="Grade" value={form.grade} onChange={v => set("grade", v)}>
+            </select>
+          </Field>
+          <Field label="Grade">
+            <select value={form.grade} onChange={e => set("grade", e.target.value)} className={SELECT}>
               <option value="">Select grade…</option>
-              {GRADES.map(g => <option key={g} value={g}>{g}</option>)}
-            </SelectField>
-
-            <Field label="Retail Price (Rs.)">
-              <input type="number" step="0.01" min="0" value={form.retailPrice} onChange={e => set("retailPrice", e.target.value)} className={inputCls} placeholder="0.00" />
-            </Field>
-
-            <div className="col-span-2">
-              <Field label="Description">
-                <textarea value={form.description} onChange={e => set("description", e.target.value)} rows={3} className={inputCls} placeholder="Brief description of the product…" />
-              </Field>
-            </div>
-
-            <div className="col-span-2">
-              <Field label="Upload Picture (URL or leave blank)">
-                <input value={form.image} onChange={e => set("image", e.target.value)} className={inputCls} placeholder="https://... or leave empty" />
-              </Field>
-            </div>
-          </div>
+              {GRADES.map(g => <option key={g} value={g}>Grade {g}</option>)}
+            </select>
+          </Field>
         </div>
 
-        <div className="flex justify-end gap-3">
-          <button type="button" onClick={() => router.back()} className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
+        {/* 8. Description */}
+        <Field label="Description">
+          <textarea value={form.description} onChange={e => set("description", e.target.value)}
+            rows={3} placeholder="Brief description of the product…"
+            className={INPUT + " resize-none"} />
+        </Field>
+
+        {/* 9. Retail Price */}
+        <Field label="Retail Price (PKR)" required>
+          <input type="number" min="0" step="0.01" value={form.retailPrice}
+            onChange={e => set("retailPrice", e.target.value)}
+            placeholder="e.g. 650" className={INPUT} required />
+        </Field>
+
+        {/* 10. Upload Picture */}
+        <Field label="Upload Picture">
+          <div className="relative">
+            {imgPreview ? (
+              <div className="relative w-full h-44 rounded-xl overflow-hidden border border-slate-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={imgPreview} alt="preview" className="w-full h-full object-cover" />
+                <button type="button" onClick={() => { setImgPreview(null); set("image", ""); }}
+                  className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-slate-200 cursor-pointer hover:border-[#C8102E] hover:bg-red-50/30 transition-colors">
+                <Upload className="h-6 w-6 text-slate-300 mb-2" />
+                <span className="text-xs text-slate-400">Click to upload product image</span>
+                <span className="text-[10px] text-slate-300 mt-1">PNG, JPG up to 5MB</span>
+                <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
+              </label>
+            )}
+          </div>
+        </Field>
+
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
+
+        <div className="flex gap-3 pt-2">
+          <button type="button" onClick={() => router.back()}
+            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             Cancel
           </button>
-          <button type="submit" disabled={saving} className="px-6 py-2.5 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition">
-            {saving ? "Saving…" : "Add Product"}
+          <button type="submit" disabled={saving}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] py-3 text-sm font-bold text-white hover:bg-red-700 transition-colors disabled:opacity-60">
+            {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Adding…</> : "Add Product"}
           </button>
         </div>
       </form>

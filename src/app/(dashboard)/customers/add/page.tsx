@@ -2,278 +2,328 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Building2, GraduationCap, User, Store, ChevronDown } from "lucide-react";
+import { ArrowLeft, Building2, Store, User, GraduationCap, Loader2, ChevronDown } from "lucide-react";
 
-const CUSTOMER_TYPES = [
-  { value: "SCHOOL",   label: "School",      icon: GraduationCap, description: "Primary/Secondary school" },
-  { value: "COLLEGE",  label: "College",     icon: GraduationCap, description: "College/University" },
-  { value: "RETAILER", label: "Book Shop",   icon: Store,         description: "Retail book store" },
-  { value: "SELF",     label: "Individual",  icon: User,          description: "Individual customer" },
-  { value: "OTHER",    label: "Other",       icon: Building2,     description: "Other institution" },
+type RegType = "school" | "shop" | "individual";
+
+interface City { id: number; name: string; }
+
+const EXAM_BOARDS  = ["AKU-EB","BIEK","BISE Karachi","BISE Lahore","Cambridge (CAIE)","Federal Board","IB","Matric","Other"];
+const PROGRAMMES   = ["A Level","O Level","Matric","Pre-Med","Pre-Engineering","Arts","Commerce","Other"];
+const ZONES        = ["North","South","East","West","Central","Other"];
+const STUDENT_RANGES = ["< 100","100–300","300–500","500–1000","1000+"];
+const PRIORITIES   = [
+  { value: "1", label: "1 — Highest" },
+  { value: "2", label: "2 — High" },
+  { value: "3", label: "3 — Medium" },
+  { value: "4", label: "4 — Low" },
+  { value: "5", label: "5 — Lowest" },
 ];
+const CATEGORIES_SCHOOL = ["A+","A","B","O LEVEL"];
+const CATEGORIES_SHOP   = ["BOOKSHOPS","BOOKSHELF INSTALLED","RETAILER","STOCKIST","NETWORKS","DEPARTMENTAL STORE","ONLINE AGENT","Other"];
+const TYPES_SHOP        = ["School","Distributor","Retailer","Other"];
 
-const EXAMINATION_BOARDS = ["Federal Board", "Punjab Board", "Sindh Board", "KPK Board", "Balochistan Board", "AJK Board", "Aga Khan Board", "Cambridge (CAIE)", "Oxford (IB)"];
-const PROGRAMMES = ["O-Level", "A-Level", "Matric", "Inter", "Primary", "Middle", "KG / Prep", "Montessori"];
-const PRIORITIES = [1, 2, 3, 4, 5];
-const ZONES = ["North", "South", "East", "West", "Central"];
+const INPUT  = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition-all placeholder:text-slate-400";
+const SELECT = INPUT + " appearance-none cursor-pointer";
 
-function Field({ label, required = false, children }: { label: string; required?: boolean; children: React.ReactNode }) {
+function Field({ num, label, required, children }: { num?: number; label: string; required?: boolean; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      {children}
+    <div className="flex gap-3">
+      {num !== undefined && (
+        <div className="flex h-7 w-7 shrink-0 mt-0.5 items-center justify-center rounded-lg bg-[#C8102E]/10 text-xs font-bold text-[#C8102E]">{num}</div>
+      )}
+      <div className="flex-1">
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+          {label} {required && <span className="text-[#C8102E]">*</span>}
+        </label>
+        {children}
+      </div>
     </div>
   );
 }
 
-const inputCls = "w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition bg-white";
-const selectCls = `${inputCls} appearance-none cursor-pointer`;
+function SelectField({ value, onChange, options, placeholder }: {
+  value: string; onChange: (v: string) => void;
+  options: (string | { value: string; label: string })[];
+  placeholder?: string;
+}) {
+  return (
+    <div className="relative">
+      <select value={value} onChange={e => onChange(e.target.value)} className={SELECT}>
+        <option value="">{placeholder ?? "Select…"}</option>
+        {options.map(o => {
+          const val = typeof o === "string" ? o : o.value;
+          const lbl = typeof o === "string" ? o : o.label;
+          return <option key={val} value={val}>{lbl}</option>;
+        })}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+    </div>
+  );
+}
+
+// ─── Registration type selector ───────────────────────────────────────────────
+
+const TYPES: { key: RegType; label: string; sub: string; icon: React.ElementType }[] = [
+  { key: "school",     label: "School Registration",      sub: "For schools & colleges",        icon: GraduationCap },
+  { key: "shop",       label: "Shop Registration",        sub: "For book shops & distributors", icon: Store         },
+  { key: "individual", label: "Individual Registration",  sub: "For individual contacts",       icon: User          },
+];
 
 export default function AddCustomerPage() {
   const router = useRouter();
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [cities, setCities] = useState<Array<{ id: number; name: string }>>([]);
-  const [customerType, setCustomerType] = useState("SCHOOL");
+  const [regType, setRegType] = useState<RegType | null>(null);
+  const [cities, setCities]   = useState<City[]>([]);
+  const [saving, setSaving]   = useState(false);
+  const [error,  setError]    = useState("");
 
-  const [form, setForm] = useState({
-    name: "", ownerName: "", ownerPhone: "", email: "", website: "",
-    address: "", zone: "", cityId: "", category: "",
-    workingPriority: 3,
-    // School/College specific
-    examinationBoard: "", offeredProgramme: "", totalStudents: "",
-    reviewMonth: "", sessionStarts: "",
-  });
+  // Shared fields
+  const [name,    setName]    = useState("");
+  const [address, setAddress] = useState("");
+  const [phone,   setPhone]   = useState("");
+  const [email,   setEmail]   = useState("");
+  const [website, setWebsite] = useState("");
+  const [cityId,  setCityId]  = useState("");
+  const [area,    setArea]    = useState("");
+  const [zone,    setZone]    = useState("");
+  const [type,    setType]    = useState("");
+  const [category, setCategory] = useState("");
+  const [priority, setPriority] = useState("3");
+
+  // School-specific
+  const [examBoard,     setExamBoard]     = useState("");
+  const [programme,     setProgramme]     = useState("");
+  const [reviewMonth,   setReviewMonth]   = useState("");
+  const [sessionStarts, setSessionStarts] = useState("");
+  const [totalStudents, setTotalStudents] = useState("");
 
   useEffect(() => {
     fetch("/api/v1/cities").then(r => r.json()).then(d => {
-      if (d.success && Array.isArray(d.data)) setCities(d.data);
-    }).catch(() => {});
+      if (d.success) setCities(d.data);
+    });
   }, []);
-
-  const set = (k: string, v: string | number) => setForm(p => ({ ...p, [k]: v }));
-
-  const isSchoolType = customerType === "SCHOOL" || customerType === "COLLEGE";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim()) { setError("Name is required"); return; }
-    if (!form.ownerPhone.trim()) { setError("Contact number is required"); return; }
-    if (!form.cityId) { setError("Please select a city"); return; }
+    if (!name.trim() || !phone.trim() || !cityId) {
+      setError("Name, phone, and city are required.");
+      return;
+    }
+    setError(""); setSaving(true);
 
-    setSaving(true); setError("");
+    const isSchool = regType === "school";
+    const isShop   = regType === "shop";
+
+    const body = {
+      name:         name.trim(),
+      ownerPhone:   phone.trim(),
+      email:        email.trim() || null,
+      website:      website.trim() || null,
+      address:      address.trim() || null,
+      cityId:       parseInt(cityId),
+      zone:         zone || null,
+      category:     category || null,
+      workingPriority: parseInt(priority) || 3,
+      approvalStatus: "APPROVED",
+      customerType: isSchool ? "SCHOOL" : isShop ? "RETAILER" : "SELF",
+      // School-specific
+      examinationBoard: isSchool ? (examBoard || null)     : null,
+      offeredProgramme: isSchool ? (programme || null)     : null,
+      reviewMonth:      isSchool && reviewMonth ? new Date(reviewMonth + "-01").toISOString() : null,
+      sessionStarts:    isSchool && sessionStarts ? new Date(sessionStarts + "-01").toISOString() : null,
+      totalStudents:    isSchool && totalStudents ? parseInt(totalStudents.split("–")[0].replace(/<\s*/,"").replace(/\+/,"").trim()) : null,
+    };
+
     try {
-      const payload: Record<string, unknown> = {
-        name: form.name.trim(),
-        ownerName: form.ownerName.trim() || null,
-        ownerPhone: form.ownerPhone.trim(),
-        email: form.email.trim() || null,
-        website: form.website.trim() || null,
-        address: form.address.trim() || null,
-        zone: form.zone || null,
-        cityId: parseInt(form.cityId),
-        category: form.category || null,
-        customerType,
-        workingPriority: Number(form.workingPriority),
-      };
-
-      if (isSchoolType) {
-        payload.examinationBoard = form.examinationBoard || null;
-        payload.offeredProgramme = form.offeredProgramme || null;
-        payload.totalStudents    = form.totalStudents ? parseInt(form.totalStudents) : null;
-        payload.reviewMonth      = form.reviewMonth || null;
-        payload.sessionStarts    = form.sessionStarts || null;
-      }
-
       const res = await fetch("/api/v1/customers", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       }).then(r => r.json());
 
       if (res.success) {
         router.push("/customers");
       } else {
-        setError(res.error?.message ?? res.error ?? "Failed to create customer");
+        setError(res.error ?? "Failed to add customer.");
       }
     } catch (err: any) {
-      setError(err.message ?? "Network error");
+      setError(err.message);
     } finally {
       setSaving(false);
     }
   }
 
+  // ── Type selector screen ─────────────────────────────────────────────────────
+  if (!regType) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.back()}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900">Add Customer</h1>
+            <p className="text-xs text-slate-500">Choose the type of customer to register</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4">
+          {TYPES.map(({ key, label, sub, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setRegType(key)}
+              className="flex items-center gap-5 rounded-2xl border-2 border-slate-200 bg-white p-5 text-left hover:border-[#C8102E] hover:bg-red-50/30 transition-all group shadow-sm"
+            >
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#C8102E]/10 group-hover:bg-[#C8102E] transition-colors">
+                <Icon className="h-6 w-6 text-[#C8102E] group-hover:text-white transition-colors" />
+              </div>
+              <div>
+                <p className="text-base font-bold text-slate-800 group-hover:text-[#C8102E] transition-colors">{label}</p>
+                <p className="text-sm text-slate-400 mt-0.5">{sub}</p>
+              </div>
+              <div className="ml-auto text-slate-300 group-hover:text-[#C8102E] transition-colors">→</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Form ─────────────────────────────────────────────────────────────────────
+  const isSchool = regType === "school";
+  const isShop   = regType === "shop";
+  const chosen   = TYPES.find(t => t.key === regType)!;
+  const Icon     = chosen.icon;
+
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => router.back()} className="p-2 rounded-xl hover:bg-slate-100 transition">
-          <ArrowLeft className="h-5 w-5 text-slate-500" />
+        <button onClick={() => setRegType(null)}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+          <ArrowLeft className="h-4 w-4" />
         </button>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Add Customer</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Register a new school, shop, or individual</p>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#C8102E]">
+            <Icon className="h-4 w-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-900 leading-none">{chosen.label}</h1>
+            <p className="text-xs text-slate-500 mt-0.5">{chosen.sub}</p>
+          </div>
         </div>
       </div>
 
-      {/* Type Selector */}
-      <div>
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Customer Type</p>
-        <div className="grid grid-cols-5 gap-2">
-          {CUSTOMER_TYPES.map(t => {
-            const Icon = t.icon;
-            const active = customerType === t.value;
-            return (
-              <button
-                key={t.value}
-                type="button"
-                onClick={() => setCustomerType(t.value)}
-                className={`flex flex-col items-center gap-2 p-3 rounded-xl border-2 text-center transition ${
-                  active
-                    ? "border-red-600 bg-red-50 text-red-700"
-                    : "border-slate-200 hover:border-slate-300 text-slate-500"
-                }`}
-              >
-                <Icon className="h-5 w-5" />
-                <span className="text-xs font-semibold">{t.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <form onSubmit={handleSubmit} className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">{error}</div>
+        {/* 1. Name */}
+        <Field num={1} label={isSchool ? "School's Name" : isShop ? "Shop's Name" : "Name"} required>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder={isSchool ? "e.g. THE CITY SCHOOL-KHI" : isShop ? "e.g. CITY BOOKS-KHI" : "Full name"} className={INPUT} required />
+        </Field>
+
+        {/* 2. Address */}
+        <Field num={2} label="Address" required>
+          <input value={address} onChange={e => setAddress(e.target.value)} placeholder="Full address" className={INPUT} />
+        </Field>
+
+        {/* 3. Contact Numbers */}
+        <Field num={3} label="Contact Numbers" required>
+          <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 03001234567" className={INPUT} required />
+        </Field>
+
+        {/* 4. Email */}
+        <Field num={4} label="Email">
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="contact@school.pk" className={INPUT} />
+        </Field>
+
+        {/* 5. Website (shop + school) */}
+        {(isShop || isSchool) && (
+          <Field num={5} label="Website">
+            <input value={website} onChange={e => setWebsite(e.target.value)} placeholder="https://www.school.pk" className={INPUT} />
+          </Field>
         )}
-
-        {/* Basic Info */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Basic Information</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <Field label={isSchoolType ? "School / College Name" : "Name"} required>
-                <input value={form.name} onChange={e => set("name", e.target.value)} required className={inputCls} placeholder="Full name" />
-              </Field>
-            </div>
-            <Field label="Contact Person">
-              <input value={form.ownerName} onChange={e => set("ownerName", e.target.value)} className={inputCls} placeholder="Principal / Owner name" />
-            </Field>
-            <Field label="Contact Number" required>
-              <input value={form.ownerPhone} onChange={e => set("ownerPhone", e.target.value)} required className={inputCls} placeholder="03XXXXXXXXX" />
-            </Field>
-            <Field label="Email">
-              <input type="email" value={form.email} onChange={e => set("email", e.target.value)} className={inputCls} placeholder="email@example.com" />
-            </Field>
-            <Field label="Website">
-              <input value={form.website} onChange={e => set("website", e.target.value)} className={inputCls} placeholder="https://..." />
-            </Field>
-          </div>
-        </div>
-
-        {/* Location */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Location</p>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <Field label="Address">
-                <textarea value={form.address} onChange={e => set("address", e.target.value)} rows={2} className={inputCls} placeholder="Street address" />
-              </Field>
-            </div>
-            <Field label="City" required>
-              <div className="relative">
-                <select value={form.cityId} onChange={e => set("cityId", e.target.value)} required className={selectCls}>
-                  <option value="">Select city…</option>
-                  {cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              </div>
-            </Field>
-            <Field label="Area / Zone">
-              <div className="relative">
-                <select value={form.zone} onChange={e => set("zone", e.target.value)} className={selectCls}>
-                  <option value="">Select zone…</option>
-                  {ZONES.map(z => <option key={z} value={z}>{z}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              </div>
-            </Field>
-          </div>
-        </div>
 
         {/* School-specific fields */}
-        {isSchoolType && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Academic Details</p>
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Examination Board">
-                <div className="relative">
-                  <select value={form.examinationBoard} onChange={e => set("examinationBoard", e.target.value)} className={selectCls}>
-                    <option value="">Select board…</option>
-                    {EXAMINATION_BOARDS.map(b => <option key={b} value={b}>{b}</option>)}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                </div>
-              </Field>
-              <Field label="Offered Programme">
-                <div className="relative">
-                  <select value={form.offeredProgramme} onChange={e => set("offeredProgramme", e.target.value)} className={selectCls}>
-                    <option value="">Select programme…</option>
-                    {PROGRAMMES.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                </div>
-              </Field>
-              <Field label="Review Month">
-                <input type="date" value={form.reviewMonth} onChange={e => set("reviewMonth", e.target.value)} className={inputCls} />
-              </Field>
-              <Field label="Session Starts">
-                <input type="date" value={form.sessionStarts} onChange={e => set("sessionStarts", e.target.value)} className={inputCls} />
-              </Field>
-              <Field label="Total Students">
-                <div className="relative">
-                  <select value={form.totalStudents} onChange={e => set("totalStudents", e.target.value)} className={selectCls}>
-                    <option value="">Select range…</option>
-                    <option value="50">Under 50</option>
-                    <option value="100">50 – 100</option>
-                    <option value="250">100 – 250</option>
-                    <option value="500">250 – 500</option>
-                    <option value="1000">500 – 1000</option>
-                    <option value="2000">1000 – 2000</option>
-                    <option value="5000">2000+</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                </div>
-              </Field>
+        {isSchool && (
+          <>
+            <Field num={6} label="Examination Board">
+              <SelectField value={examBoard} onChange={setExamBoard} options={EXAM_BOARDS} placeholder="Select examination board…" />
+            </Field>
+
+            <Field num={7} label="Offered Programme">
+              <SelectField value={programme} onChange={setProgramme} options={PROGRAMMES} placeholder="Select programme…" />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-4 pl-10">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                  8 · Review Month <span className="text-slate-400 font-normal normal-case text-[10px]">Calendar</span>
+                </label>
+                <input type="month" value={reviewMonth} onChange={e => setReviewMonth(e.target.value)} className={INPUT} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                  9 · Session Starts <span className="text-slate-400 font-normal normal-case text-[10px]">Calendar</span>
+                </label>
+                <input type="month" value={sessionStarts} onChange={e => setSessionStarts(e.target.value)} className={INPUT} />
+              </div>
             </div>
-          </div>
+
+            <Field num={10} label="Total Students">
+              <SelectField value={totalStudents} onChange={setTotalStudents} options={STUDENT_RANGES} placeholder="Select range…" />
+            </Field>
+          </>
         )}
 
-        {/* Settings */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Settings</p>
-          <div className="grid grid-cols-2 gap-4">
-            <Field label="Category">
-              <input value={form.category} onChange={e => set("category", e.target.value)} className={inputCls} placeholder="e.g. Private, Government" />
-            </Field>
-            <Field label="Working Priority">
-              <div className="relative">
-                <select value={form.workingPriority} onChange={e => set("workingPriority", parseInt(e.target.value))} className={selectCls}>
-                  {PRIORITIES.map(p => <option key={p} value={p}>{p} {p === 1 ? "(Highest)" : p === 5 ? "(Lowest)" : ""}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              </div>
-            </Field>
+        {/* City */}
+        <Field num={isSchool ? 11 : isShop ? 6 : 5} label="City" required>
+          <div className="relative">
+            <select value={cityId} onChange={e => setCityId(e.target.value)} className={SELECT} required>
+              <option value="">Select city…</option>
+              {cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           </div>
-        </div>
+        </Field>
 
-        <div className="flex justify-end gap-3">
-          <button type="button" onClick={() => router.back()} className="px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition">
-            Cancel
+        {/* Area */}
+        <Field num={isSchool ? 12 : isShop ? 7 : 6} label="Area">
+          <input value={area} onChange={e => setArea(e.target.value)} placeholder="e.g. DHA Phase 5, Gulshan-e-Iqbal" className={INPUT} />
+        </Field>
+
+        {/* Zone */}
+        <Field num={isSchool ? 13 : isShop ? 8 : 7} label="Zone">
+          <SelectField value={zone} onChange={setZone} options={ZONES} placeholder="Select zone…" />
+        </Field>
+
+        {/* Shop: Type, Category, Working Priority */}
+        {(isShop || isSchool) && (
+          <>
+            <Field num={isSchool ? 14 : 9} label="Type">
+              <SelectField value={type} onChange={setType} options={isSchool ? ["School","College","Other"] : TYPES_SHOP} placeholder="Select type…" />
+            </Field>
+            <Field num={isSchool ? 15 : 10} label="Category">
+              <SelectField value={category} onChange={setCategory}
+                options={isSchool ? CATEGORIES_SCHOOL : CATEGORIES_SHOP}
+                placeholder="Select category…" />
+            </Field>
+            <Field num={isSchool ? 16 : 11} label="Working Priority">
+              <SelectField value={priority} onChange={setPriority} options={PRIORITIES} />
+            </Field>
+          </>
+        )}
+
+        {error && (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
+
+        <div className="flex gap-3 pt-2">
+          <button type="button" onClick={() => setRegType(null)}
+            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            Back
           </button>
-          <button type="submit" disabled={saving} className="px-6 py-2.5 rounded-xl bg-red-600 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition">
-            {saving ? "Saving…" : "Add Customer"}
+          <button type="submit" disabled={saving}
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] py-3 text-sm font-bold text-white hover:bg-red-700 transition-colors disabled:opacity-60">
+            {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Adding…</> : "Add Customer"}
           </button>
         </div>
       </form>
