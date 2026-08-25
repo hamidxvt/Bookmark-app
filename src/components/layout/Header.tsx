@@ -68,20 +68,28 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Fetch notifications on mount and every 60s
+  // Real-time notifications via SSE
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch("/api/v1/notifications");
-        if (!res.ok) return;
-        const data = await res.json();
-        setNotifs(data.notifications ?? []);
-        setUnread(data.unread ?? 0);
-      } catch {}
-    };
-    load();
-    const iv = setInterval(load, 60_000);
-    return () => clearInterval(iv);
+    // First load full notifs list
+    fetch("/api/v1/notifications").then(r => r.json()).then(data => {
+      setNotifs(data.notifications ?? []);
+      setUnread(data.unread ?? 0);
+    }).catch(() => {});
+
+    // SSE for live count updates
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource("/api/v1/notifications/stream");
+      es.onmessage = (event) => {
+        try {
+          const counts: { leaves: number; requests: number; missed: number; total: number } = JSON.parse(event.data);
+          setUnread(counts.total);
+        } catch {}
+      };
+      es.onerror = () => { es?.close(); };
+    } catch {}
+
+    return () => { es?.close(); };
   }, []);
 
   const pageTitle = crumbs[crumbs.length - 1]?.label ?? "Dashboard";

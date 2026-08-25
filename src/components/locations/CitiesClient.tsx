@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Building2, Plus, Trash2, MapPin, Shield, RefreshCw, Users, X, Check, Edit2 } from "lucide-react";
 
 interface City {
@@ -21,6 +21,64 @@ const PALETTE = [
   "from-rose-400 to-pink-500",
   "from-emerald-400 to-green-500",
 ];
+
+function MapPicker({ lat, lng, onChange }: { lat: string; lng: string; onChange: (lat: string, lng: string) => void }) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const lMap = useRef<any>(null);
+  const marker = useRef<any>(null);
+
+  useEffect(() => {
+    const initMap = () => {
+      const L = (window as any).L;
+      if (!L || !mapRef.current || lMap.current) return;
+      const initLat = parseFloat(lat) || 30.3753;
+      const initLng = parseFloat(lng) || 69.3451;
+      const map = L.map(mapRef.current, { center: [initLat, initLng], zoom: lat ? 10 : 5, zoomControl: true });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
+      const style = document.createElement("style");
+      style.textContent = "a.leaflet-control-attribution{display:none!important}";
+      document.head.appendChild(style);
+      if (lat && lng) {
+        marker.current = L.marker([parseFloat(lat), parseFloat(lng)]).addTo(map);
+      }
+      map.on("click", (e: any) => {
+        const { lat: la, lng: lo } = e.latlng;
+        if (marker.current) marker.current.remove();
+        marker.current = L.marker([la, lo]).addTo(map);
+        onChange(la.toFixed(6), lo.toFixed(6));
+      });
+      lMap.current = map;
+    };
+
+    if (typeof window === "undefined") return;
+    if ((window as any).L) { initMap(); return; }
+    if (!document.querySelector("#leaflet-css")) {
+      const link = document.createElement("link"); link.id = "leaflet-css"; link.rel = "stylesheet";
+      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
+    }
+    if (!document.querySelector("#leaflet-js")) {
+      const script = document.createElement("script"); script.id = "leaflet-js";
+      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.onload = initMap;
+      document.head.appendChild(script);
+    }
+    return () => { if (lMap.current) { lMap.current.remove(); lMap.current = null; } };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div>
+      <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
+        Click map to set location
+      </label>
+      <div ref={mapRef} className="mt-1 w-full h-48 rounded-xl border border-slate-200 overflow-hidden z-0" />
+      {lat && lng && (
+        <p className="text-[11px] text-emerald-600 mt-1">
+          Pin set: {parseFloat(lat).toFixed(4)}, {parseFloat(lng).toFixed(4)}
+        </p>
+      )}
+    </div>
+  );
+}
 
 function EditModal({ city, onClose, onSaved }: { city: City | null; onClose: () => void; onSaved: () => void }) {
   const isNew = !city;
@@ -60,7 +118,7 @@ function EditModal({ city, onClose, onSaved }: { city: City | null; onClose: () 
           <h2 className="text-sm font-bold text-white">{isNew ? "Add New City" : `Edit ${city!.name}`}</h2>
           <button onClick={onClose} className="text-white/70 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
           {/* City Name */}
           <div>
             <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">City Name *</label>
@@ -69,19 +127,25 @@ function EditModal({ city, onClose, onSaved }: { city: City | null; onClose: () 
               placeholder="e.g. LAHORE" />
           </div>
 
-          {/* Coordinates */}
+          {/* Map Picker */}
+          <MapPicker
+            lat={form.latitude} lng={form.longitude}
+            onChange={(la, lo) => setForm(f => ({ ...f, latitude: la, longitude: lo }))}
+          />
+
+          {/* Coordinate display (read-only, updated by map) */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Latitude</label>
-              <input value={form.latitude} onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-                placeholder="e.g. 31.5204" type="number" step="any" />
+              <input value={form.latitude} readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 cursor-default"
+                placeholder="Click map to set" />
             </div>
             <div>
               <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Longitude</label>
-              <input value={form.longitude} onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))}
-                className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-                placeholder="e.g. 74.3587" type="number" step="any" />
+              <input value={form.longitude} readOnly
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 cursor-default"
+                placeholder="Click map to set" />
             </div>
           </div>
 
@@ -98,15 +162,6 @@ function EditModal({ city, onClose, onSaved }: { city: City | null; onClose: () 
             </p>
           </div>
 
-          {/* Map link for finding coords */}
-          {form.latitude && form.longitude && (
-            <a href={`https://maps.google.com/?q=${form.latitude},${form.longitude}`}
-              target="_blank" rel="noreferrer"
-              className="flex items-center gap-1.5 text-xs text-[#C8102E] hover:underline">
-              <MapPin className="h-3 w-3" /> Preview on Google Maps ↗
-            </a>
-          )}
-
           {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
           <div className="flex gap-3 pt-2">
@@ -115,7 +170,7 @@ function EditModal({ city, onClose, onSaved }: { city: City | null; onClose: () 
               Cancel
             </button>
             <button onClick={save} disabled={saving}
-              className="flex-1 rounded-xl bg-gradient-to-r from-[#1A3A5C] to-[#0D9488] py-2.5 text-sm font-semibold text-white hover:opacity-90 transition-opacity disabled:opacity-60">
+              className="flex-1 rounded-xl bg-[#C8102E] py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-60">
               {saving ? "Saving…" : isNew ? "Add City" : "Save Changes"}
             </button>
           </div>

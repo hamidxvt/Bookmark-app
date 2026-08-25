@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Plus, Search, Download, Eye, Pencil, RefreshCw, Filter, ChevronDown } from "lucide-react";
 
@@ -9,17 +9,58 @@ function stripHtml(s: string | null | undefined) {
   return s.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
 }
 
-function ApprovalBadge({ html }: { html: string }) {
-  const text = stripHtml(html).toLowerCase();
-  const isApproved = text.includes("approved") && !text.includes("not");
-  const isPending = text.includes("pending");
-  const style = isApproved
-    ? "bg-emerald-100 text-emerald-800 border-emerald-200"
-    : isPending
-    ? "bg-amber-100 text-amber-800 border-amber-200"
-    : "bg-red-100 text-red-800 border-red-200";
-  const label = isApproved ? "Approved" : isPending ? "Pending" : "Not Approved";
-  return <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-medium ${style}`}>{label}</span>;
+function ApprovalBadge({ status }: { status: string }) {
+  const s = (status ?? "").toUpperCase();
+  if (s === "APPROVED") return <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 border-emerald-200">Approved</span>;
+  if (s === "PENDING")  return <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 border-amber-200">Pending</span>;
+  return <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 border-red-200">Not Approved</span>;
+}
+
+function ExportMenu({ rows }: { rows: any[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  function exportCSV() {
+    const headers = ["ID", "Name", "Type", "City", "Phone", "Status", "Joined"];
+    const csv = [headers.join(","), ...rows.map(r => [
+      r.id, `"${r.name ?? ""}"`, r.customerType ?? "",
+      `"${r.city?.name ?? ""}"`, r.ownerPhone ?? "", r.approvalStatus ?? "",
+      r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "",
+    ].join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = `customers_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+    setOpen(false);
+  }
+  function exportPDF() {
+    const win = window.open("", "_blank"); if (!win) return;
+    win.document.write(`<html><head><title>Customers</title>
+      <style>body{font-family:Arial;font-size:12px}h1{color:#C8102E;font-size:16px}
+      table{width:100%;border-collapse:collapse}th{background:#f8f9fa;padding:6px;border-bottom:2px solid #dee2e6;font-size:11px;text-align:left}
+      td{padding:6px;border-bottom:1px solid #f0f0f0;font-size:11px}</style></head>
+      <body><h1>Customers Report</h1><p style="color:#666">Exported: ${new Date().toLocaleString()}</p>
+      <table><thead><tr><th>#</th><th>Name</th><th>Type</th><th>City</th><th>Phone</th><th>Status</th></tr></thead>
+      <tbody>${rows.map((r,i) => `<tr><td>${i+1}</td><td>${r.name??""}</td><td>${r.customerType??""}</td><td>${r.city?.name??""}</td><td>${r.ownerPhone??""}</td><td>${r.approvalStatus??""}</td></tr>`).join("")}
+      </tbody></table></body></html>`);
+    win.document.close(); win.focus(); win.print(); setOpen(false);
+  }
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
+        <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 w-36 rounded-xl border border-slate-200 bg-white shadow-lg z-10">
+          <button onClick={exportCSV} className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 rounded-t-xl">Export CSV</button>
+          <button onClick={exportPDF} className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 rounded-b-xl">Export PDF</button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function CustomersClient() {
@@ -82,8 +123,9 @@ export default function CustomersClient() {
             <option value="all">All Types</option>
             <option value="SCHOOL">School</option>
             <option value="COLLEGE">College</option>
-            <option value="BOOKSHOP">Bookshop</option>
-            <option value="UNIVERSITY">University</option>
+            <option value="RETAILER">Book Shop</option>
+            <option value="SELF">Individual</option>
+            <option value="OTHER">Other</option>
           </select>
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
         </div>
@@ -104,9 +146,7 @@ export default function CustomersClient() {
           <button onClick={() => load(page)} disabled={loading} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
-          <button className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-            <Download className="h-4 w-4" /> Export CSV
-          </button>
+          <ExportMenu rows={filtered} />
           <Link href="/customers/add" className="flex items-center gap-2 rounded-lg bg-[#0f1e3c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1a3060] transition-colors">
             <Plus className="h-4 w-4" /> Add Customer
           </Link>
@@ -142,12 +182,12 @@ export default function CustomersClient() {
                     </div>
                     <div>
                       <p className="text-xs font-medium text-slate-800">{stripHtml(r.name)}</p>
-                      <p className="text-xs text-slate-400">{r.customerType === "SCHOOL" ? "School" : r.customerType === "BOOKSHOP" ? "Bookshop" : (r.customerType ?? "Other")}</p>
+                      <p className="text-xs text-slate-400">{r.customerType ?? "Other"}</p>
                     </div>
                   </div>
                 </td>
                 <td className="px-4 py-3 text-slate-600 text-xs">{stripHtml(r.city?.name) || "—"}</td>
-                <td className="px-4 py-3"><ApprovalBadge html={r.approvalStatus ?? ""} /></td>
+                <td className="px-4 py-3"><ApprovalBadge status={r.approvalStatus ?? ""} /></td>
                 <td className="px-4 py-3 text-slate-500 text-xs">{r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}</td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1">
@@ -161,7 +201,7 @@ export default function CustomersClient() {
         </table>
         <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
           <p className="text-xs text-slate-500">
-            Showing {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, total)} of {total.toLocaleString()} customers · Live data
+            Showing {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, total)} of {total.toLocaleString()} customers
           </p>
           <div className="flex items-center gap-1 text-xs text-slate-500">
             <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-40">← Prev</button>

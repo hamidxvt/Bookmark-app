@@ -6,10 +6,10 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Navigation, UserCheck, ClipboardList, Users,
   Package, ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, X,
-  Clock, AlertTriangle, Banknote, Database, Download, Zap, MapPin,
+  Clock, AlertTriangle, Banknote, Download, Zap, MapPin, MessageSquare,
 } from "lucide-react";
 import { useState } from "react";
-import { signOut, useSession } from "next-auth/react";
+import { signOut } from "next-auth/react";
 import { useSidebar } from "./SidebarContext";
 
 const NAV = [
@@ -85,8 +85,8 @@ const NAV = [
   {
     section: "ADMIN",
     items: [
-      { icon: Zap,      label: "Run Schedulers", href: "/scheduler" },
-      { icon: Database, label: "Migrate Data",   href: "/migrate"   },
+      { icon: Zap,            label: "Run Schedulers",  href: "/scheduler" },
+      { icon: MessageSquare,  label: "Support Tickets", href: "/requests"  },
     ],
   },
 ];
@@ -196,8 +196,6 @@ function NavItem({
 }
 
 function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavigate: () => void }) {
-  const { data: session } = useSession();
-
   return (
     <div className="flex h-full flex-col">
       {/* Logo */}
@@ -236,19 +234,8 @@ function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavig
         ))}
       </nav>
 
-      {/* User + Signout */}
-      <div className="shrink-0 border-t border-white/5 p-2.5 space-y-1">
-        {!collapsed && (
-          <div className="flex items-center gap-3 rounded-xl px-3 py-2.5 mb-1">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20 text-xs font-bold text-white">
-              {session?.user?.name?.[0]?.toUpperCase() ?? "A"}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-300 truncate">{session?.user?.name ?? "Admin"}</p>
-              <p className="text-[10px] text-slate-600 truncate">{session?.user?.email ?? ""}</p>
-            </div>
-          </div>
-        )}
+      {/* Signout */}
+      <div className="shrink-0 border-t border-white/5 p-2.5">
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           title={collapsed ? "Sign out" : undefined}

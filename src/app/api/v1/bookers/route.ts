@@ -9,7 +9,7 @@ export async function GET(req: Request) {
     const status = searchParams.get("status");
     const cityId = searchParams.get("cityId");
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { deletedAt: null };
     if (status) where.adminApproved = status.toUpperCase();
     if (cityId) where.cityId = parseInt(cityId);
 
@@ -25,6 +25,7 @@ export async function GET(req: Request) {
           email: true,
           phone: true,
           gender: true,
+          designation: true,
           jobStatus: true,
           adminApproved: true,
           gpsStatus: true,
@@ -33,6 +34,8 @@ export async function GET(req: Request) {
           lastLongitude: true,
           visitTargets: true,
           ratesPerVisit: true,
+          basicSalary: true,
+          sampleBudget: true,
           createdAt: true,
           city: { select: { id: true, name: true } },
           region: { select: { id: true, name: true } },

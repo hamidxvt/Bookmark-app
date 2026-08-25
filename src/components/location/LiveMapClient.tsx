@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { RefreshCw, Users, Clock, Navigation, Building2, ChevronDown, ExternalLink, CheckCircle2, Circle, Calendar, Activity, AlertCircle } from "lucide-react";
+import { RefreshCw, Users, Clock, Navigation, Building2, ChevronDown, ExternalLink, CheckCircle2, Circle, Calendar, Activity, AlertCircle, Search } from "lucide-react";
 
 interface City {
   id: number; name: string;
@@ -216,10 +216,7 @@ function LiveMap({ officers, onSelect }: {
           </div>
         </div>
       )}
-      <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-sm rounded-lg px-2.5 py-1 text-[11px] font-medium text-emerald-600 border border-emerald-200 shadow z-[1000] flex items-center gap-1.5">
-        <span className="h-2 w-2 bg-emerald-500 rounded-full animate-pulse inline-block" />
-        Live · updates every 5s
-      </div>
+      <style>{`a.leaflet-control-attribution { display: none !important; }`}</style>
     </div>
   );
 }
@@ -233,6 +230,8 @@ export default function LiveMapClient() {
   const [lastUpdate,    setLastUpdate]    = useState<Date | null>(null);
   const [selected,      setSelected]      = useState<Officer | null>(null);
   const [dropOpen,      setDropOpen]      = useState(false);
+  const [officerSearch, setOfficerSearch] = useState("");
+  const [gpsFilter,     setGpsFilter]     = useState("all");
   const [officerVisits, setOfficerVisits] = useState<OfficerVisit[]>([]);
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [etaData,       setEtaData]       = useState<ETAData | null>(null);
@@ -288,12 +287,17 @@ export default function LiveMapClient() {
     .finally(() => setVisitsLoading(false));
   }, [selected]);
 
-  const withLoc = officers.filter(o => {
+  const filteredOfficers = officers.filter(o => {
+    const matchName = !officerSearch || stripHtml(o.name).toLowerCase().includes(officerSearch.toLowerCase());
+    const matchGps = gpsFilter === "all" || o.gpsStatus?.toUpperCase() === gpsFilter;
+    return matchName && matchGps;
+  });
+  const withLoc = filteredOfficers.filter(o => {
     const lt = Number(o.lastLatitude), lg = Number(o.lastLongitude);
     return lt && lg && isValidPakCoord(lt, lg);
   });
-  const cleanOfficers = officers.map(o => ({ ...o, name: stripHtml(o.name) }));
-  const active = withLoc.filter(o => o.gpsStatus === "ACTIVE").length;
+  const cleanOfficers = filteredOfficers.map(o => ({ ...o, name: stripHtml(o.name) }));
+  const active = officers.filter(o => o.gpsStatus === "ACTIVE").length;
 
   return (
     <div className="space-y-6">
@@ -301,7 +305,7 @@ export default function LiveMapClient() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-slate-900">Live GPS Tracking</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Real-time officer positions · auto-refreshes every 5s</p>
+          <p className="text-sm text-slate-500 mt-0.5">Real-time officer positions</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -316,12 +320,12 @@ export default function LiveMapClient() {
             {dropOpen && (
               <div className="absolute right-0 mt-1 w-52 rounded-xl border border-slate-200 bg-white shadow-lg z-50 overflow-hidden max-h-60 overflow-y-auto">
                 <button onClick={() => { setSelCity(null); setDropOpen(false); }}
-                  className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${!selCity ? "text-[#C8102E] font-semibold bg-[#C8102E]" : "text-slate-700"}`}>
+                  className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${!selCity ? "text-[#C8102E] font-semibold bg-red-50" : "text-slate-700"}`}>
                   All Cities
                 </button>
                 {cities.map(c => (
                   <button key={c.id} onClick={() => { setSelCity(c); setDropOpen(false); }}
-                    className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${selCity?.id === c.id ? "text-[#C8102E] font-semibold bg-[#C8102E]" : "text-slate-700"}`}>
+                    className={`w-full px-3 py-2 text-xs text-left hover:bg-slate-50 ${selCity?.id === c.id ? "text-[#C8102E] font-semibold bg-red-50" : "text-slate-700"}`}>
                     {c.name}
                     {c.geofenceRadius && <span className="ml-1 text-slate-400">· {c.geofenceRadius >= 1000 ? `${(c.geofenceRadius/1000).toFixed(0)}km` : `${c.geofenceRadius}m`}</span>}
                   </button>
@@ -334,6 +338,25 @@ export default function LiveMapClient() {
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-48 max-w-xs">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input value={officerSearch} onChange={e => setOfficerSearch(e.target.value)} placeholder="Search officer name…"
+            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition" />
+        </div>
+        <div className="relative">
+          <select value={gpsFilter} onChange={e => setGpsFilter(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-white px-3 pr-8 py-2 text-sm appearance-none cursor-pointer focus:outline-none">
+            <option value="all">All GPS Status</option>
+            <option value="ACTIVE">Active</option>
+            <option value="IDLE">Idle</option>
+            <option value="OFFLINE">Offline</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
         </div>
       </div>
 

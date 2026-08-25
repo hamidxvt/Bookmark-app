@@ -174,13 +174,21 @@ model Customer {
   ownerName       String?        @map("owner_name")
   ownerPhone      String         @map("owner_phone")
   email           String?
+  website         String?        @map("website")
   address         String?        @db.Text
+  zone            String?        @map("zone")
   cityId          Int            @map("city_id")
   regionId        Int?           @map("region_id")
   areaId          Int?           @map("area_id")
   workingPriority Int            @default(3) @map("working_priority")
   approvalStatus  ApprovalStatus @default(NOT_APPROVED) @map("approval_status")
   assignedBookerId Int?          @map("assigned_booker_id")
+  // School / College specific fields
+  examinationBoard  String?      @map("examination_board")
+  offeredProgramme  String?      @map("offered_programme")
+  reviewMonth       DateTime?    @map("review_month") @db.Date
+  sessionStarts     DateTime?    @map("session_starts") @db.Date
+  totalStudents     Int?         @map("total_students")
   latitude        Decimal?       @db.Decimal(10, 8)
   longitude       Decimal?       @db.Decimal(11, 8)
   createdAt       DateTime       @default(now()) @map("created_at")
