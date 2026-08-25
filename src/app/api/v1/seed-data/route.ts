@@ -1,14 +1,15 @@
 /**
  * POST /api/v1/seed-data?type=customers|products|all
  * One-time data seed from XLSX-derived JSON files.
- * Uses upsert so it is safe to call multiple times (idempotent).
+ * Idempotent: finds existing records by name and UPDATES them (city + category included).
+ * This fixes old imports that assigned wrong cities.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import path from "path";
 import fs from "fs";
 
-// ─── Type definitions ─────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface SeedCustomer {
   externalCode: number | null;
@@ -51,72 +52,71 @@ function readJson<T>(filename: string): T {
   return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
 }
 
-async function getOrCreateCity(name: string): Promise<number> {
+// City cache: name → id (creates city if missing)
+const _cityCache = new Map<string, number>();
+async function getCityId(rawName: string): Promise<number> {
+  const key = rawName.trim().toUpperCase();
+  if (_cityCache.has(key)) return _cityCache.get(key)!;
   const city = await prisma.city.upsert({
-    where: { name: name.toUpperCase() },
+    where: { name: key },
     update: {},
-    create: { name: name.toUpperCase() },
+    create: { name: key },
   });
+  _cityCache.set(key, city.id);
   return city.id;
 }
 
 // ─── Seed Customers ───────────────────────────────────────────────────────────
+// Looks up by name alone so it can FIX records that were imported with wrong city.
 
-async function seedCustomers() {
+export async function seedCustomers(): Promise<{ created: number; updated: number; skipped: number; total: number }> {
+  _cityCache.clear();
   const data = readJson<SeedCustomer[]>("seed-customers.json");
-  const cityCache = new Map<string, number>();
-  let created = 0;
-  let updated = 0;
-  let skipped = 0;
+  let created = 0, updated = 0, skipped = 0;
 
-  // Batch in chunks to avoid timeout
-  const CHUNK = 200;
+  const CHUNK = 150;
   for (let i = 0; i < data.length; i += CHUNK) {
     const chunk = data.slice(i, i + CHUNK);
-
     for (const row of chunk) {
-      if (!row.externalCode) { skipped++; continue; }
+      if (!row.name) { skipped++; continue; }
 
-      const cityKey = row.cityName.toUpperCase();
-      if (!cityCache.has(cityKey)) {
-        cityCache.set(cityKey, await getOrCreateCity(cityKey));
+      let cityId: number;
+      try {
+        cityId = await getCityId(row.cityName || "KARACHI");
+      } catch {
+        skipped++;
+        continue;
       }
-      const cityId = cityCache.get(cityKey)!;
 
-      // Build display name (combine name + branch if distinct)
-      const fullName = row.branchName && row.branchName !== row.name
-        ? row.name
-        : row.name;
+      const payload = {
+        customerType: row.customerType,
+        category:          row.category    ?? null,
+        ownerName:         row.ownerName   ?? null,
+        ownerPhone:        row.phone,
+        email:             row.email       ?? null,
+        website:           row.website     ?? null,
+        address:           row.address     ?? null,
+        zone:              row.zone        ?? null,
+        examinationBoard:  row.examinationBoard  ?? null,
+        offeredProgramme:  row.offeredProgramme  ?? null,
+        totalStudents:     row.totalStudents      ?? null,
+        workingPriority:   row.workingPriority    ?? 3,
+        approvalStatus:    "APPROVED" as const,
+        cityId,
+      };
 
       try {
+        // Look up by name only — catches records imported with wrong city
         const existing = await prisma.customer.findFirst({
-          where: { name: fullName, cityId },
+          where: { name: row.name },
           select: { id: true },
         });
-
-        const payload = {
-          name: fullName,
-          customerType: row.customerType as "SCHOOL" | "COLLEGE" | "RETAILER" | "SELF" | "OTHER",
-          category: row.category ?? undefined,
-          ownerName: row.ownerName ?? undefined,
-          ownerPhone: row.phone,
-          email: row.email ?? undefined,
-          website: row.website ?? undefined,
-          address: row.address ?? undefined,
-          zone: row.zone ?? undefined,
-          examinationBoard: row.examinationBoard ?? undefined,
-          offeredProgramme: row.offeredProgramme ?? undefined,
-          totalStudents: row.totalStudents ?? undefined,
-          workingPriority: row.workingPriority ?? 3,
-          approvalStatus: "APPROVED" as const,
-          cityId,
-        };
 
         if (existing) {
           await prisma.customer.update({ where: { id: existing.id }, data: payload });
           updated++;
         } else {
-          await prisma.customer.create({ data: payload });
+          await prisma.customer.create({ data: { name: row.name, ...payload } });
           created++;
         }
       } catch {
@@ -130,58 +130,47 @@ async function seedCustomers() {
 
 // ─── Seed Products ────────────────────────────────────────────────────────────
 
-async function seedProducts() {
+async function seedProducts(): Promise<{ created: number; updated: number; skipped: number; total: number }> {
   const data = readJson<SeedProduct[]>("seed-products.json");
   const brandCache   = new Map<string, number>();
   const subjectCache = new Map<string, number>();
   const seriesCache  = new Map<string, number>();
-  let created = 0;
-  let updated = 0;
-  let skipped = 0;
+  let created = 0, updated = 0, skipped = 0;
 
   for (const row of data) {
     if (!row.name) { skipped++; continue; }
 
-    // Upsert Brand
     const brandKey = row.brand.toUpperCase();
     if (!brandCache.has(brandKey)) {
       const b = await prisma.brand.upsert({
-        where: { name: row.brand },
-        update: {},
-        create: { name: row.brand },
+        where: { name: row.brand }, update: {}, create: { name: row.brand },
       });
       brandCache.set(brandKey, b.id);
     }
     const brandId = brandCache.get(brandKey)!;
 
-    // Upsert Subject
-    let subjectId: number | undefined;
+    let subjectId: number | null = null;
     if (row.subject) {
       const sk = row.subject.toUpperCase();
       if (!subjectCache.has(sk)) {
         const s = await prisma.subject.upsert({
-          where: { name: row.subject },
-          update: {},
-          create: { name: row.subject },
+          where: { name: row.subject }, update: {}, create: { name: row.subject },
         });
         subjectCache.set(sk, s.id);
       }
-      subjectId = subjectCache.get(sk);
+      subjectId = subjectCache.get(sk)!;
     }
 
-    // Upsert Series
-    let seriesId: number | undefined;
+    let seriesId: number | null = null;
     if (row.series) {
       const sk = row.series.toUpperCase();
       if (!seriesCache.has(sk)) {
         const s = await prisma.series.upsert({
-          where: { name: row.series },
-          update: {},
-          create: { name: row.series },
+          where: { name: row.series }, update: {}, create: { name: row.series },
         });
         seriesCache.set(sk, s.id);
       }
-      seriesId = seriesCache.get(sk);
+      seriesId = seriesCache.get(sk)!;
     }
 
     try {
@@ -191,13 +180,12 @@ async function seedProducts() {
       });
 
       const payload = {
-        name: row.name,
         brandId,
-        subjectId: subjectId ?? null,
-        seriesId: seriesId ?? null,
-        isbn: row.isbn ?? null,
-        segment: row.segment ?? null,
-        grade: row.grade ? String(row.grade) : null,
+        subjectId,
+        seriesId,
+        isbn:        row.isbn        ?? null,
+        segment:     row.segment     ?? null,
+        grade:       row.grade ? String(row.grade) : null,
         description: row.description ?? null,
         retailPrice: row.retailPrice,
       };
@@ -206,7 +194,7 @@ async function seedProducts() {
         await prisma.product.update({ where: { id: existing.id }, data: payload });
         updated++;
       } else {
-        await prisma.product.create({ data: payload });
+        await prisma.product.create({ data: { name: row.name, ...payload } });
         created++;
       }
     } catch {
@@ -217,7 +205,7 @@ async function seedProducts() {
   return { created, updated, skipped, total: data.length };
 }
 
-// ─── Route Handler ────────────────────────────────────────────────────────────
+// ─── Route Handlers ───────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type") ?? "all";
@@ -226,15 +214,15 @@ export async function POST(req: NextRequest) {
     const results: Record<string, unknown> = {};
 
     if (type === "customers" || type === "all") {
-      console.log("[seed] Starting customer seed…");
+      console.log("[seed] Seeding customers…");
       results.customers = await seedCustomers();
-      console.log("[seed] Customers done:", results.customers);
+      console.log("[seed] Customers:", results.customers);
     }
 
     if (type === "products" || type === "all") {
-      console.log("[seed] Starting product seed…");
+      console.log("[seed] Seeding products…");
       results.products = await seedProducts();
-      console.log("[seed] Products done:", results.products);
+      console.log("[seed] Products:", results.products);
     }
 
     return NextResponse.json({ success: true, data: results });
@@ -245,9 +233,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET() {
-  const [customers, products] = await Promise.all([
+  const [customers, products, aplus] = await Promise.all([
     prisma.customer.count(),
     prisma.product.count(),
+    prisma.customer.count({ where: { category: "A+" } }),
   ]);
-  return NextResponse.json({ success: true, data: { customers, products } });
+  return NextResponse.json({ success: true, data: { customers, products, aplusCount: aplus } });
 }
