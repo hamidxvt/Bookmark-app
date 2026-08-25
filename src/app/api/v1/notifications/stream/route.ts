@@ -8,13 +8,12 @@ async function getCounts() {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
 
-  const [leaves, requests, missed] = await Promise.all([
+  const [leaves, requests] = await Promise.all([
     prisma.leaveRequest.count({ where: { status: "PENDING" } }),
     (prisma as any).request.count({ where: { status: "PENDING" } }),
-    prisma.visit.count({ where: { status: "MISSED", visitDate: { gte: today, lt: tomorrow } } }),
   ]);
 
-  return { leaves, requests, missed, total: leaves + requests + missed };
+  return { leaves, requests, total: leaves + requests };
 }
 
 export async function GET(_req: NextRequest) {
