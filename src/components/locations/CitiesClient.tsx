@@ -240,7 +240,7 @@ export default function CitiesClient() {
         <div>
           <div className="flex items-center gap-2.5 mb-1">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#C8102E]">
-              <Building2 className="h-4 w-4 text-[#C8102E]" />
+              <Building2 className="h-4 w-4 text-white" />
             </div>
             <h1 className="text-xl font-bold text-slate-900">City Management</h1>
           </div>
@@ -248,7 +248,7 @@ export default function CitiesClient() {
         </div>
         <div className="flex gap-2">
           <button onClick={runSetup} disabled={seeding}
-            className="flex items-center gap-2 rounded-xl border border-[#C8102E] bg-[#C8102E] px-4 py-2.5 text-sm font-semibold text-[#C8102E] hover:bg-[#C8102E] transition-colors cursor-pointer disabled:opacity-60">
+            className="flex items-center gap-2 rounded-xl border border-[#C8102E] bg-white px-4 py-2.5 text-sm font-semibold text-[#C8102E] hover:bg-red-50 transition-colors cursor-pointer disabled:opacity-60">
             {seeding ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
             {seeding ? "Running Setup…" : "Run Setup & Seed"}
           </button>
@@ -271,7 +271,7 @@ export default function CitiesClient() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total Cities",    value: cities.length,   icon: Building2, color: "text-[#C8102E] bg-[#C8102E]"   },
+          { label: "Total Cities",    value: cities.length,   icon: Building2, color: "text-white bg-[#C8102E]"   },
           { label: "Total Officers",  value: totalOfficers,   icon: Users,     color: "text-blue-600 bg-blue-50"   },
           { label: "Total Customers", value: totalCustomers,  icon: MapPin,    color: "text-violet-600 bg-violet-50"},
         ].map(s => (
@@ -340,7 +340,7 @@ export default function CitiesClient() {
                   {city.geofenceRadius && (
                     <div className="flex items-center gap-1.5 mb-3">
                       <Shield className="h-3 w-3 text-[#C8102E]" />
-                      <span className="text-[10px] text-[#C8102E] bg-[#C8102E] rounded-full px-2 py-0.5 border border-[#C8102E] font-semibold">
+                      <span className="text-[10px] text-[#C8102E] bg-red-50 rounded-full px-2 py-0.5 border border-red-200 font-semibold">
                         Geofence: {city.geofenceRadius >= 1000
                           ? `${(city.geofenceRadius / 1000).toFixed(1)} km`
                           : `${city.geofenceRadius} m`}

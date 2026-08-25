@@ -62,15 +62,10 @@ export async function planNextDayVisits(forToday = false) {
   const assignedTodayIds: Set<number> = new Set();
 
   for (const booker of activeBookers) {
-    if (booker.id === 88) console.log(`[scheduler] Processing booker 88...`);
-    
     const existing = await prisma.visit.count({
       where: { bookerId: booker.id, visitDate: target },
     });
-    if (existing >= 7) {
-      if (booker.id === 88) console.log(`[scheduler] Booker 88 already has ${existing} visits`);
-      continue;
-    }
+    if (existing >= 7) continue;
 
     const recentlyVisited = await prisma.visit.findMany({
       where: {
@@ -90,52 +85,88 @@ export async function planNextDayVisits(forToday = false) {
 
     // Exclude recently visited AND customers already assigned today
     const allExcludeIds = [...recentIds, ...Array.from(assignedTodayIds)];
-    const excludeFilter = allExcludeIds.length > 0 ? { id: { notIn: allExcludeIds } } : {};
 
-    // Primary: city customers WITH GPS coordinates (needed for route map)
-    let customers = await prisma.customer.findMany({
-      where: {
-        approvalStatus: "APPROVED",
-        deletedAt: null,
-        cityId: booker.cityId,
-        latitude:  { not: null },
-        longitude: { not: null },
-        ...excludeFilter,
-      },
-      orderBy: [{ workingPriority: "asc" }],
-      take: 7 - existing,
+    // ── 7-visit Distribution: 2 existing + 1 A+ + 2 A + 2 Bookseller ─────────
+    // Helper: fetch N customers matching optional category, excluding used ids
+    const baseWhere = (extraExclude: number[], category?: string) => ({
+      approvalStatus: "APPROVED" as const,
+      deletedAt: null,
+      cityId: booker.cityId!,
+      ...((allExcludeIds.length + extraExclude.length) > 0
+        ? { id: { notIn: [...allExcludeIds, ...extraExclude] } }
+        : {}),
+      ...(category !== undefined ? { category } : {}),
     });
 
-    if (booker.id === 88) {
-      console.log(`[scheduler] Booker 88: found ${customers.length} GPS customers, need ${7 - existing}`);
+    const pickCustomers = async (n: number, category?: string, usedIds: number[] = []) => {
+      if (n <= 0) return [];
+      return prisma.customer.findMany({
+        where: baseWhere(usedIds, category),
+        orderBy: [{ workingPriority: "asc" }, { id: "asc" }],
+        take: n,
+        select: { id: true, category: true },
+      });
+    };
+
+    // 1. 2 "existing customers" — customers this booker has previously completed visits with
+    const previouslyVisited = await prisma.visit.findMany({
+      where: {
+        bookerId: booker.id,
+        status: "COMPLETED",
+        customerId: { notIn: allExcludeIds.length > 0 ? allExcludeIds : undefined },
+        customer: { approvalStatus: "APPROVED", deletedAt: null, cityId: booker.cityId! },
+      },
+      select: { customerId: true },
+      distinct: ["customerId"],
+      orderBy: { visitDate: "desc" },
+      take: 2,
+    });
+    const existingCustomers = previouslyVisited.map(v => ({ id: v.customerId, category: null as string | null }));
+
+    // 2. 1 A+ customer
+    const collectedIds = existingCustomers.map(c => c.id);
+    const aplusList = await pickCustomers(1, "A+", collectedIds);
+
+    // 3. 2 A customers
+    const collectedIds2 = [...collectedIds, ...aplusList.map(c => c.id)];
+    const aList = await pickCustomers(2, "A", collectedIds2);
+
+    // 4. 2 Bookseller customers
+    const collectedIds3 = [...collectedIds2, ...aList.map(c => c.id)];
+    const booksellers = await pickCustomers(2, "BOOKSHOPS", collectedIds3);
+
+    let customers: { id: number; category: string | null }[] = [
+      ...existingCustomers,
+      ...aplusList,
+      ...aList,
+      ...booksellers,
+    ];
+
+    // 5. Fill remaining slots (up to 7) with any available city customer
+    const needed = (7 - existing) - customers.length;
+    if (needed > 0) {
+      const fillIds = customers.map(c => c.id);
+      const fillers = await prisma.customer.findMany({
+        where: {
+          ...baseWhere(fillIds),
+        },
+        orderBy: [{ workingPriority: "asc" }, { id: "asc" }],
+        take: needed,
+        select: { id: true, category: true },
+      });
+      customers = [...customers, ...fillers];
     }
 
-    // Fallback: city customers WITHOUT GPS (still same city, just no map pin)
-    if (customers.length < 7 - existing) {
-      const needed = 7 - existing - customers.length;
-      const excludeIds = [...customers.map(c => c.id), ...recentIds, ...Array.from(assignedTodayIds)];
-      const extra = await prisma.customer.findMany({
-        where: {
-          approvalStatus: "APPROVED",
-          deletedAt: null,
-          cityId: booker.cityId,
-          ...(excludeIds.length > 0 ? { id: { notIn: excludeIds } } : {}),
-        },
-        orderBy: [{ workingPriority: "asc" }],
-        take: needed,
-      });
-      customers = [...customers, ...extra];
-      if (booker.id === 88) console.log(`[scheduler] Booker 88: found ${extra.length} non-GPS customers`);
-    }
+    // Cap at how many slots remain
+    customers = customers.slice(0, 7 - existing);
 
     // No customers in city — skip (don't assign random far-away customers)
     if (customers.length === 0) {
       console.log(`[scheduler] No customers in city ${booker.cityId} for booker ${booker.id} — skipping`);
-      if (booker.id === 88) console.log(`[scheduler] Booker 88: NO CUSTOMERS FOUND - skipping`);
       continue;
     }
 
-    if (booker.id === 88) console.log(`[scheduler] Booker 88: assigning ${customers.length} total customers`);
+    console.log(`[scheduler] Booker ${booker.id}: ${customers.length} visits planned (${existingCustomers.length} existing, ${aplusList.length} A+, ${aList.length} A, ${booksellers.length} booksellers)`);
 
     for (const c of customers) {
       try {
@@ -150,9 +181,7 @@ export async function planNextDayVisits(forToday = false) {
         assignedTodayIds.add(c.id);
         planned++;
       } catch (err: any) {
-        const msg = `[scheduler] Error creating visit for booker ${booker.id}, customer ${c.id}: ${err.message}`;
-        console.error(msg);
-        if (booker.id === 88) console.error(`[scheduler] Error for officer 88: ${err.message}`);
+        console.error(`[scheduler] Error creating visit for booker ${booker.id}, customer ${c.id}: ${err.message}`);
       }
     }
   }
