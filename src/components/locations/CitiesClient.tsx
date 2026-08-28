@@ -38,8 +38,8 @@ function MapPicker({ lat, lng, onChange }: {
     const init = async () => {
       try {
         const { Loader } = await import("@googlemaps/js-api-loader");
-        const loader = new Loader({ apiKey: GMAP_API_KEY, version: "weekly", libraries: ["maps", "marker"] });
-        await loader.load();
+        const loader = new (Loader as any)({ apiKey: GMAP_API_KEY, version: "weekly", libraries: ["maps", "marker"] });
+        await (loader as any).load();
         if (!mapRef.current || gmap.current) return;
 
         const gmaps = (window as any).google;

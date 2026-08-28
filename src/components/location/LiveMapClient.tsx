@@ -109,12 +109,12 @@ function LiveMap({ officers, onSelect }: {
     const init = async () => {
       try {
         const { Loader } = await import("@googlemaps/js-api-loader");
-        const loader = new Loader({
+        const loader = new (Loader as any)({
           apiKey: GMAP_API_KEY,
           version: "weekly",
           libraries: ["maps", "marker"],
         });
-        await loader.load();
+        await (loader as any).load();
 
         if (!mapRef.current || gmap.current) return;
 
