@@ -37,14 +37,13 @@ function MapPicker({ lat, lng, onChange }: {
 
     const init = async () => {
       try {
-        const { Loader } = await import("@googlemaps/js-api-loader");
-        const loader = new (Loader as any)({ apiKey: GMAP_API_KEY, version: "weekly", libraries: ["maps", "marker"] });
-        await (loader as any).load();
-        if (!mapRef.current || gmap.current) return;
+        const loader = await import("@googlemaps/js-api-loader");
+        loader.setOptions({ apiKey: GMAP_API_KEY, version: "weekly" });
 
-        const gmaps = (window as any).google;
-        const Map = gmaps.maps.Map;
-        const AdvancedMarkerElement = gmaps.maps.marker.AdvancedMarkerElement;
+        const { Map } = await loader.importLibrary("maps") as any;
+        const { AdvancedMarkerElement } = await loader.importLibrary("marker") as any;
+
+        if (!mapRef.current || gmap.current) return;
 
         const initLat = parseFloat(lat) || 30.3753;
         const initLng = parseFloat(lng) || 69.3451;

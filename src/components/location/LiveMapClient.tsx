@@ -102,42 +102,32 @@ function LiveMap({ officers, onSelect }: {
     return el;
   }, []);
 
-  // Load Google Maps once
+  // Load Google Maps once — using new functional API (js-api-loader v2+)
   useEffect(() => {
     if (typeof window === "undefined" || !GMAP_API_KEY) return;
 
     const init = async () => {
       try {
-        const { Loader } = await import("@googlemaps/js-api-loader");
-        const loader = new (Loader as any)({
-          apiKey: GMAP_API_KEY,
-          version: "weekly",
-          libraries: ["maps", "marker"],
-        });
-        await (loader as any).load();
+        const loader = await import("@googlemaps/js-api-loader");
+        // New API: setOptions + importLibrary (no Loader class)
+        loader.setOptions({ apiKey: GMAP_API_KEY, version: "weekly" });
+
+        const { Map, TrafficLayer, InfoWindow } = await loader.importLibrary("maps") as any;
+        await loader.importLibrary("marker");
 
         if (!mapRef.current || gmap.current) return;
-
-        // Use window.google after dynamic import
-        const gmaps = (window as any).google;
-        const Map = gmaps.maps.Map;
-        const TrafficLayer = gmaps.maps.TrafficLayer;
-        const InfoWindow = gmaps.maps.InfoWindow;
 
         const map = new Map(mapRef.current, {
           center: { lat: 34.3512, lng: 72.0189 },
           zoom: 13,
           mapId: "bookmark_livemap",
-          disableDefaultUI: false,
           zoomControl: true,
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: true,
         });
 
-        const traffic = new TrafficLayer();
-        traffic.setMap(map);
-
+        new TrafficLayer().setMap(map);
         infoWindow.current = new InfoWindow();
         gmap.current = map;
 
@@ -178,8 +168,9 @@ function LiveMap({ officers, onSelect }: {
 
     const loadAdvanced = async () => {
       try {
+        const loader = await import("@googlemaps/js-api-loader");
+        const { AdvancedMarkerElement } = await loader.importLibrary("marker") as any;
         const gmaps = (window as any).google;
-        const AdvancedMarkerElement = gmaps.maps.marker.AdvancedMarkerElement;
         const LatLngBounds = gmaps.maps.LatLngBounds;
 
         const bounds = new LatLngBounds();
