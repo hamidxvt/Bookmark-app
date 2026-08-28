@@ -28,8 +28,8 @@ function MapPicker({ lat, lng, onChange }: {
   lat: string; lng: string; onChange: (lat: string, lng: string) => void;
 }) {
   const mapRef   = useRef<HTMLDivElement>(null);
-  const gmap     = useRef<google.maps.Map | null>(null);
-  const marker   = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const gmap     = useRef<any>(null);
+  const marker   = useRef<any>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {

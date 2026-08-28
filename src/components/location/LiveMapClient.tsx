@@ -67,9 +67,9 @@ function LiveMap({ officers, onSelect }: {
   onSelect: (o: Officer) => void;
 }) {
   const mapRef     = useRef<HTMLDivElement>(null);
-  const gmap       = useRef<google.maps.Map | null>(null);
-  const markers    = useRef<Record<number, google.maps.marker.AdvancedMarkerElement>>({});
-  const infoWindow = useRef<google.maps.InfoWindow | null>(null);
+  const gmap       = useRef<any>(null);
+  const markers    = useRef<Record<number, any>>({});
+  const infoWindow = useRef<any>(null);
   const [ready, setReady] = useState(false);
   const onSelectRef = useRef(onSelect);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
