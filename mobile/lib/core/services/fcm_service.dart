@@ -107,24 +107,26 @@ class FcmService {
 
   void _handleTap(RemoteMessage msg) {
     debugPrint('[FCM] Notification tapped: ${msg.data}');
-    // Route to relevant screen based on data payload
     final type = msg.data['type'] as String?;
     final ctx = navigatorKey.currentContext;
     if (ctx == null) return;
 
-    switch (type) {
-      case 'visit':
-        ctx.go('/visits');
-        break;
-      case 'sample':
-        ctx.go('/samples');
-        break;
-      case 'leave':
-        ctx.go('/leaves');
-        break;
-      default:
-        ctx.go('/dashboard');
-    }
+    try {
+      final router = GoRouter.of(ctx);
+      switch (type) {
+        case 'visit':
+          router.go('/visits');
+          break;
+        case 'sample':
+          router.go('/samples');
+          break;
+        case 'leave':
+          router.go('/leaves');
+          break;
+        default:
+          router.go('/dashboard');
+      }
+    } catch (_) {}
   }
 
   /// Call on logout to clear state
