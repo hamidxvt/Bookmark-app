@@ -59,164 +59,173 @@ function GpsDot({ s }: { s: string }) {
   return <span className="h-2.5 w-2.5 rounded-full bg-slate-300 inline-block" />;
 }
 
-// ── Leaflet Map with real-time avatar markers ─────────────────────────────────
+// ── Google Maps with real-time officer markers ────────────────────────────────
+const GMAP_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+
 function LiveMap({ officers, onSelect }: {
   officers: Officer[];
   onSelect: (o: Officer) => void;
 }) {
-  const mapRef   = useRef<HTMLDivElement>(null);
-  const lMap     = useRef<any>(null);
-  const markers  = useRef<Record<number, any>>({});
+  const mapRef     = useRef<HTMLDivElement>(null);
+  const gmap       = useRef<google.maps.Map | null>(null);
+  const markers    = useRef<Record<number, google.maps.marker.AdvancedMarkerElement>>({});
+  const infoWindow = useRef<google.maps.InfoWindow | null>(null);
   const [ready, setReady] = useState(false);
+  const onSelectRef = useRef(onSelect);
+  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
 
-  // Build custom HTML marker icon
-  const buildIcon = useCallback((o: Officer) => {
-    const L = (window as any).L;
+  // Build the custom HTML element for each officer pin
+  const buildPinEl = useCallback((o: Officer) => {
     const isActive = o.gpsStatus?.toUpperCase() === "ACTIVE";
     const initials = stripHtml(o.name).split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
-    const dot = isActive
-      ? `<span style="position:absolute;bottom:2px;right:2px;width:9px;height:9px;background:#10b981;border-radius:50%;border:1.5px solid white;animation:pulse 1.5s infinite;"></span>`
-      : `<span style="position:absolute;bottom:2px;right:2px;width:9px;height:9px;background:#94a3b8;border-radius:50%;border:1.5px solid white;"></span>`;
-
-    const inner = o.profilePhoto
-      ? `<img src="${o.profilePhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" />`
-      : `<span style="font-size:13px;font-weight:700;color:white;">${initials}</span>`;
-
-    const html = `
-      <div style="position:relative;width:46px;height:46px;">
-        <div style="width:44px;height:44px;border-radius:50%;background:${isActive ? "#0d9488" : "#94a3b8"};
-          border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.35);
-          display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;">
-          ${inner}
-        </div>
-        ${dot}
-        <div style="position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);
-          background:rgba(15,30,60,0.85);color:white;font-size:9px;font-weight:600;
-          border-radius:4px;padding:1px 5px;white-space:nowrap;max-width:80px;
-          overflow:hidden;text-overflow:ellipsis;">
-          ${initials}
-        </div>
+    const el = document.createElement("div");
+    el.style.cssText = "position:relative;width:48px;height:64px;cursor:pointer;";
+    el.innerHTML = `
+      <div style="width:44px;height:44px;border-radius:50%;
+        background:${isActive ? "#0d9488" : "#94a3b8"};
+        border:3px solid white;box-shadow:0 3px 10px rgba(0,0,0,0.4);
+        display:flex;align-items:center;justify-content:center;overflow:hidden;">
+        ${o.profilePhoto
+          ? `<img src="${o.profilePhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`
+          : `<span style="font-size:13px;font-weight:700;color:white;">${initials}</span>`
+        }
       </div>
+      <span style="position:absolute;bottom:16px;right:1px;
+        width:10px;height:10px;border-radius:50%;border:2px solid white;
+        background:${isActive ? "#10b981" : "#94a3b8"};
+        ${isActive ? "animation:gm-pulse 1.5s infinite;" : ""}"></span>
+      <div style="position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+        background:rgba(15,30,60,0.85);color:white;font-size:9px;font-weight:600;
+        border-radius:4px;padding:1px 5px;white-space:nowrap;max-width:80px;
+        overflow:hidden;text-overflow:ellipsis;">${initials}</div>
     `;
-
-    return L.divIcon({
-      html,
-      iconSize: [46, 64],
-      iconAnchor: [23, 50],
-      className: "",
-    });
+    return el;
   }, []);
 
-  // Initialise Leaflet once
+  // Load Google Maps once
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !GMAP_API_KEY) return;
 
-    const initMap = () => {
-      const L = (window as any).L;
-      if (!L || !mapRef.current || lMap.current) return;
-
-      const map = L.map(mapRef.current, {
-        center: [34.3512, 72.0189],
-        zoom: 13,
-        zoomControl: true,
+    const init = async () => {
+      const { Loader } = await import("@googlemaps/js-api-loader");
+      const loader = new Loader({
+        apiKey: GMAP_API_KEY,
+        version: "weekly",
+        libraries: ["maps", "marker"],
       });
+      await loader.load();
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-        maxZoom: 19,
-      }).addTo(map);
+      if (!mapRef.current || gmap.current) return;
 
-      // Add pulse animation CSS
-      const style = document.createElement("style");
-      style.textContent = `@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.7;transform:scale(1.3)}}`;
-      document.head.appendChild(style);
+      const { Map } = await google.maps.importLibrary("maps") as google.maps.MapsLibrary;
+      const map = new Map(mapRef.current, {
+        center: { lat: 34.3512, lng: 72.0189 },
+        zoom: 13,
+        mapId: "bookmark_livemap",
+        disableDefaultUI: false,
+        zoomControl: true,
+        streetViewControl: false,
+        mapTypeControl: false,
+        fullscreenControl: true,
+        trafficLayer: true,
+      } as google.maps.MapOptions);
 
-      lMap.current = map;
+      // Traffic layer for live conditions
+      const traffic = new google.maps.TrafficLayer();
+      traffic.setMap(map);
+
+      infoWindow.current = new google.maps.InfoWindow();
+      gmap.current = map;
+
+      // Inject pulse keyframe
+      if (!document.querySelector("#gm-pulse-style")) {
+        const s = document.createElement("style");
+        s.id = "gm-pulse-style";
+        s.textContent = `@keyframes gm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.4)}}`;
+        document.head.appendChild(s);
+      }
+
       setReady(true);
     };
 
-    if ((window as any).L) {
-      initMap();
-      return;
-    }
-
-    // Load Leaflet CSS
-    if (!document.querySelector("#leaflet-css")) {
-      const link = document.createElement("link");
-      link.id = "leaflet-css";
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      document.head.appendChild(link);
-    }
-
-    // Load Leaflet JS
-    if (!document.querySelector("#leaflet-js")) {
-      const script = document.createElement("script");
-      script.id = "leaflet-js";
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-      script.onload = initMap;
-      document.head.appendChild(script);
-    }
+    init().catch(console.error);
   }, []);
 
-  // Update markers whenever officers data changes
+  // Update markers on every data change
   useEffect(() => {
-    const L = (window as any).L;
-    if (!ready || !lMap.current || !L) return;
+    if (!ready || !gmap.current) return;
 
-    const map = lMap.current;
     const validOfficers = officers.filter(o => {
       const lt = Number(o.lastLatitude), lg = Number(o.lastLongitude);
       return lt && lg && isValidPakCoord(lt, lg);
     });
-
     const currentIds = new Set(validOfficers.map(o => o.id));
 
-    // Remove markers for officers no longer present
-    Object.keys(markers.current).forEach(id => {
-      if (!currentIds.has(Number(id))) {
-        markers.current[Number(id)].remove();
-        delete markers.current[Number(id)];
+    // Remove stale markers
+    Object.keys(markers.current).forEach(idStr => {
+      const id = Number(idStr);
+      if (!currentIds.has(id)) {
+        markers.current[id].map = null;
+        delete markers.current[id];
       }
     });
 
-    validOfficers.forEach(o => {
-      const lat = Number(o.lastLatitude);
-      const lng = Number(o.lastLongitude);
-      const icon = buildIcon(o);
+    const loadAdvanced = async () => {
+      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
+      const bounds = new google.maps.LatLngBounds();
 
-      if (markers.current[o.id]) {
-        // Smooth position update — no map flash
-        markers.current[o.id].setLatLng([lat, lng]);
-        markers.current[o.id].setIcon(icon);
-      } else {
-        // New marker
-        const m = L.marker([lat, lng], { icon })
-          .addTo(map)
-          .on("click", () => onSelect(o));
-        markers.current[o.id] = m;
+      validOfficers.forEach(o => {
+        const pos = { lat: Number(o.lastLatitude!), lng: Number(o.lastLongitude!) };
+        bounds.extend(pos);
+        const el = buildPinEl(o);
+
+        if (markers.current[o.id]) {
+          // Smooth move — no map flash
+          markers.current[o.id].position = pos;
+          (markers.current[o.id] as any).content = el;
+        } else {
+          const m = new AdvancedMarkerElement({ map: gmap.current!, position: pos, content: el });
+          m.addListener("click", () => {
+            infoWindow.current?.setContent(`
+              <div style="font-family:sans-serif;padding:2px 4px;">
+                <p style="font-weight:700;margin:0 0 2px;">${stripHtml(o.name)}</p>
+                <p style="font-size:11px;color:#64748b;margin:0;">${o.city?.name ?? "Unknown"} · ${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}</p>
+                <p style="font-size:11px;color:#64748b;margin:2px 0 0;">Speed: ${o.lastSpeedKmh != null ? Number(o.lastSpeedKmh).toFixed(1) + " km/h" : "—"}</p>
+              </div>
+            `);
+            infoWindow.current?.open({ map: gmap.current!, anchor: m });
+            onSelectRef.current(o);
+          });
+          markers.current[o.id] = m;
+        }
+      });
+
+      // Fit all officers in view on first population
+      if (validOfficers.length > 0 && !bounds.isEmpty()) {
+        gmap.current?.fitBounds(bounds, 80);
       }
-    });
+    };
 
-    // Pan to show all officers on first load
-    if (validOfficers.length > 0 && Object.keys(markers.current).length === validOfficers.length) {
-      const bounds = L.latLngBounds(validOfficers.map(o => [Number(o.lastLatitude), Number(o.lastLongitude)]));
-      map.fitBounds(bounds, { padding: [60, 60], maxZoom: 15 });
-    }
-  }, [officers, ready, buildIcon, onSelect]);
+    loadAdvanced().catch(console.error);
+  }, [officers, ready, buildPinEl]);
 
   return (
     <div className="relative w-full h-[480px]">
-      <div ref={mapRef} className="absolute inset-0 rounded-b-2xl" />
+      <div ref={mapRef} className="absolute inset-0 rounded-b-2xl" style={{ minHeight: 480 }} />
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-50 rounded-b-2xl">
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <RefreshCw className="h-4 w-4 animate-spin" />
-            Loading map…
+            Loading Google Maps…
           </div>
         </div>
       )}
-      <style>{`a.leaflet-control-attribution { display: none !important; }`}</style>
+      {!GMAP_API_KEY && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-amber-50 rounded-b-2xl gap-2">
+          <p className="text-sm font-semibold text-amber-800">Google Maps API key missing</p>
+          <p className="text-xs text-amber-600">Set <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> in Railway environment variables</p>
+        </div>
+      )}
     </div>
   );
 }

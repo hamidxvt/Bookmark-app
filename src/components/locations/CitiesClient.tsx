@@ -22,55 +22,76 @@ const PALETTE = [
   "from-emerald-400 to-green-500",
 ];
 
-function MapPicker({ lat, lng, onChange }: { lat: string; lng: string; onChange: (lat: string, lng: string) => void }) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const lMap = useRef<any>(null);
-  const marker = useRef<any>(null);
+const GMAP_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
+
+function MapPicker({ lat, lng, onChange }: {
+  lat: string; lng: string; onChange: (lat: string, lng: string) => void;
+}) {
+  const mapRef   = useRef<HTMLDivElement>(null);
+  const gmap     = useRef<google.maps.Map | null>(null);
+  const marker   = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const initMap = () => {
-      const L = (window as any).L;
-      if (!L || !mapRef.current || lMap.current) return;
+    if (typeof window === "undefined" || !GMAP_API_KEY) return;
+
+    const init = async () => {
+      const { Loader } = await import("@googlemaps/js-api-loader");
+      const loader = new Loader({ apiKey: GMAP_API_KEY, version: "weekly", libraries: ["maps", "marker"] });
+      await loader.load();
+      if (!mapRef.current || gmap.current) return;
+
+      const { Map } = await google.maps.importLibrary("maps") as google.maps.MapsLibrary;
+      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
+
       const initLat = parseFloat(lat) || 30.3753;
       const initLng = parseFloat(lng) || 69.3451;
-      const map = L.map(mapRef.current, { center: [initLat, initLng], zoom: lat ? 10 : 5, zoomControl: true });
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
-      const style = document.createElement("style");
-      style.textContent = "a.leaflet-control-attribution{display:none!important}";
-      document.head.appendChild(style);
+      const map = new Map(mapRef.current, {
+        center: { lat: initLat, lng: initLng },
+        zoom: lat ? 10 : 5,
+        mapId: "bookmark_citypicker",
+        streetViewControl: false,
+        mapTypeControl: false,
+        fullscreenControl: false,
+      });
+
       if (lat && lng) {
-        marker.current = L.marker([parseFloat(lat), parseFloat(lng)]).addTo(map);
+        marker.current = new AdvancedMarkerElement({
+          map,
+          position: { lat: parseFloat(lat), lng: parseFloat(lng) },
+        });
       }
-      map.on("click", (e: any) => {
-        const { lat: la, lng: lo } = e.latlng;
-        if (marker.current) marker.current.remove();
-        marker.current = L.marker([la, lo]).addTo(map);
+
+      map.addListener("click", (e: google.maps.MapMouseEvent) => {
+        if (!e.latLng) return;
+        const la = e.latLng.lat(), lo = e.latLng.lng();
+        if (marker.current) marker.current.map = null;
+        marker.current = new AdvancedMarkerElement({ map, position: { lat: la, lng: lo } });
         onChange(la.toFixed(6), lo.toFixed(6));
       });
-      lMap.current = map;
+
+      gmap.current = map;
+      setReady(true);
     };
 
-    if (typeof window === "undefined") return;
-    if ((window as any).L) { initMap(); return; }
-    if (!document.querySelector("#leaflet-css")) {
-      const link = document.createElement("link"); link.id = "leaflet-css"; link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"; document.head.appendChild(link);
-    }
-    if (!document.querySelector("#leaflet-js")) {
-      const script = document.createElement("script"); script.id = "leaflet-js";
-      script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"; script.onload = initMap;
-      document.head.appendChild(script);
-    }
-    return () => { if (lMap.current) { lMap.current.remove(); lMap.current = null; } };
+    init().catch(console.error);
+    return () => { gmap.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <div>
       <label className="text-xs font-semibold text-slate-600 uppercase tracking-wide">
-        Click map to set location
+        Click map to set location (Google Maps)
       </label>
-      <div ref={mapRef} className="mt-1 w-full h-48 rounded-xl border border-slate-200 overflow-hidden z-0" />
+      <div className="relative mt-1 w-full h-48 rounded-xl border border-slate-200 overflow-hidden">
+        <div ref={mapRef} className="absolute inset-0" />
+        {!ready && (
+          <div className="absolute inset-0 flex items-center justify-center bg-slate-50 text-xs text-slate-400">
+            {GMAP_API_KEY ? "Loading map…" : "Set NEXT_PUBLIC_GOOGLE_MAPS_API_KEY in env"}
+          </div>
+        )}
+      </div>
       {lat && lng && (
         <p className="text-[11px] text-emerald-600 mt-1">
           Pin set: {parseFloat(lat).toFixed(4)}, {parseFloat(lng).toFixed(4)}
