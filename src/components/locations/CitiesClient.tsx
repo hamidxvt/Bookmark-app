@@ -35,29 +35,28 @@ function MapPicker({ lat, lng, onChange }: {
   useEffect(() => {
     if (typeof window === "undefined" || !GMAP_API_KEY) return;
 
-    const init = async () => {
-      try {
-        const { setOptions, importLibrary } = await import("@googlemaps/js-api-loader");
-        setOptions({ apiKey: GMAP_API_KEY, version: "weekly" });
+    const init = () => {
+      if ((window as any).google?.maps?.Map) { setReady(true); return; }
 
-        const { Map } = await importLibrary("maps") as any;
-        const { AdvancedMarkerElement } = await importLibrary("marker") as any;
-
-        if (!mapRef.current || gmap.current) return;
-
+      const script = document.createElement("script");
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAP_API_KEY}&libraries=marker`;
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (!mapRef.current) return;
+        const gmaps = (window as any).google;
         const initLat = parseFloat(lat) || 30.3753;
         const initLng = parseFloat(lng) || 69.3451;
-        const map = new Map(mapRef.current, {
+        const map = new gmaps.maps.Map(mapRef.current, {
           center: { lat: initLat, lng: initLng },
           zoom: lat ? 10 : 5,
           mapId: "bookmark_citypicker",
           streetViewControl: false,
           mapTypeControl: false,
-          fullscreenControl: false,
         });
 
         if (lat && lng) {
-          marker.current = new AdvancedMarkerElement({
+          marker.current = new gmaps.maps.marker.AdvancedMarkerElement({
             map,
             position: { lat: parseFloat(lat), lng: parseFloat(lng) },
           });
@@ -67,15 +66,15 @@ function MapPicker({ lat, lng, onChange }: {
           if (!e.latLng) return;
           const la = e.latLng.lat(), lo = e.latLng.lng();
           if (marker.current) marker.current.map = null;
-          marker.current = new AdvancedMarkerElement({ map, position: { lat: la, lng: lo } });
+          marker.current = new gmaps.maps.marker.AdvancedMarkerElement({ map, position: { lat: la, lng: lo } });
           onChange(la.toFixed(6), lo.toFixed(6));
         });
 
         gmap.current = map;
         setReady(true);
-      } catch (e) {
-        console.error("Map picker init error:", e);
-      }
+      };
+      script.onerror = () => console.error("Failed to load Google Maps");
+      document.head.appendChild(script);
     };
 
     init();

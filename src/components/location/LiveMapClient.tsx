@@ -102,43 +102,43 @@ function LiveMap({ officers, onSelect }: {
     return el;
   }, []);
 
-  // Load Google Maps once — using new functional API (js-api-loader v2+)
+  // Load Google Maps script directly
   useEffect(() => {
     if (typeof window === "undefined" || !GMAP_API_KEY) return;
+    if ((window as any).google?.maps?.Map) { setReady(true); return; } // Already loaded
 
     const init = async () => {
       try {
-        const { setOptions, importLibrary } = await import("@googlemaps/js-api-loader");
-        // New API: setOptions + importLibrary (no Loader class)
-        setOptions({ apiKey: GMAP_API_KEY, version: "weekly" });
+        // Load script directly
+        const script = document.createElement("script");
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAP_API_KEY}&libraries=places,marker`;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+          if (!mapRef.current) return;
+          const gmaps = (window as any).google;
+          const map = new gmaps.maps.Map(mapRef.current, {
+            center: { lat: 34.3512, lng: 72.0189 },
+            zoom: 13,
+            mapId: "bookmark_livemap",
+            zoomControl: true,
+            streetViewControl: false,
+            mapTypeControl: false,
+          });
+          new gmaps.maps.TrafficLayer().setMap(map);
+          infoWindow.current = new gmaps.maps.InfoWindow();
+          gmap.current = map;
 
-        const { Map, TrafficLayer, InfoWindow } = await importLibrary("maps") as any;
-        await importLibrary("marker");
-
-        if (!mapRef.current || gmap.current) return;
-
-        const map = new Map(mapRef.current, {
-          center: { lat: 34.3512, lng: 72.0189 },
-          zoom: 13,
-          mapId: "bookmark_livemap",
-          zoomControl: true,
-          streetViewControl: false,
-          mapTypeControl: false,
-          fullscreenControl: true,
-        });
-
-        new TrafficLayer().setMap(map);
-        infoWindow.current = new InfoWindow();
-        gmap.current = map;
-
-        if (!document.querySelector("#gm-pulse-style")) {
-          const s = document.createElement("style");
-          s.id = "gm-pulse-style";
-          s.textContent = `@keyframes gm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.4)}}`;
-          document.head.appendChild(s);
-        }
-
-        setReady(true);
+          if (!document.querySelector("#gm-pulse-style")) {
+            const s = document.createElement("style");
+            s.id = "gm-pulse-style";
+            s.textContent = `@keyframes gm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.4)}}`;
+            document.head.appendChild(s);
+          }
+          setReady(true);
+        };
+        script.onerror = () => console.error("Failed to load Google Maps");
+        document.head.appendChild(script);
       } catch (e) {
         console.error("Google Maps init error:", e);
       }
@@ -168,9 +168,8 @@ function LiveMap({ officers, onSelect }: {
 
     const loadAdvanced = async () => {
       try {
-        const { importLibrary } = await import("@googlemaps/js-api-loader");
-        const { AdvancedMarkerElement } = await importLibrary("marker") as any;
         const gmaps = (window as any).google;
+        const AdvancedMarkerElement = gmaps.maps.marker.AdvancedMarkerElement;
         const LatLngBounds = gmaps.maps.LatLngBounds;
 
         const bounds = new LatLngBounds();
