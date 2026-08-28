@@ -126,9 +126,10 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
         }).catchError((_) => null);
 
         if (mounted) await _showETASheet(stop, info.car, info.walk, info.km);
+        await _drawRouteOnMap(stop);
       }
     } catch (_) {}
-    _openMaps(stop);
+
   }
 
   Future<void> _showETASheet(
@@ -211,18 +212,29 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
     );
   }
 
-  Future<void> _openMaps(RouteStop stop) async {
-    // Google Maps navigation intent — opens turn-by-turn if installed
-    final gmNav =
-        Uri.parse('google.navigation:q=${stop.lat},${stop.lng}&mode=d');
-    if (await canLaunchUrl(gmNav)) {
-      await launchUrl(gmNav, mode: LaunchMode.externalApplication);
-      return;
-    }
-    final fallback = Uri.parse(
-        'https://www.google.com/maps/dir/?api=1'
-        '&destination=${stop.lat},${stop.lng}&travelmode=driving');
-    await launchUrl(fallback, mode: LaunchMode.externalApplication);
+  // Draw route on in-app map instead of opening external Maps
+  Future<void> _drawRouteOnMap(RouteStop stop) async {
+    if (_mapController == null) return;
+    try {
+      final gps = ref.read(gpsServiceProvider);
+      final pos = await gps.getCurrentPosition();
+      if (pos == null) return;
+
+      // Move camera to show both origin and destination
+      final bounds = LatLngBounds(
+        southwest: LatLng(
+          pos.latitude < stop.lat ? pos.latitude : stop.lat,
+          pos.longitude < stop.lng ? pos.longitude : stop.lng,
+        ),
+        northeast: LatLng(
+          pos.latitude > stop.lat ? pos.latitude : stop.lat,
+          pos.longitude > stop.lng ? pos.longitude : stop.lng,
+        ),
+      );
+      await _mapController!.animateCamera(
+        CameraUpdate.newLatLngBounds(bounds, 80),
+      );
+    } catch (_) {}
   }
 
   Set<Marker> _buildMarkers(
