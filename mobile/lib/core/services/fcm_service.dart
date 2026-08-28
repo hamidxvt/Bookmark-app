@@ -1,15 +1,17 @@
 /// fcm_service.dart
-/// Manages Firebase Cloud Messaging (FCM) for push notifications.
-/// Registers device token with backend and handles incoming messages.
+/// Full Firebase Cloud Messaging implementation.
+/// Registers device FCM token with the backend, handles foreground/background
+/// notifications, and surfaces them as in-app banners.
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
-// Firebase imports — only active when google-services.json is configured
-// If firebase is not yet set up, the app still works — push notifications
-// will simply not function until Firebase is configured.
 import '../network/dio_client.dart';
 import '../constants/api_constants.dart';
+
+// ── Notification overlay key — set this from your root widget ───────────────
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 class FcmService {
   final DioClient _dio;
@@ -17,75 +19,117 @@ class FcmService {
 
   FcmService(this._dio);
 
-  /// Initialize FCM and register token with backend.
-  /// Call this after login.
+  /// Call once after a successful login.
   Future<void> initialize() async {
-    if (_initialized || kIsWeb) return;
+    if (_initialized) return;
 
     try {
-      // Dynamic import so app compiles even without Firebase configured
-      final messaging = await _getMessaging();
-      if (messaging == null) return;
+      final messaging = FirebaseMessaging.instance;
 
-      // Request permission (iOS requires explicit grant)
-      await messaging.requestPermission();
+      // Request permission (Android 13+ / iOS both require this)
+      final settings = await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+      );
 
-      // Get token and register with backend
-      final token = await messaging.getToken();
-      if (token != null) {
-        await _registerToken(token);
+      if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        debugPrint('[FCM] Permission denied by user');
+        return;
       }
 
-      // Listen for token refresh
+      // Register token
+      final token = await messaging.getToken();
+      if (token != null) await _registerToken(token);
+
+      // Refresh token whenever Firebase rotates it
       messaging.onTokenRefresh.listen(_registerToken);
 
-      // Handle foreground messages — show a local banner
-      messaging.onMessage.listen((message) {
-        debugPrint('[FCM] Foreground message: ${message.notification?.title}');
-      });
+      // Foreground messages — show an in-app snackbar
+      FirebaseMessaging.onMessage.listen(_handleForeground);
+
+      // App opened from a background notification tap
+      FirebaseMessaging.onMessageOpenedApp.listen(_handleTap);
+
+      // App launched cold from notification tap
+      final initial = await messaging.getInitialMessage();
+      if (initial != null) _handleTap(initial);
 
       _initialized = true;
-      debugPrint('[FCM] Initialized ✅');
+      debugPrint('[FCM] Initialized — token: ${token?.substring(0, 20)}...');
     } catch (e) {
-      debugPrint('[FCM] Initialization skipped (Firebase not configured): $e');
+      debugPrint('[FCM] Initialization error: $e');
     }
   }
 
   Future<void> _registerToken(String token) async {
     try {
       await _dio.post(ApiConstants.registerFcm, data: {'fcmToken': token});
-      debugPrint('[FCM] Token registered with backend');
+      debugPrint('[FCM] Token registered');
     } catch (e) {
-      debugPrint('[FCM] Token registration failed: $e');
+      debugPrint('[FCM] Token registration failed (will retry on next launch): $e');
     }
   }
 
-  /// Unregister token on logout
-  Future<void> dispose() async {
+  void _handleForeground(RemoteMessage msg) {
+    final title = msg.notification?.title ?? '';
+    final body = msg.notification?.body ?? '';
+    debugPrint('[FCM] Foreground: $title — $body');
+
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null) return;
+
+    ScaffoldMessenger.of(ctx).showSnackBar(
+      SnackBar(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (title.isNotEmpty)
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+            if (body.isNotEmpty)
+              Text(body, style: const TextStyle(fontSize: 12)),
+          ],
+        ),
+        backgroundColor: const Color(0xFF1E293B),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Dismiss',
+          textColor: const Color(0xFFC8102E),
+          onPressed: () => ScaffoldMessenger.of(ctx).hideCurrentSnackBar(),
+        ),
+      ),
+    );
+  }
+
+  void _handleTap(RemoteMessage msg) {
+    debugPrint('[FCM] Notification tapped: ${msg.data}');
+    // Route to relevant screen based on data payload
+    final type = msg.data['type'] as String?;
+    final ctx = navigatorKey.currentContext;
+    if (ctx == null) return;
+
+    switch (type) {
+      case 'visit':
+        ctx.go('/visits');
+        break;
+      case 'sample':
+        ctx.go('/samples');
+        break;
+      case 'leave':
+        ctx.go('/leaves');
+        break;
+      default:
+        ctx.go('/dashboard');
+    }
+  }
+
+  /// Call on logout to clear state
+  void dispose() {
     _initialized = false;
-  }
-
-  /// Dynamically load firebase_messaging to avoid hard crash if not configured
-  Future<dynamic> _getMessaging() async {
-    try {
-      // ignore: unused_local_variable
-      final firebase = await _loadFirebase();
-      if (firebase == null) return null;
-      return firebase;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<dynamic> _loadFirebase() async {
-    try {
-      // This will succeed once google-services.json is added and
-      // firebase_core + firebase_messaging are initialized
-      // For now, we use a lazy import pattern
-      return null; // replace with FirebaseMessaging.instance when Firebase is set up
-    } catch (_) {
-      return null;
-    }
   }
 }
 

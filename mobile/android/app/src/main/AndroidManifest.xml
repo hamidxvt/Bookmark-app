@@ -53,10 +53,23 @@
             </intent-filter>
         </activity>
 
-        <!-- Google Maps — replace with real key before release -->
+        <!-- Google Maps SDK -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyDEMO_REPLACE_WITH_REAL_KEY"/>
+            android:value="AIzaSyDvZs-jeZnFTUXoIE4UeXfXDylLMyPu0Gc"/>
+
+        <!-- Firebase Cloud Messaging channel -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="bookmark_alerts"/>
+
+        <!-- FCM foreground / high-priority channel icon -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher"/>
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color"/>
 
         <!-- Background GPS Foreground Service -->
         <service
