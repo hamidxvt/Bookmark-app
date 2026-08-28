@@ -107,48 +107,54 @@ function LiveMap({ officers, onSelect }: {
     if (typeof window === "undefined" || !GMAP_API_KEY) return;
 
     const init = async () => {
-      const { Loader } = await import("@googlemaps/js-api-loader");
-      const loader = new Loader({
-        apiKey: GMAP_API_KEY,
-        version: "weekly",
-        libraries: ["maps", "marker"],
-      });
-      await loader.load();
+      try {
+        const { Loader } = await import("@googlemaps/js-api-loader");
+        const loader = new Loader({
+          apiKey: GMAP_API_KEY,
+          version: "weekly",
+          libraries: ["maps", "marker"],
+        });
+        await loader.load();
 
-      if (!mapRef.current || gmap.current) return;
+        if (!mapRef.current || gmap.current) return;
 
-      const { Map } = await google.maps.importLibrary("maps") as google.maps.MapsLibrary;
-      const map = new Map(mapRef.current, {
-        center: { lat: 34.3512, lng: 72.0189 },
-        zoom: 13,
-        mapId: "bookmark_livemap",
-        disableDefaultUI: false,
-        zoomControl: true,
-        streetViewControl: false,
-        mapTypeControl: false,
-        fullscreenControl: true,
-        trafficLayer: true,
-      } as google.maps.MapOptions);
+        // Use window.google after dynamic import
+        const gmaps = (window as any).google;
+        const Map = gmaps.maps.Map;
+        const TrafficLayer = gmaps.maps.TrafficLayer;
+        const InfoWindow = gmaps.maps.InfoWindow;
 
-      // Traffic layer for live conditions
-      const traffic = new google.maps.TrafficLayer();
-      traffic.setMap(map);
+        const map = new Map(mapRef.current, {
+          center: { lat: 34.3512, lng: 72.0189 },
+          zoom: 13,
+          mapId: "bookmark_livemap",
+          disableDefaultUI: false,
+          zoomControl: true,
+          streetViewControl: false,
+          mapTypeControl: false,
+          fullscreenControl: true,
+        });
 
-      infoWindow.current = new google.maps.InfoWindow();
-      gmap.current = map;
+        const traffic = new TrafficLayer();
+        traffic.setMap(map);
 
-      // Inject pulse keyframe
-      if (!document.querySelector("#gm-pulse-style")) {
-        const s = document.createElement("style");
-        s.id = "gm-pulse-style";
-        s.textContent = `@keyframes gm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.4)}}`;
-        document.head.appendChild(s);
+        infoWindow.current = new InfoWindow();
+        gmap.current = map;
+
+        if (!document.querySelector("#gm-pulse-style")) {
+          const s = document.createElement("style");
+          s.id = "gm-pulse-style";
+          s.textContent = `@keyframes gm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.4)}}`;
+          document.head.appendChild(s);
+        }
+
+        setReady(true);
+      } catch (e) {
+        console.error("Google Maps init error:", e);
       }
-
-      setReady(true);
     };
 
-    init().catch(console.error);
+    init();
   }, []);
 
   // Update markers on every data change
@@ -171,42 +177,47 @@ function LiveMap({ officers, onSelect }: {
     });
 
     const loadAdvanced = async () => {
-      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
-      const bounds = new google.maps.LatLngBounds();
+      try {
+        const gmaps = (window as any).google;
+        const AdvancedMarkerElement = gmaps.maps.marker.AdvancedMarkerElement;
+        const LatLngBounds = gmaps.maps.LatLngBounds;
 
-      validOfficers.forEach(o => {
-        const pos = { lat: Number(o.lastLatitude!), lng: Number(o.lastLongitude!) };
-        bounds.extend(pos);
-        const el = buildPinEl(o);
+        const bounds = new LatLngBounds();
 
-        if (markers.current[o.id]) {
-          // Smooth move — no map flash
-          markers.current[o.id].position = pos;
-          (markers.current[o.id] as any).content = el;
-        } else {
-          const m = new AdvancedMarkerElement({ map: gmap.current!, position: pos, content: el });
-          m.addListener("click", () => {
-            infoWindow.current?.setContent(`
-              <div style="font-family:sans-serif;padding:2px 4px;">
-                <p style="font-weight:700;margin:0 0 2px;">${stripHtml(o.name)}</p>
-                <p style="font-size:11px;color:#64748b;margin:0;">${o.city?.name ?? "Unknown"} · ${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}</p>
-                <p style="font-size:11px;color:#64748b;margin:2px 0 0;">Speed: ${o.lastSpeedKmh != null ? Number(o.lastSpeedKmh).toFixed(1) + " km/h" : "—"}</p>
-              </div>
-            `);
-            infoWindow.current?.open({ map: gmap.current!, anchor: m });
-            onSelectRef.current(o);
-          });
-          markers.current[o.id] = m;
+        validOfficers.forEach(o => {
+          const pos = { lat: Number(o.lastLatitude!), lng: Number(o.lastLongitude!) };
+          bounds.extend(pos);
+          const el = buildPinEl(o);
+
+          if (markers.current[o.id]) {
+            markers.current[o.id].position = pos;
+            (markers.current[o.id] as any).content = el;
+          } else {
+            const m = new AdvancedMarkerElement({ map: gmap.current!, position: pos, content: el });
+            m.addListener("click", () => {
+              infoWindow.current?.setContent(`
+                <div style="font-family:sans-serif;padding:2px 4px;">
+                  <p style="font-weight:700;margin:0 0 2px;">${stripHtml(o.name)}</p>
+                  <p style="font-size:11px;color:#64748b;margin:0;">${o.city?.name ?? "Unknown"} · ${pos.lat.toFixed(4)}, ${pos.lng.toFixed(4)}</p>
+                  <p style="font-size:11px;color:#64748b;margin:2px 0 0;">Speed: ${o.lastSpeedKmh != null ? Number(o.lastSpeedKmh).toFixed(1) + " km/h" : "—"}</p>
+                </div>
+              `);
+              infoWindow.current?.open({ map: gmap.current!, anchor: m });
+              onSelectRef.current(o);
+            });
+            markers.current[o.id] = m;
+          }
+        });
+
+        if (validOfficers.length > 0 && !bounds.isEmpty()) {
+          gmap.current?.fitBounds(bounds, 80);
         }
-      });
-
-      // Fit all officers in view on first population
-      if (validOfficers.length > 0 && !bounds.isEmpty()) {
-        gmap.current?.fitBounds(bounds, 80);
+      } catch (e) {
+        console.error("Marker load error:", e);
       }
     };
 
-    loadAdvanced().catch(console.error);
+    loadAdvanced();
   }, [officers, ready, buildPinEl]);
 
   return (

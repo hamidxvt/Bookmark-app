@@ -36,45 +36,50 @@ function MapPicker({ lat, lng, onChange }: {
     if (typeof window === "undefined" || !GMAP_API_KEY) return;
 
     const init = async () => {
-      const { Loader } = await import("@googlemaps/js-api-loader");
-      const loader = new Loader({ apiKey: GMAP_API_KEY, version: "weekly", libraries: ["maps", "marker"] });
-      await loader.load();
-      if (!mapRef.current || gmap.current) return;
+      try {
+        const { Loader } = await import("@googlemaps/js-api-loader");
+        const loader = new Loader({ apiKey: GMAP_API_KEY, version: "weekly", libraries: ["maps", "marker"] });
+        await loader.load();
+        if (!mapRef.current || gmap.current) return;
 
-      const { Map } = await google.maps.importLibrary("maps") as google.maps.MapsLibrary;
-      const { AdvancedMarkerElement } = await google.maps.importLibrary("marker") as google.maps.MarkerLibrary;
+        const gmaps = (window as any).google;
+        const Map = gmaps.maps.Map;
+        const AdvancedMarkerElement = gmaps.maps.marker.AdvancedMarkerElement;
 
-      const initLat = parseFloat(lat) || 30.3753;
-      const initLng = parseFloat(lng) || 69.3451;
-      const map = new Map(mapRef.current, {
-        center: { lat: initLat, lng: initLng },
-        zoom: lat ? 10 : 5,
-        mapId: "bookmark_citypicker",
-        streetViewControl: false,
-        mapTypeControl: false,
-        fullscreenControl: false,
-      });
-
-      if (lat && lng) {
-        marker.current = new AdvancedMarkerElement({
-          map,
-          position: { lat: parseFloat(lat), lng: parseFloat(lng) },
+        const initLat = parseFloat(lat) || 30.3753;
+        const initLng = parseFloat(lng) || 69.3451;
+        const map = new Map(mapRef.current, {
+          center: { lat: initLat, lng: initLng },
+          zoom: lat ? 10 : 5,
+          mapId: "bookmark_citypicker",
+          streetViewControl: false,
+          mapTypeControl: false,
+          fullscreenControl: false,
         });
+
+        if (lat && lng) {
+          marker.current = new AdvancedMarkerElement({
+            map,
+            position: { lat: parseFloat(lat), lng: parseFloat(lng) },
+          });
+        }
+
+        map.addListener("click", (e: any) => {
+          if (!e.latLng) return;
+          const la = e.latLng.lat(), lo = e.latLng.lng();
+          if (marker.current) marker.current.map = null;
+          marker.current = new AdvancedMarkerElement({ map, position: { lat: la, lng: lo } });
+          onChange(la.toFixed(6), lo.toFixed(6));
+        });
+
+        gmap.current = map;
+        setReady(true);
+      } catch (e) {
+        console.error("Map picker init error:", e);
       }
-
-      map.addListener("click", (e: google.maps.MapMouseEvent) => {
-        if (!e.latLng) return;
-        const la = e.latLng.lat(), lo = e.latLng.lng();
-        if (marker.current) marker.current.map = null;
-        marker.current = new AdvancedMarkerElement({ map, position: { lat: la, lng: lo } });
-        onChange(la.toFixed(6), lo.toFixed(6));
-      });
-
-      gmap.current = map;
-      setReady(true);
     };
 
-    init().catch(console.error);
+    init();
     return () => { gmap.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
