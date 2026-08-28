@@ -108,12 +108,12 @@ function LiveMap({ officers, onSelect }: {
 
     const init = async () => {
       try {
-        const loader = await import("@googlemaps/js-api-loader");
+        const { setOptions, importLibrary } = await import("@googlemaps/js-api-loader");
         // New API: setOptions + importLibrary (no Loader class)
-        loader.setOptions({ apiKey: GMAP_API_KEY, version: "weekly" });
+        setOptions({ apiKey: GMAP_API_KEY, version: "weekly" });
 
-        const { Map, TrafficLayer, InfoWindow } = await loader.importLibrary("maps") as any;
-        await loader.importLibrary("marker");
+        const { Map, TrafficLayer, InfoWindow } = await importLibrary("maps") as any;
+        await importLibrary("marker");
 
         if (!mapRef.current || gmap.current) return;
 
@@ -168,8 +168,8 @@ function LiveMap({ officers, onSelect }: {
 
     const loadAdvanced = async () => {
       try {
-        const loader = await import("@googlemaps/js-api-loader");
-        const { AdvancedMarkerElement } = await loader.importLibrary("marker") as any;
+        const { importLibrary } = await import("@googlemaps/js-api-loader");
+        const { AdvancedMarkerElement } = await importLibrary("marker") as any;
         const gmaps = (window as any).google;
         const LatLngBounds = gmaps.maps.LatLngBounds;
 

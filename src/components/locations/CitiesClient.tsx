@@ -37,11 +37,11 @@ function MapPicker({ lat, lng, onChange }: {
 
     const init = async () => {
       try {
-        const loader = await import("@googlemaps/js-api-loader");
-        loader.setOptions({ apiKey: GMAP_API_KEY, version: "weekly" });
+        const { setOptions, importLibrary } = await import("@googlemaps/js-api-loader");
+        setOptions({ apiKey: GMAP_API_KEY, version: "weekly" });
 
-        const { Map } = await loader.importLibrary("maps") as any;
-        const { AdvancedMarkerElement } = await loader.importLibrary("marker") as any;
+        const { Map } = await importLibrary("maps") as any;
+        const { AdvancedMarkerElement } = await importLibrary("marker") as any;
 
         if (!mapRef.current || gmap.current) return;
 
