@@ -19,7 +19,18 @@ interface ETAData { visitId: number; customerName: string | null; eta_minutes: n
 interface OfficerVisit { id: number; sequence: number; customerName: string; address: string; status: string; latitude: number | null; longitude: number | null; }
 interface TrailPoint { lat: number; lng: number; speed?: number; heading?: number; time: string; }
 
-function stripHtml(s: string) { return (s || "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim(); }
+function stripHtml(s: string) {
+  return (s || "")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&amp;/gi,  "&")
+    .replace(/&lt;/gi,   "<")
+    .replace(/&gt;/gi,   ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi,  "'")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 function isValidPakCoord(lat: number, lng: number) { return lat >= 20 && lat <= 40 && lng >= 55 && lng <= 80; }
 
 function statusLabel(s: string) {
@@ -92,11 +103,21 @@ function animateMarkerTo(
 }
 
 // ── Google Maps sub-component ─────────────────────────────────────────────────
-function LiveMap({ officers, trailPoints, onSelect }: { officers: Officer[]; trailPoints: TrailPoint[]; onSelect: (o: Officer) => void; }) {
+function LiveMap({
+  officers, trailPoints, onSelect,
+  focusOfficerId, navRoute,
+}: {
+  officers: Officer[];
+  trailPoints: TrailPoint[];
+  onSelect: (o: Officer) => void;
+  focusOfficerId?: number | null;
+  navRoute?: Array<{ lat: number; lng: number }>;
+}) {
   const mapRef       = useRef<HTMLDivElement>(null);
   const gmap         = useRef<any>(null);
   const markers      = useRef<Record<number, any>>({});
   const trailPoly    = useRef<any>(null);
+  const navPoly      = useRef<any>(null);
   const infoWindow   = useRef<any>(null);
   const prevPos      = useRef<Record<number, { lat: number; lng: number }>>({});
   const animFrames   = useRef<Record<number, number>>({});
@@ -240,9 +261,49 @@ function LiveMap({ officers, trailPoints, onSelect }: { officers: Officer[]; tra
         // Remember position for next frame's animation
         prevPos.current[o.id] = pos;
       });
-      if (validOfficers.length === 1 && !bounds.isEmpty()) gmap.current?.fitBounds(bounds, 120);
+      // Single officer → zoom to street level; multiple → fit all
+      if (validOfficers.length === 1 && !bounds.isEmpty()) {
+        const o = validOfficers[0];
+        gmap.current?.setCenter({ lat: Number(o.lastLatitude!), lng: Number(o.lastLongitude!) });
+        if ((gmap.current?.getZoom() ?? 0) < 15) gmap.current?.setZoom(16);
+      } else if (!bounds.isEmpty()) {
+        gmap.current?.fitBounds(bounds, 80);
+      }
     } catch (e) { console.error("Marker error:", e); }
   }, [officers, ready, buildPinEl]);
+
+  // Zoom to focused officer at street level
+  useEffect(() => {
+    if (!ready || !gmap.current || !focusOfficerId) return;
+    const o = officers.find(x => x.id === focusOfficerId);
+    if (!o) return;
+    const lat = Number(o.lastLatitude), lng = Number(o.lastLongitude);
+    if (!lat || !lng) return;
+    gmap.current.panTo({ lat, lng });
+    if ((gmap.current.getZoom() ?? 0) < 15) gmap.current.setZoom(16);
+  }, [focusOfficerId, ready]);
+
+  // Draw navigation route polyline
+  useEffect(() => {
+    if (!ready || !gmap.current) return;
+    try {
+      const gmaps = (window as any).google;
+      if (navPoly.current) { navPoly.current.setMap(null); navPoly.current = null; }
+      if (!navRoute || navRoute.length < 2) return;
+      navPoly.current = new gmaps.maps.Polyline({
+        path: navRoute,
+        geodesic: true,
+        strokeColor: "#1D4ED8",
+        strokeOpacity: 0.9,
+        strokeWeight: 6,
+        icons: [{
+          icon: { path: gmaps.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 3, strokeColor: "#1D4ED8" },
+          offset: "100%", repeat: "100px",
+        }],
+        map: gmap.current,
+      });
+    } catch (e) { console.error("navRoute error:", e); }
+  }, [navRoute, ready]);
 
   useEffect(() => {
     if (!ready || !gmap.current) return;
@@ -292,6 +353,24 @@ function VisitStatusDot({ status }: { status: string }) {
   return <Circle className="h-4 w-4 text-slate-300 shrink-0" />;
 }
 
+// ── Decode Google Maps encoded polyline ───────────────────────────────────────
+function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
+  const result: Array<{ lat: number; lng: number }> = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let b, shift = 0, res = 0;
+    do { b = encoded.charCodeAt(index++) - 63; res |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += (res & 1) ? ~(res >> 1) : (res >> 1);
+    shift = 0; res = 0;
+    do { b = encoded.charCodeAt(index++) - 63; res |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += (res & 1) ? ~(res >> 1) : (res >> 1);
+    result.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+  return result;
+}
+
+interface ActivityEvent { id: string; icon: string; text: string; time: string; color: string; }
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function LiveMapClient() {
   const [officers,      setOfficers]      = useState<Officer[]>([]);
@@ -307,9 +386,19 @@ export default function LiveMapClient() {
   const [visitsLoading, setVisitsLoading] = useState(false);
   const [etaData,       setEtaData]       = useState<ETAData | null>(null);
   const [trailPoints,   setTrailPoints]   = useState<TrailPoint[]>([]);
+  const [navRoute,      setNavRoute]      = useState<Array<{ lat: number; lng: number }>>([]);
+  const [activityFeed,  setActivityFeed]  = useState<ActivityEvent[]>([]);
+  const prevOfficers    = useRef<Record<number, Officer>>({});
 
   useEffect(() => {
     fetch("/api/v1/cities").then(r => r.json()).then(d => { if (d.success) setCities(d.data ?? []); }).catch(() => {});
+  }, []);
+
+  const addEvent = useCallback((ev: Omit<ActivityEvent, "id" | "time">) => {
+    setActivityFeed(prev => [{
+      ...ev, id: `${Date.now()}-${Math.random()}`,
+      time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    }, ...prev].slice(0, 20));
   }, []);
 
   const load = useCallback(async () => {
@@ -317,17 +406,65 @@ export default function LiveMapClient() {
       const params = selCity ? `?cityId=${selCity.id}` : "";
       const res = await fetch(`/api/v1/location${params}`).then(r => r.json());
       if (res.success) {
-        setOfficers(res.data?.bookers ?? []);
+        const fresh: Officer[] = res.data?.bookers ?? [];
         setLastUpdate(new Date());
+
+        // Detect state changes for activity feed
+        fresh.forEach(o => {
+          const prev = prevOfficers.current[o.id];
+          const name = stripHtml(o.name);
+          if (!prev) {
+            if (o.gpsStatus === "ACTIVE") addEvent({ icon: "🟢", text: `${name} came online`, color: "text-emerald-700 bg-emerald-50" });
+          } else {
+            if (prev.gpsStatus !== "ACTIVE" && o.gpsStatus === "ACTIVE")
+              addEvent({ icon: "🟢", text: `${name} is now active`, color: "text-emerald-700 bg-emerald-50" });
+            if (prev.gpsStatus === "ACTIVE" && o.gpsStatus !== "ACTIVE")
+              addEvent({ icon: "🔴", text: `${name} went ${o.gpsStatus?.toLowerCase()}`, color: "text-slate-600 bg-slate-50" });
+            const prevSpd = Number(prev.lastSpeedKmh ?? 0);
+            const curSpd  = Number(o.lastSpeedKmh ?? 0);
+            if (prevSpd < 2 && curSpd > 5)
+              addEvent({ icon: "🚗", text: `${name} started moving (${curSpd.toFixed(0)} km/h)`, color: "text-blue-700 bg-blue-50" });
+            if (prevSpd > 5 && curSpd < 1)
+              addEvent({ icon: "🅿️", text: `${name} stopped`, color: "text-amber-700 bg-amber-50" });
+          }
+          prevOfficers.current[o.id] = o;
+        });
+
+        setOfficers(fresh);
         if (selected) {
-          const updated = (res.data?.bookers ?? []).find((o: Officer) => o.id === selected.id);
+          const updated = fresh.find((o: Officer) => o.id === selected.id);
           if (updated) setSelected(updated);
         }
       }
     } catch { /* silent */ } finally { setLoading(false); }
-  }, [selCity, selected]);
+  }, [selCity, selected, addEvent]);
 
   useEffect(() => { load(); const t = setInterval(load, 1_500); return () => clearInterval(t); }, [load]);
+
+  // Fetch & draw navigation route when ETA is active
+  useEffect(() => {
+    if (!etaData || !selected) { setNavRoute([]); return; }
+    const o = selected;
+    const destVisit = officerVisits.find(v => v.id === etaData.visitId);
+    if (!destVisit?.latitude || !destVisit?.longitude) { setNavRoute([]); return; }
+    if (!o.lastLatitude || !o.lastLongitude) { setNavRoute([]); return; }
+
+    fetch("/api/mobile/directions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        originLat: Number(o.lastLatitude), originLng: Number(o.lastLongitude),
+        destLat: destVisit.latitude, destLng: destVisit.longitude,
+      }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        const polyline = d?.data?.polyline ?? d?.polyline ?? "";
+        if (polyline) setNavRoute(decodePolyline(polyline));
+        else setNavRoute([]);
+      })
+      .catch(() => setNavRoute([]));
+  }, [etaData?.visitId, selected?.id]);
 
   // Load visits + ETA + trail when officer is selected
   useEffect(() => {
@@ -502,7 +639,13 @@ export default function LiveMapClient() {
           </div>
         ) : (
           <div className="relative">
-            <LiveMap officers={withLoc} trailPoints={trailPoints} onSelect={setSelected} />
+            <LiveMap
+            officers={withLoc}
+            trailPoints={trailPoints}
+            onSelect={setSelected}
+            focusOfficerId={selected?.id}
+            navRoute={navRoute}
+          />
 
             {/* Selected officer detail panel */}
             {selected && (() => {
@@ -540,7 +683,15 @@ export default function LiveMapClient() {
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-white/20 text-white border border-white/20">
                         {sl.text}
                       </span>
-                      <span className="text-[10px] text-white/50">{secondsAgo(lastSeen)}</span>
+                      {(() => {
+                        const diff = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : 9999;
+                        const fresh = diff < 15;
+                        return (
+                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${fresh ? "bg-emerald-400/30 text-emerald-100" : "bg-red-400/30 text-red-200"}`}>
+                            {fresh ? "🔴 LIVE" : `⚠ ${secondsAgo(lastSeen)}`}
+                          </span>
+                        );
+                      })()}
                       <a href={`https://maps.google.com/?q=${lat},${lng}`} target="_blank" rel="noreferrer"
                         className="ml-auto flex items-center gap-1 text-[10px] text-white/70 hover:text-white">
                         <ExternalLink className="h-3 w-3" /> Open Maps
@@ -658,6 +809,31 @@ export default function LiveMapClient() {
           </div>
         )}
       </div>
+
+      {/* Live Activity Feed */}
+      {activityFeed.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              <h3 className="text-sm font-semibold text-slate-800">Live Activity Feed</h3>
+            </div>
+            <button onClick={() => setActivityFeed([])}
+              className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100">
+              Clear
+            </button>
+          </div>
+          <div className="divide-y divide-slate-50 max-h-48 overflow-y-auto">
+            {activityFeed.map(ev => (
+              <div key={ev.id} className={`flex items-center gap-3 px-5 py-2.5 ${ev.color}`}>
+                <span className="text-base shrink-0">{ev.icon}</span>
+                <p className="text-xs font-medium flex-1 min-w-0">{ev.text}</p>
+                <span className="text-[10px] text-slate-400 shrink-0 font-mono">{ev.time}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Officer list */}
       {cleanOfficers.length > 0 && (
