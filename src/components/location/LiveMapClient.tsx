@@ -700,17 +700,18 @@ export default function LiveMapClient() {
             <p className="text-xs text-slate-300 mt-1">Officers appear when the app is open and GPS is pinging</p>
           </div>
         ) : (
-          <div className="relative">
-            <LiveMap
-            officers={withLoc}
-            trailPoints={trailPoints}
-            onSelect={setSelected}
-            focusOfficerId={selected?.id}
-            navRoute={navRoute}
-          />
-          </div>
+          <>
+            <div className="relative">
+              <LiveMap
+              officers={withLoc}
+              trailPoints={trailPoints}
+              onSelect={setSelected}
+              focusOfficerId={selected?.id}
+              navRoute={navRoute}
+            />
+            </div>
 
-            {/* Selected officer detail panel — rendered outside map div so it never blocks map events */}
+            {/* Selected officer detail panel — fixed positioning so map events work */}
             {selected && (() => {
               const lat      = Number(selected.lastLatitude);
               const lng      = Number(selected.lastLongitude);
@@ -880,6 +881,7 @@ export default function LiveMapClient() {
                 </div>
               );
             })()}
+          </>
         )}
       </div>
 
