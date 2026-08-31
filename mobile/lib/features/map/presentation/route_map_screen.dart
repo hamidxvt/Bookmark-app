@@ -354,16 +354,13 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
   Set<Marker> _buildMarkers(List<RouteStop> stops, int selected, LatLng? myPos, double? heading) {
     final ms = <Marker>{};
     if (myPos != null) {
-      // Officer position with premium styling
+      // Your location — blue marker rotates with heading
       ms.add(Marker(
         markerId: const MarkerId('me'),
         position: myPos,
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
-        infoWindow: InfoWindow(
-          title: 'You',
-          snippet: heading != null ? 'Heading: ${heading.toStringAsFixed(0)}°' : 'Location',
-        ),
-        rotation: heading ?? 0,
+        infoWindow: const InfoWindow(title: 'Your Location'),
+        rotation: heading ?? 0, // Marker rotates to show direction
         zIndex: 10,
       ));
     }
