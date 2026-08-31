@@ -113,19 +113,18 @@ class FcmService {
     if (ctx == null) return;
 
     try {
-      final router = GoRouter.of(ctx);
       switch (type) {
         case 'visit':
-          router.go('/visits');
+          ctx.go('/visits');
           break;
         case 'sample':
-          router.go('/samples');
+          ctx.go('/samples');
           break;
         case 'leave':
-          router.go('/leaves');
+          ctx.go('/leaves');
           break;
         default:
-          router.go('/dashboard');
+          ctx.go('/dashboard');
       }
     } catch (_) {}
   }

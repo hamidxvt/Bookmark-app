@@ -528,9 +528,9 @@ class _AdhocVisitSheetState extends ConsumerState<_AdhocVisitSheet> {
                             style: const TextStyle(fontSize: 12),
                           ),
                           onTap: () => setState(() => _selected = c),
-                        );
-                      },
-                    ),
+                          );
+                          },
+                        ),
                       ),
                     ]),
             ),
