@@ -7,6 +7,11 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+generator dbSeed {
+  provider = "node -r esbuild-register"
+  seed     = "prisma/seed.ts"
+}
+
 // ─── ADMIN USERS ─────────────────────────────────────────────────────────────
 model User {
   id           Int       @id @default(autoincrement())
