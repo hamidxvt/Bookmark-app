@@ -354,11 +354,13 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
   Set<Marker> _buildMarkers(List<RouteStop> stops, int selected, LatLng? myPos) {
     final ms = <Marker>{};
     if (myPos != null) {
+      // Officer position with heading rotation
       ms.add(Marker(
         markerId: const MarkerId('me'),
         position: myPos,
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
-        infoWindow: const InfoWindow(title: 'You'),
+        infoWindow: const InfoWindow(title: 'Your Location'),
+        rotation: _myHeading ?? 0, // Rotate marker based on heading
         zIndex: 10,
       ));
     }
@@ -449,6 +451,7 @@ class _MapBody extends ConsumerStatefulWidget {
 
 class _MapBodyState extends ConsumerState<_MapBody> {
   LatLng? _myPos;
+  double? _myHeading;
 
   @override
   void initState() {
@@ -460,7 +463,10 @@ class _MapBodyState extends ConsumerState<_MapBody> {
     final gps = ref.read(gpsServiceProvider);
     final pos = await gps.getCurrentPosition();
     if (pos != null && mounted) {
-      setState(() => _myPos = LatLng(pos.latitude, pos.longitude));
+      setState(() {
+        _myPos = LatLng(pos.latitude, pos.longitude);
+        _myHeading = pos.heading >= 0 ? pos.heading : null;
+      });
     }
   }
 
