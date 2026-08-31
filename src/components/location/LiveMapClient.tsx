@@ -708,8 +708,9 @@ export default function LiveMapClient() {
             focusOfficerId={selected?.id}
             navRoute={navRoute}
           />
+          </div>
 
-            {/* Selected officer detail panel */}
+            {/* Selected officer detail panel — rendered outside map div so it never blocks map events */}
             {selected && (() => {
               const lat      = Number(selected.lastLatitude);
               const lng      = Number(selected.lastLongitude);
@@ -722,12 +723,14 @@ export default function LiveMapClient() {
               const sl       = statusLabel(selected.gpsStatus);
 
               return (
-                <div className="absolute top-3 right-3 w-[300px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-[200]" style={{ maxHeight: "calc(100% - 24px)" }}>
+                <div className="fixed bottom-6 right-6 w-[300px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-50" style={{ maxHeight: "calc(100vh - 120px)" }}>
 
-                  {/* Header — always visible */}
+                  {/* Header — pinned, never scrolls away */}
                   <div className="relative shrink-0 p-4 bg-gradient-to-br from-[#C8102E] to-[#7B0000]">
-                    <button onClick={() => { setSelected(null); setTrailPoints([]); }}
-                      className="absolute top-3 right-3 text-white/70 hover:text-white text-xl leading-none w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/20 transition-all z-10">×</button>
+                    <button
+                      onClick={() => { setSelected(null); setTrailPoints([]); }}
+                      className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition-all text-xl font-light z-10"
+                    >×</button>
                     <div className="flex items-center gap-3">
                       {selected.profilePhoto ? (
                         <img src={selected.profilePhoto} alt={selected.name} className="h-11 w-11 rounded-full object-cover border-2 border-white/30 shrink-0" />
@@ -877,7 +880,6 @@ export default function LiveMapClient() {
                 </div>
               );
             })()}
-          </div>
         )}
       </div>
 

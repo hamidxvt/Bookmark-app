@@ -39,7 +39,8 @@ export async function GET(req: Request) {
       contact: c.ownerName ?? "",
       phone: c.ownerPhone ?? "",
       address: c.address ?? "",
-      city: c.city?.name ?? "",
+      // Return city as object so mobile can do c['city']['name']
+      city: c.city ? { name: c.city.name } : null,
     }));
 
     return NextResponse.json({
