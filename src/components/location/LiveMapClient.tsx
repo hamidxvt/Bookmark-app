@@ -5,6 +5,8 @@ import {
   RefreshCw, Users, Clock, Navigation, Building2, ChevronDown,
   ExternalLink, CheckCircle2, Circle, Calendar, Activity,
   AlertCircle, Search, MapPin, TrendingUp, Zap, Route,
+  Wifi, WifiOff, Car, PersonStanding, ParkingCircle, Footprints,
+  ArrowUpRight, Radio, BellDot, Signal,
 } from "lucide-react";
 
 interface City { id: number; name: string; latitude: number | null; longitude: number | null; geofenceRadius: number | null; }
@@ -41,13 +43,23 @@ function statusLabel(s: string) {
   return                     { text: "Offline",  cls: "text-slate-500  bg-slate-50  border border-slate-200"  };
 }
 
-function activityIcon(a: string | null | undefined) {
+function activityLabel(a: string | null | undefined): string {
   switch ((a ?? "").toUpperCase()) {
-    case "MOVING_FAST": return "🚗";
-    case "MOVING":      return "🚶";
-    case "MOVING_SLOW": return "🐢";
-    case "STATIONARY":  return "🅿️";
+    case "MOVING_FAST": return "Moving Fast";
+    case "MOVING":      return "Moving";
+    case "MOVING_SLOW": return "Moving Slow";
+    case "STATIONARY":  return "Stationary";
     default:            return "—";
+  }
+}
+
+function ActivityIcon({ activity, className = "h-4 w-4" }: { activity: string | null | undefined; className?: string }) {
+  switch ((activity ?? "").toUpperCase()) {
+    case "MOVING_FAST": return <Car className={className} />;
+    case "MOVING":      return <Footprints className={className} />;
+    case "MOVING_SLOW": return <PersonStanding className={className} />;
+    case "STATIONARY":  return <ParkingCircle className={className} />;
+    default:            return <Activity className={className} />;
   }
 }
 
@@ -235,21 +247,26 @@ function LiveMap({
           m.addListener("click", () => {
             const speed = o.lastSpeedKmh != null ? `${Number(o.lastSpeedKmh).toFixed(1)} km/h` : "—";
             const lastSeen = secondsAgo(o.lastPingAt ?? o.lastSeenAt);
-            const actIcon = activityIcon(o.lastActivity);
+            const activity = activityLabel(o.lastActivity);
             const sl = statusLabel(o.gpsStatus);
+            const isActive = o.gpsStatus?.toUpperCase() === "ACTIVE";
             infoWindow.current?.setContent(`
-              <div style="font-family:'Inter',system-ui,sans-serif;padding:0;min-width:200px;border-radius:12px;overflow:hidden;">
+              <div style="font-family:'Inter',system-ui,sans-serif;padding:0;min-width:210px;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.12);">
                 <div style="background:linear-gradient(135deg,#C8102E,#8B0000);padding:12px 14px;">
-                  <p style="font-weight:800;margin:0;font-size:14px;color:white;">${stripHtml(o.name)}</p>
-                  <p style="font-size:11px;color:rgba(255,255,255,.7);margin:2px 0 0;">${o.city?.name ?? "Unknown"}</p>
+                  <p style="font-weight:800;margin:0;font-size:14px;color:white;letter-spacing:-.2px;">${stripHtml(o.name)}</p>
+                  <p style="font-size:11px;color:rgba(255,255,255,.65);margin:3px 0 0;font-weight:500;">${o.city?.name ?? "Unknown"}</p>
                 </div>
                 <div style="padding:10px 14px;background:white;">
-                  <div style="display:flex;gap:8px;margin-bottom:8px;">
-                    <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${o.gpsStatus?.toUpperCase()==='ACTIVE'?'#dcfce7':'#f1f5f9'};color:${o.gpsStatus?.toUpperCase()==='ACTIVE'?'#15803d':'#64748b'};">${sl.text}</span>
-                    <span style="font-size:10px;color:#94a3b8;">${lastSeen}</span>
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+                    <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${isActive?'#22c55e':'#94a3b8'};${isActive?'box-shadow:0 0 0 2px #dcfce7;':''}"></span>
+                    <span style="font-size:10px;font-weight:700;color:${isActive?'#15803d':'#64748b'};">${sl.text}</span>
+                    <span style="font-size:10px;color:#cbd5e1;margin-left:auto;">${lastSeen}</span>
                   </div>
-                  <p style="font-size:11px;color:#475569;margin:0 0 4px;">📍 ${Number(o.lastLatitude).toFixed(4)}, ${Number(o.lastLongitude).toFixed(4)}</p>
-                  <p style="font-size:11px;color:#C8102E;font-weight:700;margin:0;">${actIcon} ${speed}</p>
+                  <p style="font-size:11px;color:#64748b;margin:0 0 4px;font-weight:500;">${Number(o.lastLatitude).toFixed(5)}, ${Number(o.lastLongitude).toFixed(5)}</p>
+                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid #f1f5f9;">
+                    <span style="font-size:11px;color:#C8102E;font-weight:700;">${speed}</span>
+                    <span style="font-size:10px;color:#94a3b8;font-weight:500;">${activity}</span>
+                  </div>
                 </div>
               </div>
             `);
@@ -369,7 +386,8 @@ function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
   return result;
 }
 
-interface ActivityEvent { id: string; icon: string; text: string; time: string; color: string; }
+type FeedIcon = "online" | "offline" | "idle" | "moving" | "stopped" | "info";
+interface ActivityEvent { id: string; iconType: FeedIcon; text: string; time: string; color: string; }
 
 // ── Main component ────────────────────────────────────────────────────────────
 export default function LiveMapClient() {
@@ -396,7 +414,8 @@ export default function LiveMapClient() {
 
   const addEvent = useCallback((ev: Omit<ActivityEvent, "id" | "time">) => {
     setActivityFeed(prev => [{
-      ...ev, id: `${Date.now()}-${Math.random()}`,
+      ...ev,
+      id: `${Date.now()}-${Math.random()}`,
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
     }, ...prev].slice(0, 20));
   }, []);
@@ -414,18 +433,18 @@ export default function LiveMapClient() {
           const prev = prevOfficers.current[o.id];
           const name = stripHtml(o.name);
           if (!prev) {
-            if (o.gpsStatus === "ACTIVE") addEvent({ icon: "🟢", text: `${name} came online`, color: "text-emerald-700 bg-emerald-50" });
+            if (o.gpsStatus === "ACTIVE") addEvent({ iconType: "online", text: `${name} came online`, color: "text-emerald-700 bg-emerald-50" });
           } else {
             if (prev.gpsStatus !== "ACTIVE" && o.gpsStatus === "ACTIVE")
-              addEvent({ icon: "🟢", text: `${name} is now active`, color: "text-emerald-700 bg-emerald-50" });
+              addEvent({ iconType: "online", text: `${name} is now active`, color: "text-emerald-700 bg-emerald-50" });
             if (prev.gpsStatus === "ACTIVE" && o.gpsStatus !== "ACTIVE")
-              addEvent({ icon: "🔴", text: `${name} went ${o.gpsStatus?.toLowerCase()}`, color: "text-slate-600 bg-slate-50" });
+              addEvent({ iconType: "offline", text: `${name} went ${o.gpsStatus?.toLowerCase()}`, color: "text-slate-600 bg-slate-50" });
             const prevSpd = Number(prev.lastSpeedKmh ?? 0);
             const curSpd  = Number(o.lastSpeedKmh ?? 0);
             if (prevSpd < 2 && curSpd > 5)
-              addEvent({ icon: "🚗", text: `${name} started moving (${curSpd.toFixed(0)} km/h)`, color: "text-blue-700 bg-blue-50" });
+              addEvent({ iconType: "moving", text: `${name} started moving · ${curSpd.toFixed(0)} km/h`, color: "text-blue-700 bg-blue-50" });
             if (prevSpd > 5 && curSpd < 1)
-              addEvent({ icon: "🅿️", text: `${name} stopped`, color: "text-amber-700 bg-amber-50" });
+              addEvent({ iconType: "stopped", text: `${name} stopped`, color: "text-amber-700 bg-amber-50" });
           }
           prevOfficers.current[o.id] = o;
         });
@@ -686,9 +705,15 @@ export default function LiveMapClient() {
                       {(() => {
                         const diff = lastSeen ? (Date.now() - new Date(lastSeen).getTime()) / 1000 : 9999;
                         const fresh = diff < 15;
-                        return (
-                          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${fresh ? "bg-emerald-400/30 text-emerald-100" : "bg-red-400/30 text-red-200"}`}>
-                            {fresh ? "🔴 LIVE" : `⚠ ${secondsAgo(lastSeen)}`}
+                        return fresh ? (
+                          <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-400/25 text-emerald-100">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                            LIVE
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white/10 text-white/60">
+                            <Clock className="h-3 w-3" />
+                            {secondsAgo(lastSeen)}
                           </span>
                         );
                       })()}
@@ -710,9 +735,9 @@ export default function LiveMapClient() {
                         <p className="text-sm font-bold text-slate-900">{speed != null ? speed.toFixed(0) : "—"}</p>
                         <p className="text-[9px] text-slate-400 font-semibold mt-0.5">KM/H</p>
                       </div>
-                      <div className="bg-slate-50 rounded-xl p-2.5 text-center border border-slate-100">
-                        <p className="text-sm font-bold text-slate-900">{activityIcon(selected.lastActivity)}</p>
-                        <p className="text-[9px] text-slate-400 font-semibold mt-0.5">STATUS</p>
+                      <div className="bg-slate-50 rounded-xl p-2.5 text-center border border-slate-100 flex flex-col items-center justify-center">
+                        <ActivityIcon activity={selected.lastActivity} className="h-4 w-4 text-slate-600" />
+                        <p className="text-[9px] text-slate-400 font-semibold mt-1">STATUS</p>
                       </div>
                       <div className="bg-slate-50 rounded-xl p-2.5 text-center border border-slate-100">
                         <p className="text-sm font-bold text-slate-900">{trailPoints.length}</p>
@@ -815,8 +840,11 @@ export default function LiveMapClient() {
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <h3 className="text-sm font-semibold text-slate-800">Live Activity Feed</h3>
+              <Radio className="h-4 w-4 text-[#C8102E]" />
+              <h3 className="text-sm font-semibold text-slate-800">Live Activity</h3>
+              <span className="text-[10px] font-semibold bg-red-50 text-[#C8102E] px-2 py-0.5 rounded-full border border-red-100">
+                {activityFeed.length}
+              </span>
             </div>
             <button onClick={() => setActivityFeed([])}
               className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100">
@@ -824,13 +852,22 @@ export default function LiveMapClient() {
             </button>
           </div>
           <div className="divide-y divide-slate-50 max-h-48 overflow-y-auto">
-            {activityFeed.map(ev => (
-              <div key={ev.id} className={`flex items-center gap-3 px-5 py-2.5 ${ev.color}`}>
-                <span className="text-base shrink-0">{ev.icon}</span>
-                <p className="text-xs font-medium flex-1 min-w-0">{ev.text}</p>
-                <span className="text-[10px] text-slate-400 shrink-0 font-mono">{ev.time}</span>
-              </div>
-            ))}
+            {activityFeed.map(ev => {
+              const Icon = ev.iconType === "online"  ? Signal
+                         : ev.iconType === "offline" ? WifiOff
+                         : ev.iconType === "moving"  ? Car
+                         : ev.iconType === "stopped" ? ParkingCircle
+                         : BellDot;
+              return (
+                <div key={ev.id} className="flex items-center gap-3 px-5 py-2.5 hover:bg-slate-50">
+                  <div className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 ${ev.color}`}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
+                  <p className="text-xs font-medium flex-1 min-w-0 text-slate-700">{ev.text}</p>
+                  <span className="text-[10px] text-slate-400 shrink-0 font-mono tabular-nums">{ev.time}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -874,7 +911,10 @@ export default function LiveMapClient() {
                   </div>
                   <div className="shrink-0 text-right space-y-1">
                     {speed != null && speed > 0 && (
-                      <p className="text-xs font-bold text-[#C8102E]">{activityIcon(o.lastActivity)} {speed.toFixed(0)} km/h</p>
+                      <div className="flex items-center gap-1 justify-end">
+                        <ActivityIcon activity={o.lastActivity} className="h-3 w-3 text-[#C8102E]" />
+                        <span className="text-xs font-bold text-[#C8102E]">{speed.toFixed(0)} km/h</span>
+                      </div>
                     )}
                     <span className={`text-[10px] font-semibold rounded-full px-2 py-0.5 ${sl.cls}`}>{sl.text}</span>
                     <p className="text-[10px] text-slate-400">{secondsAgo(o.lastPingAt ?? o.lastSeenAt)}</p>
