@@ -48,8 +48,8 @@ export async function GET(req: Request) {
       id: string;
       type: "active" | "idle" | "late" | "completed" | "pending";
       officer: string;
-      designation?: string;
-      city?: string;
+      designation?: string | null;
+      city?: string | null;
       title: string;
       description: string;
       timestamp: Date;
