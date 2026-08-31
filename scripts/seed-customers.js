@@ -75,6 +75,41 @@ async function main() {
         latitude: 30.1780,
         longitude: 66.9750,
       },
+      {
+        name: 'Academic Excellence Quetta',
+        address: 'Arbab Road, Quetta',
+        type: 'A',
+        latitude: 30.1920,
+        longitude: 66.9600,
+      },
+      {
+        name: 'Books & More Quetta',
+        address: 'Gulberg Road, Quetta',
+        type: 'B',
+        latitude: 30.1700,
+        longitude: 66.9900,
+      },
+      {
+        name: 'Star Education Quetta',
+        address: 'Kuchlak Road, Quetta',
+        type: 'A+',
+        latitude: 30.1650,
+        longitude: 66.9550,
+      },
+      {
+        name: 'Premier Academy Store Quetta',
+        address: 'Aabadgir Road, Quetta',
+        type: 'A',
+        latitude: 30.1950,
+        longitude: 66.9750,
+      },
+      {
+        name: 'Student Needs Quetta',
+        address: 'Breweryroad, Quetta',
+        type: 'B',
+        latitude: 30.1820,
+        longitude: 66.9820,
+      },
     ];
 
     // Karachi customers
@@ -113,6 +148,41 @@ async function main() {
         type: 'B',
         latitude: 24.8500,
         longitude: 67.0100,
+      },
+      {
+        name: 'Bright Future Store Karachi',
+        address: 'North Nazimabad, Karachi',
+        type: 'A+',
+        latitude: 24.9200,
+        longitude: 67.0150,
+      },
+      {
+        name: 'Students Paradise Karachi',
+        address: 'Gulsan-e-Hadeed, Karachi',
+        type: 'B',
+        latitude: 24.8800,
+        longitude: 67.0400,
+      },
+      {
+        name: 'Knowledge Center Karachi',
+        address: 'Mohammadi, Karachi',
+        type: 'A',
+        latitude: 24.9100,
+        longitude: 67.0250,
+      },
+      {
+        name: 'Premier Books Karachi',
+        address: 'Korangi, Karachi',
+        type: 'A+',
+        latitude: 24.8300,
+        longitude: 67.0600,
+      },
+      {
+        name: 'Learning Hub Karachi',
+        address: 'Liaquatabad, Karachi',
+        type: 'B',
+        latitude: 24.8950,
+        longitude: 67.0320,
       },
     ];
 
@@ -168,7 +238,7 @@ async function main() {
       }
     }
 
-    console.log('\n✅ Seeding completed! 10 test customers created.');
+    console.log('\n✅ Seeding completed! 20 test customers created (10 in Quetta + 10 in Karachi).');
   } catch (error) {
     console.error('❌ Error:', error.message);
     process.exit(1);
