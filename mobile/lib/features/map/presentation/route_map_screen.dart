@@ -131,6 +131,11 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
         'destLat': dest.lat,
         'destLng': dest.lng,
       });
+      if (res.data['success'] != true) {
+        final errMsg = res.data['error'] ?? 'Unknown error';
+        _showSnack('Route error: $errMsg');
+        return null;
+      }
       final d = res.data['data'] as Map<String, dynamic>;
       final pts = decodePolyline(d['polyline'] as String? ?? '');
       return DirectionsResult(
@@ -140,7 +145,8 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
         durationSec: (d['durationSec'] as num?)?.toInt() ?? 0,
         walkDurationText: d['walkDurationText'] as String?,
       );
-    } catch (_) {
+    } catch (e) {
+      _showSnack('Connection error: ${e.toString().split('\n').first}');
       return null;
     }
   }
