@@ -58,13 +58,48 @@ function secondsAgo(dateStr: string | null): string {
 
 const GMAP_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
+// ── Smooth animation helpers (Uber-style) ─────────────────────────────────────
+function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
+function easeInOut(t: number) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+
+function calcBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const la1  = lat1 * Math.PI / 180;
+  const la2  = lat2 * Math.PI / 180;
+  const y = Math.sin(dLng) * Math.cos(la2);
+  const x = Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(dLng);
+  return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+}
+
+function animateMarkerTo(
+  marker: any,
+  officerId: number,
+  fromLat: number, fromLng: number,
+  toLat: number,   toLng: number,
+  durationMs: number,
+  frameMap: Record<number, number>,
+) {
+  if (frameMap[officerId]) { cancelAnimationFrame(frameMap[officerId]); }
+  const start = performance.now();
+  const step = (now: number) => {
+    const t = Math.min((now - start) / durationMs, 1);
+    const e = easeInOut(t);
+    marker.position = { lat: lerp(fromLat, toLat, e), lng: lerp(fromLng, toLng, e) };
+    if (t < 1) { frameMap[officerId] = requestAnimationFrame(step); }
+    else { delete frameMap[officerId]; }
+  };
+  frameMap[officerId] = requestAnimationFrame(step);
+}
+
 // ── Google Maps sub-component ─────────────────────────────────────────────────
 function LiveMap({ officers, trailPoints, onSelect }: { officers: Officer[]; trailPoints: TrailPoint[]; onSelect: (o: Officer) => void; }) {
-  const mapRef     = useRef<HTMLDivElement>(null);
-  const gmap       = useRef<any>(null);
-  const markers    = useRef<Record<number, any>>({});
-  const trailPoly  = useRef<any>(null);
-  const infoWindow = useRef<any>(null);
+  const mapRef       = useRef<HTMLDivElement>(null);
+  const gmap         = useRef<any>(null);
+  const markers      = useRef<Record<number, any>>({});
+  const trailPoly    = useRef<any>(null);
+  const infoWindow   = useRef<any>(null);
+  const prevPos      = useRef<Record<number, { lat: number; lng: number }>>({});
+  const animFrames   = useRef<Record<number, number>>({});
   const [ready, setReady] = useState(false);
   const onSelectRef = useRef(onSelect);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
@@ -129,7 +164,16 @@ function LiveMap({ officers, trailPoints, onSelect }: { officers: Officer[]; tra
     if (!ready || !gmap.current) return;
     const validOfficers = officers.filter(o => { const lt = Number(o.lastLatitude), lg = Number(o.lastLongitude); return lt && lg && isValidPakCoord(lt, lg); });
     const currentIds = new Set(validOfficers.map(o => o.id));
-    Object.keys(markers.current).forEach(idStr => { const id = Number(idStr); if (!currentIds.has(id)) { markers.current[id].map = null; delete markers.current[id]; } });
+    Object.keys(markers.current).forEach(idStr => {
+      const id = Number(idStr);
+      if (!currentIds.has(id)) {
+        // Cancel any ongoing animation and remove marker
+        if (animFrames.current[id]) { cancelAnimationFrame(animFrames.current[id]); delete animFrames.current[id]; }
+        markers.current[id].map = null;
+        delete markers.current[id];
+        delete prevPos.current[id];
+      }
+    });
     try {
       const gmaps = (window as any).google;
       const AdvancedMarkerElement = gmaps.maps.marker.AdvancedMarkerElement;
@@ -137,9 +181,33 @@ function LiveMap({ officers, trailPoints, onSelect }: { officers: Officer[]; tra
       validOfficers.forEach(o => {
         const pos = { lat: Number(o.lastLatitude!), lng: Number(o.lastLongitude!) };
         bounds.extend(pos);
-        const el = buildPinEl(o);
+
+        // Calculate bearing from movement if server didn't send heading
+        const prev = prevPos.current[o.id];
+        const movedFar = prev &&
+          (Math.abs(prev.lat - pos.lat) > 0.000015 ||
+           Math.abs(prev.lng - pos.lng) > 0.000015);
+        const effectiveHeading = o.lastHeading != null
+          ? o.lastHeading
+          : (movedFar ? calcBearing(prev.lat, prev.lng, pos.lat, pos.lng) : undefined);
+        const oWithHeading = effectiveHeading != null
+          ? { ...o, lastHeading: effectiveHeading }
+          : o;
+        const el = buildPinEl(oWithHeading);
+
         if (markers.current[o.id]) {
-          markers.current[o.id].position = pos;
+          // Smooth Uber-style animation to new position
+          if (movedFar) {
+            animateMarkerTo(
+              markers.current[o.id], o.id,
+              prev.lat, prev.lng,
+              pos.lat, pos.lng,
+              1400,                 // 1.4 s smooth glide
+              animFrames.current,
+            );
+          } else {
+            markers.current[o.id].position = pos;
+          }
           markers.current[o.id].content = el;
         } else {
           const m = new AdvancedMarkerElement({ map: gmap.current!, position: pos, content: el });
@@ -169,6 +237,8 @@ function LiveMap({ officers, trailPoints, onSelect }: { officers: Officer[]; tra
           });
           markers.current[o.id] = m;
         }
+        // Remember position for next frame's animation
+        prevPos.current[o.id] = pos;
       });
       if (validOfficers.length === 1 && !bounds.isEmpty()) gmap.current?.fitBounds(bounds, 120);
     } catch (e) { console.error("Marker error:", e); }
@@ -257,7 +327,7 @@ export default function LiveMapClient() {
     } catch { /* silent */ } finally { setLoading(false); }
   }, [selCity, selected]);
 
-  useEffect(() => { load(); const t = setInterval(load, 2_000); return () => clearInterval(t); }, [load]);
+  useEffect(() => { load(); const t = setInterval(load, 1_500); return () => clearInterval(t); }, [load]);
 
   // Load visits + ETA + trail when officer is selected
   useEffect(() => {
@@ -328,7 +398,7 @@ export default function LiveMapClient() {
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
             Live GPS Tracking
           </h2>
-          <p className="text-sm text-slate-500 mt-0.5">Real-time officer positions · updates every 2s</p>
+          <p className="text-sm text-slate-500 mt-0.5">Real-time officer positions · live marker animation</p>
         </div>
         <div className="flex items-center gap-2">
           {/* City filter */}
