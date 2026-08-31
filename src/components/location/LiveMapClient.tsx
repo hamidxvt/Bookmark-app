@@ -527,16 +527,23 @@ export default function LiveMapClient() {
           const activities = res.data.activeActivities as Array<any>;
           setActivityFeed(prev => {
             const now = new Date();
-            const merged = [
-              ...activities.filter(a => a.officer).map((a: any) => ({
+            const newActivities: ActivityEvent[] = activities.filter(a => a.officer).map((a: any) => {
+              let icon: FeedIcon;
+              if (a.type === "idle") icon = "offline";
+              else if (a.type === "completed") icon = "online";
+              else if (a.type === "late") icon = "stopped";
+              else if (a.type === "active") icon = "moving";
+              else icon = "info";
+              
+              return {
                 id: a.id,
-                iconType: a.type === "idle" ? "offline" : a.type === "completed" ? "online" : a.type === "late" ? "stopped" : "moving",
+                iconType: icon,
                 color: a.severity === "critical" ? "bg-red-50" : a.severity === "warning" ? "bg-amber-50" : "bg-blue-50",
                 text: `${a.officer}: ${a.title} — ${a.description}`,
                 time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              })),
-              ...prev,
-            ];
+              };
+            });
+            const merged = [...newActivities, ...prev];
             const seen = new Set<string>();
             return merged.filter(a => seen.has(a.id) ? false : (seen.add(a.id), true)).slice(0, 25);
           });
