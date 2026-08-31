@@ -712,7 +712,7 @@ export default function LiveMapClient() {
             {/* Backdrop overlay — clicking closes modal */}
             {selected && (
               <div
-                className="absolute inset-0 z-[1999]"
+                className="fixed inset-0 z-[1999] bg-transparent"
                 onClick={() => { setSelected(null); setTrailPoints([]); }}
               />
             )}
@@ -730,13 +730,15 @@ export default function LiveMapClient() {
               const sl       = statusLabel(selected.gpsStatus);
 
               return (
-                <div className="absolute bottom-4 right-4 w-[320px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-[2000] max-h-[90vh]"
-                  style={{ backdropFilter: "blur(8px)", maxWidth: "calc(100vw - 40px)" }}>
+                <div 
+                  className="fixed bottom-4 right-4 w-[320px] max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-[2000] max-h-[calc(100vh-32px)]"
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ backdropFilter: "blur(8px)" }}>
 
                   {/* Header */}
                   <div className="relative p-4 bg-gradient-to-br from-[#C8102E] to-[#7B0000]">
-                    <button onClick={() => { setSelected(null); setTrailPoints([]); }}
-                      className="absolute top-3 right-3 text-white/50 hover:text-white text-lg leading-none w-6 h-6 flex items-center justify-center rounded-full hover:bg-white/10 transition-colors">×</button>
+                    <button onClick={(e) => { e.stopPropagation(); setSelected(null); setTrailPoints([]); }}
+                      className="absolute top-3 right-3 text-white/50 hover:text-white hover:bg-white/20 text-lg leading-none w-8 h-8 flex items-center justify-center rounded-full transition-all">×</button>
                     <div className="flex items-center gap-3">
                       {selected.profilePhoto ? (
                         <img src={selected.profilePhoto} alt={selected.name} className="h-11 w-11 rounded-full object-cover border-2 border-white/30 shrink-0" />
