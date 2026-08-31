@@ -147,12 +147,6 @@ function LiveMap({
     const heading  = o.lastHeading;
     const speed = Number(o.lastSpeedKmh ?? 0);
     
-    // Premium animated heading arrow
-    const arrowHtml = (heading != null && isActive)
-      ? `<div style="position:absolute;top:-20px;left:50%;transform:translateX(-50%) rotate(${heading}deg);width:24px;height:24px;display:flex;align-items:flex-end;justify-content:center;">
-           <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid #C8102E;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));"></div>
-         </div>`
-      : "";
     
     // Speed badge with gradient
     const speedHtml = speed > 0
@@ -160,13 +154,18 @@ function LiveMap({
       : "";
     
     const el = document.createElement("div");
-    el.style.cssText = "position:relative;width:56px;height:90px;cursor:pointer;";
+    el.style.cssText = `position:relative;width:56px;height:90px;cursor:pointer;transform:rotate(${heading ?? 0}deg);`;
     el.innerHTML = `
       <style>
         @keyframes gm-pulse-new { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.6);opacity:0} }
         .marker-pulse { animation: gm-pulse-new 2s infinite; }
       </style>
-      ${arrowHtml}${speedHtml}
+      ${speedHtml}
+      <!-- Heading arrow integrated into marker (rotates with whole marker) -->
+      ${heading != null && isActive ? `
+        <div style="position:absolute;top:-16px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid ${pinColor};filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));"></div>
+      ` : ""}
+      
       <!-- Main profile circle with gradient ring -->
       <div style="position:absolute;top:16px;left:4px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${pinColor},${pinColor}dd);border:3px solid white;box-shadow:0 0 0 2px ${pinColor}40,0 6px 16px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;overflow:hidden;">
         ${o.profilePhoto
