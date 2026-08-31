@@ -117,14 +117,7 @@ class _VisitTile extends ConsumerWidget {
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: visit.isCompleted
-                ? AppColors.success.withOpacity(0.3)
-                : visit.isMissed
-                    ? AppColors.error.withOpacity(0.3)
-                    : AppColors.outline,
-            width: 1,
-          ),
+          border: Border.all(color: AppColors.outline.withOpacity(0.6), width: 0.5),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.04),
@@ -133,9 +126,20 @@ class _VisitTile extends ConsumerWidget {
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                // Status accent bar
+                Container(
+                  width: 4,
+                  color: _statusColor(visit.status),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
             children: [
               // Sequence number
               Container(
@@ -238,12 +242,15 @@ class _VisitTile extends ConsumerWidget {
                 ),
               ),
 
-              // Arrow
-              if (isActionable)
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: AppColors.outline,
-                ),
+                  // Arrow
+                  if (isActionable)
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: AppColors.outline,
+                    ),
+                ]),
+              ),
+            ),
             ],
           ),
         ),

@@ -29,17 +29,10 @@ class VisitRepository {
   VisitRepository(this._dio, this._gps, this._queue);
 
   Future<List<Visit>> getTodayVisits() async {
-    try {
-      final res = await _dio.get(ApiConstants.todayVisits);
-      final list = res.data['data'] as List;
-      return list.map((e) => Visit.fromJson(e as Map<String, dynamic>)).toList();
-    } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionError) {
-        // Return empty list when offline — cached data would be shown
-        return [];
-      }
-      rethrow;
-    }
+    final res = await _dio.get(ApiConstants.todayVisits);
+    final raw = res.data['data'];
+    final list = raw is List ? raw : (raw is Map ? (raw['visits'] as List? ?? []) : []);
+    return list.map((e) => Visit.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   /// Check if current GPS position is within 200m of the visit customer location.

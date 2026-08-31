@@ -16,7 +16,7 @@ class GpsService {
 
   GpsService(this._dio);
 
-  /// Start periodic GPS pings every 30 seconds + background service
+  /// Start periodic GPS pings every 10 seconds (foreground) + background service
   Future<void> startTracking({String? jwtToken}) async {
     stopTracking();
 
@@ -31,8 +31,8 @@ class GpsService {
       await startBackgroundGps();
     }
 
-    // Also run foreground timer for immediate updates
-    _pingTimer = Timer.periodic(const Duration(seconds: 30), (_) => _ping());
+    // Foreground timer — 10s for responsive live tracking
+    _pingTimer = Timer.periodic(const Duration(seconds: 10), (_) => _ping());
     _ping(); // immediate first ping
   }
 
@@ -95,6 +95,7 @@ class GpsService {
         'isMock': pos.isMocked,
         'speed_kmh': double.parse(speedKmh),
         'altitude': pos.altitude,
+        'heading': pos.heading >= 0 ? pos.heading : null,
         'timestamp': DateTime.now().toIso8601String(),
       });
     } on DioException {

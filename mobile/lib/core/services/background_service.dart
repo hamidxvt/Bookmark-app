@@ -110,6 +110,9 @@ Future<void> _sendGpsPing(ServiceInstance service) async {
         'lng': pos.longitude,
         'accuracy': pos.accuracy,
         'isMock': pos.isMocked,
+        'speed_kmh': pos.speed >= 0 ? pos.speed * 3.6 : 0,
+        'heading': pos.heading >= 0 ? pos.heading : null,
+        'altitude': pos.altitude,
       }),
     ).timeout(const Duration(seconds: 10));
 

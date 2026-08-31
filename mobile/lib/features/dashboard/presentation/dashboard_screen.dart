@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/services/gps_service.dart';
 import '../../auth/presentation/auth_notifier.dart';
 import '../../workday/data/workday_status_provider.dart';
+import '../../visits/data/visit_repository.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -56,13 +57,29 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 // Stats row
                 Consumer(builder: (_, ref, __) {
                   final s = ref.watch(workdayStatusProvider).valueOrNull;
-                  return _StatsRow(started: s?.dayStarted ?? false, ended: s?.dayEnded ?? false);
+                  final visitsAsync = ref.watch(visitListProvider);
+                  final visits = visitsAsync.valueOrNull ?? [];
+                  final done = visits.where((v) => v.status == 'COMPLETED').length;
+                  final planned = visits.length;
+                  return _StatsRow(
+                    started: s?.dayStarted ?? false,
+                    ended: s?.dayEnded ?? false,
+                    planned: planned,
+                    done: done,
+                    visitsLoading: visitsAsync.isLoading,
+                  );
                 }),
                 const SizedBox(height: 16),
                 // Day card
                 Consumer(builder: (_, ref, __) {
-                  final s = ref.watch(workdayStatusProvider).valueOrNull;
-                  return _DayCard(started: s?.dayStarted ?? false, ended: s?.dayEnded ?? false);
+                  final workdayAsync = ref.watch(workdayStatusProvider);
+                  return workdayAsync.when(
+                    loading: () => const _DayCardLoading(),
+                    error: (_, __) => _DayCardError(
+                      onRetry: () => ref.invalidate(workdayStatusProvider),
+                    ),
+                    data: (s) => _DayCard(started: s.dayStarted, ended: s.dayEnded),
+                  );
                 }),
                 const SizedBox(height: 24),
                 // Quick actions label
@@ -235,7 +252,17 @@ class _HeaderBtn extends StatelessWidget {
 class _StatsRow extends StatelessWidget {
   final bool started;
   final bool ended;
-  const _StatsRow({required this.started, required this.ended});
+  final int planned;
+  final int done;
+  final bool visitsLoading;
+
+  const _StatsRow({
+    required this.started,
+    required this.ended,
+    required this.planned,
+    required this.done,
+    required this.visitsLoading,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -254,11 +281,24 @@ class _StatsRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _StatCell(label: 'Planned', value: '—', icon: Icons.route_rounded),
+          _StatCell(
+            label: 'Planned',
+            value: visitsLoading ? '…' : '$planned',
+            icon: Icons.route_rounded,
+          ),
           _divider(),
-          _StatCell(label: 'Done', value: '—', icon: Icons.check_circle_outline_rounded),
+          _StatCell(
+            label: 'Done',
+            value: visitsLoading ? '…' : '$done',
+            icon: Icons.check_circle_outline_rounded,
+            highlight: done > 0,
+          ),
           _divider(),
-          _StatCell(label: 'Earned', value: 'Rs. 0', icon: Icons.attach_money_rounded),
+          _StatCell(
+            label: 'Left',
+            value: visitsLoading ? '…' : '${planned - done}',
+            icon: Icons.pending_actions_rounded,
+          ),
           _divider(),
           _StatCell(
             label: 'GPS',
@@ -394,6 +434,69 @@ class _DayCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _DayCardLoading extends StatelessWidget {
+  const _DayCardLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+      ),
+      child: Row(children: [
+        Container(
+          width: 48, height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(14)),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(width: 120, height: 12, decoration: BoxDecoration(
+              color: const Color(0xFFE2E8F0), borderRadius: BorderRadius.circular(6))),
+            const SizedBox(height: 6),
+            Container(width: 200, height: 10, decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9), borderRadius: BorderRadius.circular(6))),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+class _DayCardError extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _DayCardError({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.error.withOpacity(0.3)),
+      ),
+      child: Row(children: [
+        Icon(Icons.wifi_off_rounded, color: AppColors.error.withOpacity(0.7), size: 20),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text('Could not load shift status',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+        ),
+        GestureDetector(
+          onTap: onRetry,
+          child: const Text('Retry', style: TextStyle(
+              fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+        ),
+      ]),
     );
   }
 }

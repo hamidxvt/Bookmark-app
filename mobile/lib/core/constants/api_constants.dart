@@ -37,6 +37,7 @@ class ApiConstants {
 
   // ── Route Optimization ────────────────────────────────────────────────────
   static const String routeOptimized = '/route';
+  static const String directions = '/directions';
 
   // ── Profile ───────────────────────────────────────────────────────────────
   static const String profile = '/profile';

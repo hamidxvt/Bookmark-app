@@ -10,6 +10,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/quotes.dart';
 import '../data/workday_status_provider.dart';
+import '../../visits/data/visit_repository.dart';
 
 class DayEndScreen extends ConsumerStatefulWidget {
   const DayEndScreen({super.key});
@@ -183,28 +184,34 @@ class _DayEndScreenState extends ConsumerState<DayEndScreen> {
 
             const SizedBox(height: 24),
 
-            // Day summary stats
-            Row(
-              children: [
-                Expanded(
-                  child: _SummaryCard(
-                    icon: Icons.check_circle_outline_rounded,
-                    label: 'Completed',
-                    value: '0',
-                    color: AppColors.success,
-                  ).animate(delay: 100.ms).slideX(begin: -0.2).fadeIn(),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _SummaryCard(
-                    icon: Icons.cancel_outlined,
-                    label: 'Missed',
-                    value: '0',
-                    color: AppColors.error,
-                  ).animate(delay: 200.ms).slideX(begin: 0.2).fadeIn(),
-                ),
-              ],
-            ),
+            // Day summary stats — real data
+            Consumer(builder: (_, ref, __) {
+              final visits = ref.watch(visitListProvider).valueOrNull ?? [];
+              final completed = visits.where((v) => v.status == 'COMPLETED').length;
+              final missed = visits.where(
+                  (v) => v.status == 'CANCELLED' || v.status == 'MISSED').length;
+              return Row(
+                children: [
+                  Expanded(
+                    child: _SummaryCard(
+                      icon: Icons.check_circle_outline_rounded,
+                      label: 'Completed',
+                      value: '$completed',
+                      color: AppColors.success,
+                    ).animate(delay: 100.ms).slideX(begin: -0.2).fadeIn(),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _SummaryCard(
+                      icon: Icons.cancel_outlined,
+                      label: 'Missed',
+                      value: '$missed',
+                      color: AppColors.error,
+                    ).animate(delay: 200.ms).slideX(begin: 0.2).fadeIn(),
+                  ),
+                ],
+              );
+            }),
 
             const SizedBox(height: AppSpacing.lg),
 

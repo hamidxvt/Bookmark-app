@@ -10,6 +10,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/quotes.dart';
 import '../data/workday_status_provider.dart';
+import '../../visits/data/visit_repository.dart';
 
 class DayStartScreen extends ConsumerStatefulWidget {
   const DayStartScreen({super.key});
@@ -163,21 +164,27 @@ class _DayStartScreenState extends ConsumerState<DayStartScreen> {
                       style: const TextStyle(color: Colors.white70, fontSize: 14),
                     ),
                     const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                      child: Text(
-                        '7 visits planned for today',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
+                    Consumer(builder: (_, ref, __) {
+                      final visits = ref.watch(visitListProvider).valueOrNull;
+                      final count = visits?.length;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(AppRadius.full),
                         ),
-                      ),
-                    ),
+                        child: Text(
+                          count != null
+                              ? '$count visit${count == 1 ? '' : 's'} planned today'
+                              : 'Loading visits…',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      );
+                    }),
                   ],
                 ),
               ),
