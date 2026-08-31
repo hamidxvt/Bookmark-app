@@ -415,7 +415,7 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
             }
           },
           onMapCreated: (ctrl) => _mapController = ctrl,
-          buildMarkers: (stops, myPos) => _buildMarkers(stops, _selectedStop, myPos, _myHeading),
+          buildMarkers: (stops, myPos, heading) => _buildMarkers(stops, _selectedStop, myPos, heading),
           onNavigate: _navigate,
         ),
       ),
@@ -431,7 +431,7 @@ class _MapBody extends ConsumerStatefulWidget {
   final bool navigating;
   final ValueChanged<int> onSelectStop;
   final void Function(GoogleMapController) onMapCreated;
-  final Set<Marker> Function(List<RouteStop>, LatLng?) buildMarkers;
+  final Set<Marker> Function(List<RouteStop>, LatLng?, double?) buildMarkers;
   final Future<void> Function(RouteStop) onNavigate;
 
   const _MapBody({
@@ -487,7 +487,7 @@ class _MapBodyState extends ConsumerState<_MapBody> {
       GoogleMap(
         onMapCreated: widget.onMapCreated,
         initialCameraPosition: initialCamera,
-        markers: widget.buildMarkers(valid, _myPos),
+        markers: widget.buildMarkers(valid, _myPos, _myHeading),
         polylines: widget.polylines,
         myLocationEnabled: true,
         myLocationButtonEnabled: false,

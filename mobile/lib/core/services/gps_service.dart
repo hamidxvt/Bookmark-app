@@ -14,12 +14,9 @@ class GpsService {
   Timer? _timer;
   StreamSubscription<Position>? _posStream;
   Position? _lastPosition;
-  DateTime? _lastPingAt;
 
   GpsService(this._dio);
 
-  /// Real-time tracking: aggressive 2-second polling + stream for real-time updates
-  /// Works indoors, on emulator with mock location, everywhere
   Future<void> startTracking({String? jwtToken}) async {
     stopTracking();
 
@@ -30,17 +27,15 @@ class GpsService {
 
     if (!kIsWeb) await startBackgroundGps();
 
-    // Try to get initial position
-    _lastPosition = await _getPositionQuick();
-
-    // Subscribe to OS position stream for real-time updates when available
+    // Position stream — fires on movement (works when outdoors/high accuracy)
     final perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.always ||
-        perm == LocationPermission.whileInUse) {
+    if (!kIsWeb &&
+        (perm == LocationPermission.always ||
+            perm == LocationPermission.whileInUse)) {
       _posStream = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
           accuracy: LocationAccuracy.high,
-          distanceFilter: 3, // Fire on 3m movement
+          distanceFilter: 3,
         ),
       ).listen((pos) {
         _lastPosition = pos;
@@ -48,11 +43,9 @@ class GpsService {
       }, onError: (_) {});
     }
 
-    // 2-second timer: fetch position aggressively + send ping
-    // This ensures frequent updates even if stream doesn't fire (indoors/emulator)
-    _timer = Timer.periodic(const Duration(seconds: 2), (_) {
-      _timerTick();
-    });
+    // 5-second timer — reliable fallback for indoors / low-signal
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) => _timerTick());
+    _timerTick(); // immediate first ping
   }
 
   void stopTracking() {
@@ -63,43 +56,26 @@ class GpsService {
     if (!kIsWeb) stopBackgroundGps();
   }
 
-  /// Timer callback: fetch position with quick timeout + send
   void _timerTick() {
     if (kIsWeb) return;
-    _getPositionQuick().then((pos) {
-      if (pos != null) {
-        _lastPosition = pos;
-        _sendPingAsync(pos);
-      }
-    });
+    _fetchAndPing();
   }
 
-  /// Quick position fetch — 5 second timeout, falls back to last known
-  Future<Position?> _getPositionQuick() async {
+  Future<void> _fetchAndPing() async {
     try {
       final perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) return _lastPosition;
+          perm == LocationPermission.deniedForever) return;
 
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 5),
-      ).timeout(
-        const Duration(seconds: 6),
-        onTimeout: () => _lastPosition ?? Position(
-          latitude: 0,
-          longitude: 0,
-          timestamp: DateTime.now(),
-          accuracy: 0,
-          altitude: 0,
-          heading: 0,
-          speed: 0,
-          speedAccuracy: 0,
-        ),
+        timeLimit: const Duration(seconds: 4),
       );
-      return pos;
+      _lastPosition = pos;
+      _sendPingAsync(pos);
     } catch (_) {
-      return _lastPosition;
+      // Timeout or permission error — try sending last known position
+      if (_lastPosition != null) _sendPingAsync(_lastPosition!);
     }
   }
 
@@ -132,7 +108,6 @@ class GpsService {
     return d <= radiusMeters;
   }
 
-  /// Fire and forget ping — don't wait, don't block
   void _sendPingAsync(Position pos) {
     _dio.post(ApiConstants.gpsPing, data: {
       'lat': pos.latitude,
