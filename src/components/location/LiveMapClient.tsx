@@ -463,6 +463,7 @@ export default function LiveMapClient() {
   const [trailPoints,   setTrailPoints]   = useState<TrailPoint[]>([]);
   const [navRoute,      setNavRoute]      = useState<Array<{ lat: number; lng: number }>>([]);
   const [activityFeed,  setActivityFeed]  = useState<ActivityEvent[]>([]);
+  const [activityFilter, setActivityFilter] = useState("all");
   const prevOfficers    = useRef<Record<number, Officer>>({});
 
   useEffect(() => {
@@ -778,14 +779,7 @@ export default function LiveMapClient() {
               const sl       = statusLabel(selected.gpsStatus);
 
               return (
-                <>
-                  {/* Transparent backdrop to close panel when clicking outside */}
-                  <div 
-                    className="fixed inset-0 z-40"
-                    onClick={() => { setSelected(null); setTrailPoints([]); }}
-                    style={{ pointerEvents: selected ? "auto" : "none" }}
-                  />
-                  <div className="fixed bottom-6 right-6 w-[300px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-50" style={{ maxHeight: "calc(100vh - 120px)" }}>
+                <div className="fixed bottom-6 right-6 w-[300px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-50" style={{ maxHeight: "calc(100vh - 120px)" }}>
 
                   {/* Header — pinned, never scrolls away */}
                   <div className="relative shrink-0 p-4 bg-gradient-to-br from-[#C8102E] to-[#7B0000]">
@@ -942,31 +936,40 @@ export default function LiveMapClient() {
                     )}
                   </div>
                 </div>
-                </>
               );
             })()}
           </>
         )}
       </div>
 
-      {/* Live Activity Feed */}
+      {/* Live Activity Feed with Filters */}
       {activityFeed.length > 0 && (
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Radio className="h-4 w-4 text-[#C8102E]" />
+          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Radio className="h-4 w-4 text-[#C8102E] shrink-0" />
               <h3 className="text-sm font-semibold text-slate-800">Live Activity</h3>
               <span className="text-[10px] font-semibold bg-red-50 text-[#C8102E] px-2 py-0.5 rounded-full border border-red-100">
                 {activityFeed.length}
               </span>
             </div>
-            <button onClick={() => setActivityFeed([])}
-              className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100">
-              Clear
-            </button>
+            <div className="flex items-center gap-2">
+              <select value={activityFilter} onChange={e => setActivityFilter(e.target.value)}
+                className="text-[10px] px-2 py-1 rounded border border-slate-200 bg-white text-slate-600 hover:border-slate-300">
+                <option value="all">All Events</option>
+                <option value="online">Online</option>
+                <option value="offline">Offline</option>
+                <option value="moving">Moving</option>
+                <option value="stopped">Stopped</option>
+              </select>
+              <button onClick={() => setActivityFeed([])}
+                className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 whitespace-nowrap">
+                Clear
+              </button>
+            </div>
           </div>
           <div className="divide-y divide-slate-50 max-h-48 overflow-y-auto">
-            {activityFeed.map(ev => {
+            {activityFeed.filter(ev => activityFilter === "all" || ev.iconType === activityFilter).map(ev => {
               const Icon = ev.iconType === "online"  ? Signal
                          : ev.iconType === "offline" ? WifiOff
                          : ev.iconType === "moving"  ? Car
