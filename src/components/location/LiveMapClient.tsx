@@ -941,7 +941,7 @@ export default function LiveMapClient() {
                       </div>
                     )}
                   </div>
-                </div>
+                  </div>
                 </>
               );
             })()}
