@@ -202,7 +202,7 @@ async function main() {
             longitude: customer.longitude,
             cityId: quetta.id,
             approvalStatus: 'APPROVED',
-            phone: `+92${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
+            ownerPhone: `+92${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
             email: `${customer.name.toLowerCase().replace(/\s+/g, '.')}@test.com`,
           },
         });
@@ -228,7 +228,7 @@ async function main() {
             longitude: customer.longitude,
             cityId: karachi.id,
             approvalStatus: 'APPROVED',
-            phone: `+92${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
+            ownerPhone: `+92${Math.floor(Math.random() * 9000000000 + 1000000000)}`,
             email: `${customer.name.toLowerCase().replace(/\s+/g, '.')}@test.com`,
           },
         });
