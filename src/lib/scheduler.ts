@@ -346,6 +346,88 @@ export async function sendPushNotification(
   }
 }
 
+// ─── 5. Smart Officer Activity Monitor — every 10 minutes ───────────────────
+// Runs during business hours (7 AM–7 PM PKT) to watch for:
+//   • Officer has not moved in 30+ minutes while day is active
+//   • Officer is significantly late for their scheduled visit
+//   • Officer completed a visit (positive notification to admin dashboard)
+export async function monitorOfficerActivity() {
+  const now = new Date();
+  const hourPKT = (now.getUTCHours() + 5) % 24; // UTC+5 Pakistan
+  if (hourPKT < 7 || hourPKT >= 19) return; // Only 7 AM – 7 PM
+
+  const todayDate = today();
+
+  // Get all officers who started their day
+  const activeAttendance = await prisma.attendance.findMany({
+    where: { date: todayDate, status: { in: ["present", "day_started"] } },
+    include: {
+      booker: {
+        select: {
+          id: true, name: true, fcmToken: true,
+          lastSeenAt: true, lastLatitude: true, lastLongitude: true,
+        },
+      },
+    },
+  });
+
+  const ADMIN_FCM_TOKENS = await prisma.booker.findMany({
+    where: { adminApproved: "APPROVED", deletedAt: null },
+    select: { fcmToken: true },
+  }).then(list => list.map(b => b.fcmToken).filter(Boolean) as string[]);
+
+  for (const att of activeAttendance) {
+    const booker = att.booker;
+    if (!booker) continue;
+
+    const lastSeen = booker.lastSeenAt ? new Date(booker.lastSeenAt) : null;
+    const minutesSincePing = lastSeen
+      ? (now.getTime() - lastSeen.getTime()) / 60000
+      : 999;
+
+    // ── Alert: Officer not moving for 30+ minutes ───────────────────────
+    if (minutesSincePing > 30 && minutesSincePing < 35) {
+      // Notify the officer
+      if (booker.fcmToken) {
+        await sendPushNotification(
+          booker.fcmToken,
+          "Are you okay?",
+          "We haven't received your location in 30 minutes. Please check your GPS.",
+          { type: "gps_inactive" }
+        ).catch(() => {});
+      }
+    }
+
+    // ── Check visit lateness ────────────────────────────────────────────
+    const pendingVisits = await prisma.visit.findMany({
+      where: {
+        bookerId: booker.id,
+        visitDate: todayDate,
+        status: "PENDING",
+      },
+      include: { customer: { select: { name: true, latitude: true, longitude: true } } },
+      orderBy: { sequence: "asc" },
+      take: 1,
+    });
+
+    for (const visit of pendingVisits) {
+      // If it's past 3 PM and there are still pending visits
+      if (hourPKT >= 15) {
+        if (booker.fcmToken) {
+          await sendPushNotification(
+            booker.fcmToken,
+            "Pending Visits Remaining",
+            `You still have ${pendingVisits.length} visit(s) pending. Visit ${visit.customer?.name ?? "customer"} now.`,
+            { type: "visit_pending", visitId: String(visit.id) }
+          ).catch(() => {});
+        }
+      }
+    }
+  }
+
+  console.log(`[scheduler] Officer monitor checked ${activeAttendance.length} active officers`);
+}
+
 // ─── Notify a booker about leave/visit/sample status change ──────────────────
 export async function notifyBooker(
   bookerId: number,

@@ -13,6 +13,7 @@ export async function register() {
       autoMarkAbsent,
       processPayrollDeductions,
       sendSampleReminders,
+      monitorOfficerActivity,
     } = await import("@/lib/scheduler");
 
     // ── Auto-seed XLSX data if not yet imported ───────────────────────────
@@ -107,6 +108,11 @@ export async function register() {
     cron.schedule("0 8 * * *", async () => {
       console.log("[cron] 8:00 AM — Sending sample reminders...");
       await sendSampleReminders().catch(console.error);
+    });
+
+    // Every 10 minutes during business hours — monitor officer activity + send smart alerts
+    cron.schedule("*/10 * * * *", async () => {
+      await monitorOfficerActivity().catch(console.error);
     });
 
     console.log("[instrumentation] All cron jobs scheduled ✅");

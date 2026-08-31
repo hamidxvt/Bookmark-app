@@ -137,6 +137,8 @@ function LiveMap({
   const [ready, setReady] = useState(false);
   const onSelectRef = useRef(onSelect);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+  const focusOfficerIdRef = useRef(focusOfficerId);
+  useEffect(() => { focusOfficerIdRef.current = focusOfficerId; }, [focusOfficerId]);
 
   const buildPinEl = useCallback((o: Officer) => {
     const isActive = o.gpsStatus?.toUpperCase() === "ACTIVE";
@@ -262,6 +264,12 @@ function LiveMap({
         } else {
           const m = new AdvancedMarkerElement({ map: gmap.current!, position: pos, content: el });
           m.addListener("click", () => {
+            // If this officer is already selected, clicking again should deselect (toggle)
+            if (focusOfficerIdRef.current === o.id) {
+              onSelectRef.current(null as any);
+              lastFocusedId.current = null;
+              return;
+            }
             const rawSpd = Number(o.lastSpeedKmh ?? 0);
             const speed = rawSpd < 3 ? "0 km/h" : `${rawSpd.toFixed(1)} km/h`;
             const lastSeen = secondsAgo(o.lastPingAt ?? o.lastSeenAt);
@@ -321,20 +329,26 @@ function LiveMap({
         // Remember position for next frame's animation
         prevPos.current[o.id] = pos;
       });
-      // Single officer → zoom to street level; multiple → fit all
-      if (validOfficers.length === 1 && !bounds.isEmpty()) {
-        const o = validOfficers[0];
-        gmap.current?.setCenter({ lat: Number(o.lastLatitude!), lng: Number(o.lastLongitude!) });
-        if ((gmap.current?.getZoom() ?? 0) < 15) gmap.current?.setZoom(16);
-      } else if (!bounds.isEmpty()) {
-        gmap.current?.fitBounds(bounds, 80);
+      // Only auto-fit when no officer is selected — don't move map while user is viewing details
+      if (!focusOfficerIdRef.current) {
+        if (validOfficers.length === 1 && !bounds.isEmpty()) {
+          const o = validOfficers[0];
+          gmap.current?.setCenter({ lat: Number(o.lastLatitude!), lng: Number(o.lastLongitude!) });
+          if ((gmap.current?.getZoom() ?? 0) < 15) gmap.current?.setZoom(16);
+        } else if (!bounds.isEmpty()) {
+          gmap.current?.fitBounds(bounds, 80);
+        }
       }
     } catch (e) { console.error("Marker error:", e); }
   }, [officers, ready, buildPinEl]);
 
-  // Zoom to focused officer at street level
+  // Zoom to focused officer at street level — only fires when selection CHANGES, not on data updates
+  const lastFocusedId = useRef<number | null>(null);
   useEffect(() => {
     if (!ready || !gmap.current || !focusOfficerId) return;
+    // Only pan if the selected officer actually changed
+    if (lastFocusedId.current === focusOfficerId) return;
+    lastFocusedId.current = focusOfficerId;
     const o = officers.find(x => x.id === focusOfficerId);
     if (!o) return;
     const lat = Number(o.lastLatitude), lng = Number(o.lastLongitude);
@@ -705,7 +719,7 @@ export default function LiveMapClient() {
               <LiveMap
               officers={withLoc}
               trailPoints={trailPoints}
-              onSelect={setSelected}
+              onSelect={(o) => { setSelected(o); if (!o) setTrailPoints([]); }}
               focusOfficerId={selected?.id}
               navRoute={navRoute}
             />
