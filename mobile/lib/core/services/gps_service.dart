@@ -11,17 +11,15 @@ import 'background_service.dart';
 
 class GpsService {
   final DioClient _dio;
-  Timer? _heartbeat;
+  Timer? _timer;
   StreamSubscription<Position>? _posStream;
   Position? _lastPosition;
   DateTime? _lastPingAt;
-  bool _pinging = false;
 
   GpsService(this._dio);
 
-  /// Real-time tracking:
-  ///  • Position stream fires on any OS-provided position update (distanceFilter 0)
-  ///  • 3-second heartbeat sends last-known position so admin stays fresh even if stationary
+  /// Real-time tracking: aggressive 2-second polling + stream for real-time updates
+  /// Works indoors, on emulator with mock location, everywhere
   Future<void> startTracking({String? jwtToken}) async {
     stopTracking();
 
@@ -32,61 +30,68 @@ class GpsService {
 
     if (!kIsWeb) await startBackgroundGps();
 
-    final perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied ||
-        perm == LocationPermission.deniedForever) {
-      await Geolocator.requestPermission();
-    }
+    // Try to get initial position
+    _lastPosition = await _getPositionQuick();
 
-    // Subscribe to OS position stream — fires whenever device has a new fix
-    // distanceFilter: 0 → get every single update the OS delivers
-    if (!kIsWeb) {
+    // Subscribe to OS position stream for real-time updates when available
+    final perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.always ||
+        perm == LocationPermission.whileInUse) {
       _posStream = Geolocator.getPositionStream(
         locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.bestForNavigation,
-          distanceFilter: 0,
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 3, // Fire on 3m movement
         ),
-      ).listen(_onNewPosition, onError: (_) {});
+      ).listen((pos) {
+        _lastPosition = pos;
+        _sendPingAsync(pos);
+      }, onError: (_) {});
     }
 
-    // 3-second heartbeat — re-sends _lastPosition so admin never goes stale
-    _heartbeat = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (_lastPosition != null) _sendPing(_lastPosition!);
+    // 2-second timer: fetch position aggressively + send ping
+    // This ensures frequent updates even if stream doesn't fire (indoors/emulator)
+    _timer = Timer.periodic(const Duration(seconds: 2), (_) {
+      _timerTick();
     });
-
-    // Get first fix immediately (don't wait for stream)
-    _initPosition();
   }
 
   void stopTracking() {
-    _heartbeat?.cancel();
-    _heartbeat = null;
+    _timer?.cancel();
+    _timer = null;
     _posStream?.cancel();
     _posStream = null;
     if (!kIsWeb) stopBackgroundGps();
   }
 
-  void _onNewPosition(Position pos) {
-    _lastPosition = pos;
-    // Send immediately on position change — no throttle on movement
-    _sendPing(pos);
+  /// Timer callback: fetch position with quick timeout + send
+  void _timerTick() {
+    if (kIsWeb) return;
+    _getPositionQuick().then((pos) {
+      if (pos != null) {
+        _lastPosition = pos;
+        _sendPingAsync(pos);
+      }
+    });
   }
 
-  Future<void> _initPosition() async {
-    if (kIsWeb) return;
+  /// Quick position fetch — 5 second timeout, falls back to last known
+  Future<Position?> _getPositionQuick() async {
     try {
       final perm = await Geolocator.checkPermission();
       if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) return;
+          perm == LocationPermission.deniedForever) return _lastPosition;
 
-      // Quick fix with short timeout — fallback to stream
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 8),
+        timeLimit: const Duration(seconds: 5),
+      ).timeout(
+        const Duration(seconds: 6),
+        onTimeout: () => _lastPosition,
       );
-      _lastPosition = pos;
-      _sendPing(pos);
-    } catch (_) {}
+      return pos;
+    } catch (_) {
+      return _lastPosition;
+    }
   }
 
   Future<Position?> getCurrentPosition() async {
@@ -118,26 +123,18 @@ class GpsService {
     return d <= radiusMeters;
   }
 
-  Future<void> _sendPing(Position pos) async {
-    if (kIsWeb || _pinging) return;
-    _pinging = true;
-    try {
-      await _dio.post(ApiConstants.gpsPing, data: {
-        'lat': pos.latitude,
-        'lng': pos.longitude,
-        'accuracy': pos.accuracy,
-        'isMock': pos.isMocked,
-        'speed_kmh': double.parse((pos.speed * 3.6).toStringAsFixed(2)),
-        'altitude': pos.altitude,
-        'heading': pos.heading >= 0 ? pos.heading : null,
-        'timestamp': DateTime.now().toIso8601String(),
-      });
-    } on DioException {
-      // silent
-    } catch (_) {
-    } finally {
-      _pinging = false;
-    }
+  /// Fire and forget ping — don't wait, don't block
+  void _sendPingAsync(Position pos) {
+    _dio.post(ApiConstants.gpsPing, data: {
+      'lat': pos.latitude,
+      'lng': pos.longitude,
+      'accuracy': pos.accuracy,
+      'isMock': pos.isMocked,
+      'speed_kmh': double.parse((pos.speed * 3.6).toStringAsFixed(2)),
+      'altitude': pos.altitude,
+      'heading': pos.heading >= 0 ? pos.heading : null,
+      'timestamp': DateTime.now().toIso8601String(),
+    }).catchError((_) {});
   }
 
   Position? get lastKnownPosition => _lastPosition;
