@@ -12,39 +12,67 @@ import 'background_service.dart';
 class GpsService {
   final DioClient _dio;
   Timer? _pingTimer;
+  StreamSubscription<Position>? _positionStream;
   Position? _lastPosition;
+  DateTime? _lastPingAt;
 
   GpsService(this._dio);
 
-  /// Start periodic GPS pings every 10 seconds (foreground) + background service
+  /// Start real-time GPS: stream every 5 m of movement + 4-second fallback timer
   Future<void> startTracking({String? jwtToken}) async {
     stopTracking();
 
-    // Save token for background isolate
     if (jwtToken != null) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', jwtToken);
     }
 
-    // Start foreground service for background GPS
     if (!kIsWeb) {
       await startBackgroundGps();
     }
 
-    // Foreground timer — 10s for responsive live tracking
-    _pingTimer = Timer.periodic(const Duration(seconds: 10), (_) => _ping());
+    // Position stream — fires every time device moves ≥ 5 m
+    // Gives Uber-like real-time movement updates instantly
+    final perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.always ||
+        perm == LocationPermission.whileInUse) {
+      _positionStream = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 5, // fire on every 5 metres of movement
+        ),
+      ).listen(_onPosition, onError: (_) {});
+    }
+
+    // Fallback heartbeat every 4 s (keeps server fresh even when stationary)
+    _pingTimer = Timer.periodic(const Duration(seconds: 4), (_) => _ping());
     _ping(); // immediate first ping
   }
 
   void stopTracking() {
     _pingTimer?.cancel();
     _pingTimer = null;
+    _positionStream?.cancel();
+    _positionStream = null;
     if (!kIsWeb) {
       stopBackgroundGps();
     }
   }
 
-  /// Returns current position or null if unavailable / mocked
+  /// Callback for position stream — ping immediately on movement
+  void _onPosition(Position pos) {
+    _lastPosition = pos;
+
+    // Throttle: don't send faster than every 2 s even if device fires more often
+    final now = DateTime.now();
+    if (_lastPingAt != null &&
+        now.difference(_lastPingAt!).inMilliseconds < 2000) {
+      return;
+    }
+    _lastPingAt = now;
+    _sendPing(pos);
+  }
+
   Future<Position?> getCurrentPosition() async {
     try {
       final perm = await Geolocator.requestPermission();
@@ -62,7 +90,6 @@ class GpsService {
     }
   }
 
-  /// Check if the device is within [radiusMeters] of [targetLat]/[targetLng]
   bool isWithinGeofence({
     required double currentLat,
     required double currentLng,
@@ -70,13 +97,9 @@ class GpsService {
     required double targetLng,
     double radiusMeters = 200,
   }) {
-    final distanceInMeters = Geolocator.distanceBetween(
-      currentLat,
-      currentLng,
-      targetLat,
-      targetLng,
-    );
-    return distanceInMeters <= radiusMeters;
+    final distance = Geolocator.distanceBetween(
+        currentLat, currentLng, targetLat, targetLng);
+    return distance <= radiusMeters;
   }
 
   Future<void> _ping() async {
@@ -84,22 +107,31 @@ class GpsService {
     try {
       final pos = await getCurrentPosition();
       if (pos == null) return;
+      final now = DateTime.now();
+      if (_lastPingAt != null &&
+          now.difference(_lastPingAt!).inMilliseconds < 2000) {
+        return; // stream already covered this moment
+      }
+      _lastPingAt = now;
+      _sendPing(pos);
+    } catch (_) {}
+  }
 
-      // Speed is in m/s, convert to km/h
-      final speedKmh = (pos.speed * 3.6).toStringAsFixed(2);
-
+  Future<void> _sendPing(Position pos) async {
+    try {
       await _dio.post(ApiConstants.gpsPing, data: {
         'lat': pos.latitude,
         'lng': pos.longitude,
         'accuracy': pos.accuracy,
         'isMock': pos.isMocked,
-        'speed_kmh': double.parse(speedKmh),
+        'speed_kmh':
+            double.parse((pos.speed * 3.6).toStringAsFixed(2)),
         'altitude': pos.altitude,
         'heading': pos.heading >= 0 ? pos.heading : null,
         'timestamp': DateTime.now().toIso8601String(),
       });
     } on DioException {
-      // Silently ignore — network may not be available
+      // silent
     } catch (_) {}
   }
 
