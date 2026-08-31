@@ -467,7 +467,7 @@ export default function LiveMapClient() {
   const prevOfficers    = useRef<Record<number, Officer>>({});
 
   useEffect(() => {
-    fetch("/api/v1/cities").then(r => r.json()).then(d => { if (d.success) setCities(d.data ?? []); }).catch(() => {});
+    fetch("/api/public/cities").then(r => r.json()).then(d => { if (d.success) setCities(d.data ?? []); }).catch(() => {});
   }, []);
 
   const addEvent = useCallback((ev: Omit<ActivityEvent, "id" | "time">) => {
