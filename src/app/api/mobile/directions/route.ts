@@ -11,7 +11,20 @@ export async function POST(req: Request) {
   if (!user) return unauthorized();
 
   if (!GMAP_KEY) {
-    return NextResponse.json({ success: false, error: "Maps API not configured" }, { status: 503 });
+    // Gracefully return empty polyline instead of 503 — allow app to function without directions
+    return NextResponse.json({
+      success: true,
+      data: {
+        polyline: "",
+        distanceM: 0,
+        distanceText: "Unknown",
+        durationSec: 0,
+        durationText: "Unknown",
+        walkDurationSec: null,
+        walkDurationText: null,
+        steps: [],
+      },
+    });
   }
 
   try {

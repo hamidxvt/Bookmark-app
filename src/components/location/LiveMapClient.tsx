@@ -12,7 +12,8 @@ import {
 interface City { id: number; name: string; latitude: number | null; longitude: number | null; geofenceRadius: number | null; }
 interface Officer {
   id: number; name: string; email: string; phone: string; profilePhoto: string | null;
-  gpsStatus: string; lastLatitude: number | null; lastLongitude: number | null;
+  designation?: string | null; gpsStatus: string;
+  lastLatitude: number | null; lastLongitude: number | null;
   lastSeenAt: string | null; lastPingAt: string | null;
   city: { id: number; name: string } | null;
   lastSpeedKmh?: number | null; lastActivity?: string | null; lastHeading?: number | null;
@@ -695,7 +696,10 @@ export default function LiveMapClient() {
                       )}
                       <div className="min-w-0">
                         <p className="font-bold text-white text-sm truncate">{stripHtml(selected.name)}</p>
-                        <p className="text-white/60 text-xs">{selected.city?.name ?? "Unknown City"}</p>
+                        {selected.designation && (
+                          <p className="text-white/70 text-[10px] font-semibold uppercase tracking-wide">{selected.designation}</p>
+                        )}
+                        <p className="text-white/50 text-xs mt-0.5">{selected.city?.name ?? "Unknown City"}</p>
                       </div>
                     </div>
                     <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -904,6 +908,9 @@ export default function LiveMapClient() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-800">{o.name || "Unknown"}</p>
+                    {o.designation && (
+                      <p className="text-[10px] text-[#C8102E] font-bold uppercase tracking-wider">{o.designation}</p>
+                    )}
                     <p className="text-xs text-slate-400 truncate">
                       {valid ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : "Waiting for GPS…"}
                       {o.city ? ` · ${o.city.name}` : ""}
