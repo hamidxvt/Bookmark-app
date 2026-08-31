@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const CACHE_TTL = 60000; // 60 seconds for location data (frequent updates)
+const CACHE_TTL = 10000; // 10 seconds for location data (frequent updates)
 interface CachedData {
   timestamp: number;
   data: any;
