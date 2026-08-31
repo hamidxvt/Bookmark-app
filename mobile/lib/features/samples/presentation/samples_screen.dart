@@ -691,69 +691,228 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
   }
 
   Future<Uint8List> _generatePdf(Uint8List? sigBytes) async {
-    final doc = pw.Document();
+    final doc   = pw.Document();
     pw.MemoryImage? sigImage;
     if (sigBytes != null) sigImage = pw.MemoryImage(sigBytes);
 
-    final fmt = NumberFormat('#,##0', 'en_US');
-    final costStr = widget.sample.price != null
-        ? 'PKR ${fmt.format((widget.sample.price! * _qty).toInt())}'
-        : 'N/A';
+    final fmt      = NumberFormat('#,##0', 'en_US');
+    final now      = DateTime.now();
+    final dateStr  = DateFormat('dd-MM-yyyy').format(now);
+    final timeStr  = DateFormat('hh:mm a').format(now);
+    final unitPrice = widget.sample.price ?? 0.0;
+    final totalAmt  = unitPrice * _qty;
+    final custName  = _selectedCustomer?['name'] as String? ?? 'N/A';
+    final custAddr  = (_selectedCustomer?['address'] as String?) ?? '';
+    final custPhone = (_selectedCustomer?['phone'] as String?) ?? '';
+    final refNo     = widget.sample.id.toString().padLeft(10, '0');
+
+    // Amount in words (simple)
+    String amountInWords(double amt) {
+      if (amt <= 0) return 'ZERO ONLY';
+      final n = amt.toInt();
+      return '${fmt.format(n)} RUPEES ONLY';
+    }
+
+    // Border style
+    const border = pw.TableBorder(
+      top:    pw.BorderSide(width: 1),
+      bottom: pw.BorderSide(width: 1),
+      left:   pw.BorderSide(width: 1),
+      right:  pw.BorderSide(width: 1),
+      horizontalInside: pw.BorderSide(width: 0.5, color: PdfColors.grey400),
+      verticalInside:   pw.BorderSide(width: 1),
+    );
+
+    pw.Widget cell(String text, {bool bold = false, pw.TextAlign align = pw.TextAlign.left, double size = 8}) =>
+        pw.Padding(
+          padding: const pw.EdgeInsets.all(4),
+          child: pw.Text(text, textAlign: align,
+              style: pw.TextStyle(fontSize: size, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+        );
 
     doc.addPage(pw.Page(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(40),
+      margin: const pw.EdgeInsets.all(24),
       build: (ctx) => pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         children: [
-          pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-            pw.Text('BOOKMARK', style: pw.TextStyle(fontSize: 30, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
-            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-              pw.Text('Sample Delivery Proof', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
-              pw.Text('Ref #${widget.sample.id}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
-            ]),
-          ]),
-          pw.Divider(color: PdfColors.red800, thickness: 2),
-          pw.SizedBox(height: 20),
+          // ── TOP HEADER BOX ─────────────────────────────────────────────
           pw.Container(
-            padding: const pw.EdgeInsets.all(14),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.grey100,
-              borderRadius: pw.BorderRadius.circular(6),
-            ),
-            child: pw.Column(children: [
-              _pdfRow('Product', widget.sample.productName),
-              _pdfRow('Quantity Delivered', '$_qty unit(s)'),
-              _pdfRow('Price per Unit', widget.sample.price != null ? 'PKR ${fmt.format(widget.sample.price!.toInt())}' : 'N/A'),
-              _pdfRow('Total Cost', costStr),
-              _pdfRow('Customer', _selectedCustomer?['name'] ?? 'N/A'),
-              _pdfRow('Delivery Date', DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())),
-              if (_notesCtrl.text.trim().isNotEmpty) _pdfRow('Notes', _notesCtrl.text.trim()),
+            decoration: pw.BoxDecoration(border: pw.Border.all(width: 1.5)),
+            child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              // Logo block
+              pw.Container(
+                width: 110, height: 100,
+                padding: const pw.EdgeInsets.all(8),
+                decoration: const pw.BoxDecoration(
+                  border: pw.Border(right: pw.BorderSide(width: 1.5)),
+                ),
+                child: pw.Column(mainAxisAlignment: pw.MainAxisAlignment.center, children: [
+                  // Red bookmark logo box
+                  pw.Container(
+                    width: 60, height: 60,
+                    color: PdfColors.red800,
+                    child: pw.Center(
+                      child: pw.Text('BOOKMARK',
+                          textAlign: pw.TextAlign.center,
+                          style: pw.TextStyle(fontSize: 8, fontWeight: pw.FontWeight.bold, color: PdfColors.white)),
+                    ),
+                  ),
+                  pw.SizedBox(height: 4),
+                  pw.Text('BOOKMARK', style: pw.TextStyle(fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                ]),
+              ),
+              // Left info block
+              pw.Expanded(
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: const pw.BoxDecoration(
+                    border: pw.Border(right: pw.BorderSide(width: 1)),
+                  ),
+                  child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                    _pdfInfoRow('INVOICE TYPE:', 'SAMPLE DELIVERY'),
+                    _pdfInfoRow('INVOICE No.:', refNo),
+                    _pdfInfoRow('INVOICE DATE:', dateStr),
+                    _pdfInfoRow('INVOICE LOCATION:', custAddr.isNotEmpty ? custAddr.split(',').first : 'FIELD'),
+                    _pdfInfoRow('HELP LINE:', '+92 3363 008 008'),
+                    pw.SizedBox(height: 4),
+                    pw.Text('For Complaints & Queries:', style: pw.TextStyle(fontSize: 7, fontWeight: pw.FontWeight.bold)),
+                    pw.Text('customer.care@bookmark.com.pk', style: const pw.TextStyle(fontSize: 7)),
+                  ]),
+                ),
+              ),
+              // Right info block
+              pw.Expanded(
+                child: pw.Padding(
+                  padding: const pw.EdgeInsets.all(8),
+                  child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                    _pdfInfoRow("CUSTOMER'S NAME:", custName, bold: true),
+                    pw.SizedBox(height: 4),
+                    _pdfInfoRow('ADDRESS:', custAddr),
+                    _pdfInfoRow('TELEPHONE No.:', custPhone),
+                    _pdfInfoRow('CONTACT PERSON:', custName),
+                    _pdfInfoRow('DELIVERY DATE:', '$dateStr  $timeStr'),
+                  ]),
+                ),
+              ),
             ]),
           ),
-          pw.SizedBox(height: 32),
-          pw.Text('Customer Signature', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
+
+          // ── PRODUCT TABLE ───────────────────────────────────────────────
           pw.SizedBox(height: 8),
-          pw.Container(
-            width: 220, height: 110,
-            decoration: pw.BoxDecoration(
-              border: pw.Border.all(color: PdfColors.grey400),
-              borderRadius: pw.BorderRadius.circular(6),
-            ),
-            child: sigImage != null
-                ? pw.Image(sigImage, fit: pw.BoxFit.contain)
-                : pw.Center(child: pw.Text('No signature captured', style: const pw.TextStyle(color: PdfColors.grey400))),
+          pw.Table(
+            border: border,
+            columnWidths: const {
+              0: pw.FixedColumnWidth(28),
+              1: pw.FixedColumnWidth(100),
+              2: pw.FlexColumnWidth(),
+              3: pw.FixedColumnWidth(36),
+              4: pw.FixedColumnWidth(60),
+              5: pw.FixedColumnWidth(70),
+            },
+            children: [
+              // Header row
+              pw.TableRow(
+                decoration: const pw.BoxDecoration(color: PdfColors.grey200),
+                children: [
+                  cell('S.No.', bold: true, align: pw.TextAlign.center),
+                  cell('Product Code', bold: true),
+                  cell("Product's Name", bold: true),
+                  cell('Qty.', bold: true, align: pw.TextAlign.center),
+                  cell('Retail Price', bold: true, align: pw.TextAlign.right),
+                  cell('Total Amount', bold: true, align: pw.TextAlign.right),
+                ],
+              ),
+              // Product row
+              pw.TableRow(children: [
+                cell('1', align: pw.TextAlign.center),
+                cell('SMP-${widget.sample.id}'),
+                cell(widget.sample.productName.toUpperCase()),
+                cell('$_qty', align: pw.TextAlign.center),
+                cell(unitPrice > 0 ? fmt.format(unitPrice.toInt()) : '—', align: pw.TextAlign.right),
+                cell(unitPrice > 0 ? fmt.format(totalAmt.toInt()) : '—', align: pw.TextAlign.right),
+              ]),
+              // Empty filler rows
+              for (int i = 0; i < 4; i++)
+                pw.TableRow(children: List.generate(6, (_) => pw.SizedBox(height: 18))),
+            ],
           ),
-          pw.SizedBox(height: 24),
+
+          // ── BOTTOM SECTION ──────────────────────────────────────────────
+          pw.SizedBox(height: 8),
+          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            // Left: amount in words + delivery info + signature
+            pw.Expanded(
+              flex: 3,
+              child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                pw.Text('AMOUNT IN WORDS:', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold)),
+                pw.Text('(${amountInWords(totalAmt)})', style: const pw.TextStyle(fontSize: 7.5)),
+                pw.SizedBox(height: 12),
+                _pdfInfoRow('DELIVERED BY:', _notesCtrl.text.trim().isEmpty ? 'FIELD OFFICER' : _notesCtrl.text.trim()),
+                _pdfInfoRow('REMARKS:', _notesCtrl.text.trim()),
+                pw.SizedBox(height: 20),
+                // Customer signature box
+                pw.Text('CUSTOMER SIGNATURE:', style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold)),
+                pw.SizedBox(height: 6),
+                pw.Container(
+                  width: 200, height: 80,
+                  decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey400)),
+                  child: sigImage != null
+                      ? pw.Image(sigImage, fit: pw.BoxFit.contain)
+                      : pw.Center(child: pw.Text('Customer Signature', style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey400))),
+                ),
+              ]),
+            ),
+            pw.SizedBox(width: 16),
+            // Right: totals
+            pw.Expanded(
+              flex: 2,
+              child: pw.Table(
+                border: pw.TableBorder(
+                  bottom: const pw.BorderSide(width: 1),
+                  horizontalInside: const pw.BorderSide(width: 0.5, color: PdfColors.grey300),
+                ),
+                columnWidths: const {0: pw.FlexColumnWidth(), 1: pw.FixedColumnWidth(80)},
+                children: [
+                  _totalsRow('GROSS AMOUNT:', fmt.format(totalAmt.toInt())),
+                  _totalsRow('LESS: DISCOUNT:', '—'),
+                  _totalsRow('DISCOUNTED AMOUNT:', fmt.format(totalAmt.toInt()), bold: true),
+                  _totalsRow('ADD: DELIVERY CHARGES:', '—'),
+                  _totalsRow('TOTAL AMOUNT:', fmt.format(totalAmt.toInt()), bold: true, highlight: true),
+                ],
+              ),
+            ),
+          ]),
+
+          pw.SizedBox(height: 16),
           pw.Divider(color: PdfColors.grey300),
-          pw.SizedBox(height: 6),
-          pw.Text('This document is auto-generated by Bookmark SFA Field Force Manager.',
-              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
+          pw.Text('This document is auto-generated by Bookmark SFA Field Force Manager. Ref #$refNo',
+              style: const pw.TextStyle(fontSize: 7, color: PdfColors.grey500)),
         ],
       ),
     ));
     return doc.save();
   }
+
+  pw.Widget _pdfInfoRow(String label, String value, {bool bold = false}) => pw.Padding(
+    padding: const pw.EdgeInsets.symmetric(vertical: 1.5),
+    child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+      pw.Text(label, style: pw.TextStyle(fontSize: 7.5, fontWeight: pw.FontWeight.bold)),
+      pw.SizedBox(width: 4),
+      pw.Expanded(child: pw.Text(value, style: pw.TextStyle(fontSize: 7.5, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal))),
+    ]),
+  );
+
+  pw.TableRow _totalsRow(String label, String value, {bool bold = false, bool highlight = false}) =>
+    pw.TableRow(
+      decoration: highlight ? const pw.BoxDecoration(color: PdfColors.grey200) : null,
+      children: [
+        pw.Padding(padding: const pw.EdgeInsets.all(3),
+            child: pw.Text(label, style: pw.TextStyle(fontSize: 7.5, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal))),
+        pw.Padding(padding: const pw.EdgeInsets.all(3),
+            child: pw.Text(value, textAlign: pw.TextAlign.right, style: pw.TextStyle(fontSize: 7.5, fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal))),
+      ],
+    );
 
   pw.Widget _pdfRow(String label, String value) => pw.Padding(
     padding: const pw.EdgeInsets.symmetric(vertical: 5),
