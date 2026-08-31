@@ -58,11 +58,32 @@ class SampleRequest {
 // ── Providers ─────────────────────────────────────────────────────────────────
 final samplesListProvider = FutureProvider.autoDispose<List<SampleRequest>>((ref) async {
   final dio = ref.watch(dioClientProvider);
-  final res = await dio.get('/samples');
-  final raw = res.data;
-  final data = raw['data'];
-  final list = data is List ? data : <dynamic>[];
-  return list.cast<Map<String, dynamic>>().map(SampleRequest.fromJson).toList();
+  try {
+    final res = await dio.get('/samples');
+    final raw = res.data;
+
+    // Handle multiple response shapes
+    List<dynamic> list = [];
+    if (raw is Map) {
+      final data = raw['data'];
+      if (data is List) {
+        list = data;
+      } else if (data is Map && data['data'] is List) {
+        list = data['data'] as List;
+      } else if (data is Map && data['samples'] is List) {
+        list = data['samples'] as List;
+      }
+    } else if (raw is List) {
+      list = raw;
+    }
+
+    return list
+        .cast<Map<String, dynamic>>()
+        .map(SampleRequest.fromJson)
+        .toList();
+  } catch (e) {
+    return []; // Return empty list on error
+  }
 });
 
 final customersSearchProvider = FutureProvider.family.autoDispose<List<Map<String, dynamic>>, String>(
