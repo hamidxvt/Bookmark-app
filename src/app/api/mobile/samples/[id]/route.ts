@@ -3,11 +3,12 @@ import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
 import { prisma } from "@/lib/prisma";
 
 // PATCH /api/mobile/samples/:id — deliver with signature
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = getMobileUser(req);
   if (!user) return unauthorized();
 
-  const id = Number(params.id);
+  const { id: idStr } = await params;
+  const id = Number(idStr);
   if (isNaN(id)) return NextResponse.json({ success: false, error: "Invalid ID" }, { status: 400 });
 
   const sample = await prisma.sampleRequest.findFirst({
@@ -42,11 +43,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 }
 
 // GET /api/mobile/samples/:id — get single sample details
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = getMobileUser(req);
   if (!user) return unauthorized();
 
-  const id = Number(params.id);
+  const { id: idStr } = await params;
+  const id = Number(idStr);
   const sample = await prisma.sampleRequest.findFirst({
     where: { id, bookerId: user.id },
     include: { customer: { select: { id: true, name: true, address: true } } },

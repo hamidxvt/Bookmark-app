@@ -4,11 +4,12 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // PATCH /api/v1/samples/:id — admin approve / reject
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
-  const id = Number(params.id);
+  const { id: idStr } = await params;
+  const id = Number(idStr);
   if (isNaN(id)) return NextResponse.json({ success: false, error: "Invalid ID" }, { status: 400 });
 
   try {
