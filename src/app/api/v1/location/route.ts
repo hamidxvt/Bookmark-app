@@ -27,21 +27,45 @@ export async function GET(req: Request) {
         lastLongitude: true,
         lastSeenAt: true,
         city: { select: { id: true, name: true } },
+        // Latest ping for speed, activity, heading
+        gps_pings: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: {
+            speed_kmh: true,
+            activity: true,
+            heading: true,
+            createdAt: true,
+          },
+        },
       },
       orderBy: { lastSeenAt: "desc" },
     });
 
     type Booker = typeof bookers[number];
+
+    const enriched = bookers.map((b: Booker) => {
+      const latestPing = b.gps_pings?.[0] ?? null;
+      const { gps_pings: _pings, ...rest } = b as any;
+      return {
+        ...rest,
+        lastSpeedKmh:  latestPing?.speed_kmh  ?? null,
+        lastActivity:  latestPing?.activity   ?? null,
+        lastHeading:   latestPing?.heading    ?? null,
+        lastPingAt:    latestPing?.createdAt  ?? null,
+      };
+    });
+
     const counts = {
-      total: bookers.length,
-      active: bookers.filter((b: Booker) => b.gpsStatus === "ACTIVE").length,
-      idle: bookers.filter((b: Booker) => b.gpsStatus === "IDLE").length,
-      offline: bookers.filter((b: Booker) => b.gpsStatus === "OFFLINE").length,
+      total:   enriched.length,
+      active:  enriched.filter((b: any) => b.gpsStatus === "ACTIVE").length,
+      idle:    enriched.filter((b: any) => b.gpsStatus === "IDLE").length,
+      offline: enriched.filter((b: any) => b.gpsStatus === "OFFLINE").length,
     };
 
     return NextResponse.json({
       success: true,
-      data: { bookers, counts },
+      data: { bookers: enriched, counts },
     });
   } catch (err) {
     console.error("[api/v1/location]", err);

@@ -457,6 +457,7 @@ model GpsPing {
   speed_kmh    Float?   @map("speed_kmh") @default(0)
   activity     String?  @db.VarChar(20) // STATIONARY, MOVING_SLOW, MOVING, MOVING_FAST
   altitude     Float?
+  heading      Float?   // 0-360 degrees, null when stationary
   batteryLevel Int?     @map("battery_level") @db.SmallInt
   timestamp    DateTime @default(now()) @map("timestamp")
   createdAt    DateTime @default(now()) @map("created_at")

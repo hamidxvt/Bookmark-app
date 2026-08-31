@@ -8,7 +8,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { lat, lng, accuracy, isMock, speed_kmh, altitude, timestamp } = body;
+    const { lat, lng, accuracy, isMock, speed_kmh, altitude, heading, timestamp } = body;
 
     if (lat === undefined || lng === undefined) {
       return NextResponse.json({ success: false, error: "Missing lat/lng" }, { status: 400 });
@@ -41,6 +41,7 @@ export async function POST(req: Request) {
         speed_kmh: speed_kmh ?? 0,
         activity: activity,
         altitude: altitude ?? null,
+        heading: heading != null ? Number(heading) : null,
         timestamp: timestamp ? new Date(timestamp) : new Date(),
       },
     }).catch(() => {}); // non-fatal
