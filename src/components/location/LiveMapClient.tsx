@@ -145,23 +145,40 @@ function LiveMap({
     const pinColor = isActive ? "#C8102E" : isMock ? "#f97316" : "#94a3b8";
     const dotColor = isActive ? "#22c55e" : isMock ? "#f97316" : "#94a3b8";
     const heading  = o.lastHeading;
+    const speed = Number(o.lastSpeedKmh ?? 0);
+    
+    // Premium animated heading arrow
     const arrowHtml = (heading != null && isActive)
-      ? `<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%) rotate(${heading}deg);font-size:16px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));">▲</div>`
+      ? `<div style="position:absolute;top:-20px;left:50%;transform:translateX(-50%) rotate(${heading}deg);width:24px;height:24px;display:flex;align-items:flex-end;justify-content:center;">
+           <div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:10px solid #C8102E;filter:drop-shadow(0 2px 3px rgba(0,0,0,.4));"></div>
+         </div>`
       : "";
-    const speedHtml = (o.lastSpeedKmh != null && Number(o.lastSpeedKmh) > 0)
-      ? `<div style="position:absolute;top:-26px;left:50%;transform:translateX(-50%);background:#1e293b;color:white;font-size:8px;font-weight:800;border-radius:6px;padding:2px 5px;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.3);">${Number(o.lastSpeedKmh).toFixed(0)} km/h</div>`
+    
+    // Speed badge with gradient
+    const speedHtml = speed > 0
+      ? `<div style="position:absolute;top:-32px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#1e293b,#0f172a);color:white;font-size:9px;font-weight:800;border-radius:8px;padding:3px 7px;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.1);">${speed.toFixed(0)} km/h</div>`
       : "";
+    
     const el = document.createElement("div");
-    el.style.cssText = "position:relative;width:52px;height:80px;cursor:pointer;";
+    el.style.cssText = "position:relative;width:56px;height:90px;cursor:pointer;";
     el.innerHTML = `
+      <style>
+        @keyframes gm-pulse-new { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.6);opacity:0} }
+        .marker-pulse { animation: gm-pulse-new 2s infinite; }
+      </style>
       ${arrowHtml}${speedHtml}
-      <div style="width:48px;height:48px;border-radius:50%;background:${pinColor};border:3px solid white;box-shadow:0 4px 14px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;overflow:hidden;">
+      <!-- Main profile circle with gradient ring -->
+      <div style="position:absolute;top:16px;left:4px;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,${pinColor},${pinColor}dd);border:3px solid white;box-shadow:0 0 0 2px ${pinColor}40,0 6px 16px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;overflow:hidden;">
         ${o.profilePhoto
           ? `<img src="${o.profilePhoto}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;"/>`
-          : `<span style="font-size:14px;font-weight:800;color:white;">${initials}</span>`}
+          : `<span style="font-size:16px;font-weight:800;color:white;">${initials}</span>`}
       </div>
-      <span style="position:absolute;bottom:24px;right:1px;width:12px;height:12px;border-radius:50%;border:2px solid white;background:${dotColor};box-shadow:0 0 0 2px ${dotColor}33;${isActive ? "animation:gm-pulse 1.5s infinite;" : ""}"></span>
-      <div style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);background:rgba(10,20,50,0.88);color:white;font-size:9px;font-weight:700;border-radius:5px;padding:2px 6px;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;letter-spacing:.3px;">${initials}</div>
+      <!-- Pulse ring for active -->
+      ${isActive ? `<div class="marker-pulse" style="position:absolute;top:16px;left:4px;width:48px;height:48px;border-radius:50%;border:2px solid ${pinColor};"></div>` : ""}
+      <!-- Status dot -->
+      <span style="position:absolute;bottom:20px;right:-2px;width:14px;height:14px;border-radius:50%;border:3px solid white;background:${dotColor};box-shadow:0 0 0 2px rgba(255,255,255,.3),inset 0 0 0 2px ${dotColor};${isActive ? "animation:gm-pulse-new 2s infinite;" : ""}"></span>
+      <!-- Initials label -->
+      <div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(15,20,40,.9),rgba(15,20,40,.95));color:white;font-size:10px;font-weight:700;border-radius:6px;padding:2px 7px;white-space:nowrap;max-width:84px;overflow:hidden;text-overflow:ellipsis;border:1px solid rgba(255,255,255,.1);letter-spacing:.3px;">${initials}</div>
     `;
     return el;
   }, []);
@@ -251,25 +268,49 @@ function LiveMap({
             const activity = activityLabel(o.lastActivity);
             const sl = statusLabel(o.gpsStatus);
             const isActive = o.gpsStatus?.toUpperCase() === "ACTIVE";
+            const isMoving = (Number(o.lastSpeedKmh ?? 0)) > 2;
+            
             infoWindow.current?.setContent(`
-              <div style="font-family:'Inter',system-ui,sans-serif;padding:0;min-width:210px;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.12);">
-                <div style="background:linear-gradient(135deg,#C8102E,#8B0000);padding:12px 14px;">
-                  <p style="font-weight:800;margin:0;font-size:14px;color:white;letter-spacing:-.2px;">${stripHtml(o.name)}</p>
-                  <p style="font-size:11px;color:rgba(255,255,255,.65);margin:3px 0 0;font-weight:500;">${o.city?.name ?? "Unknown"}</p>
-                </div>
-                <div style="padding:10px 14px;background:white;">
-                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
-                    <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${isActive?'#22c55e':'#94a3b8'};${isActive?'box-shadow:0 0 0 2px #dcfce7;':''}"></span>
-                    <span style="font-size:10px;font-weight:700;color:${isActive?'#15803d':'#64748b'};">${sl.text}</span>
-                    <span style="font-size:10px;color:#cbd5e1;margin-left:auto;">${lastSeen}</span>
+              <div style="font-family:'Inter',system-ui,sans-serif;padding:0;min-width:240px;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.2);">
+                <!-- Header with red gradient -->
+                <div style="background:linear-gradient(135deg,#C8102E 0%,#8B0000 100%);padding:14px 16px;position:relative;">
+                  <div style="display:flex;align-items:center;gap:2;margin-bottom:8px;">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${isActive?'#22c55e':'#cbd5e1'};${isActive?'box-shadow:0 0 0 2px rgba(34,197,94,.3);':''}animation:${isActive?'gm-pulse-new 2s infinite;':''}"></span>
+                    <span style="font-size:9px;font-weight:800;letter-spacing:.5px;color:white;text-transform:uppercase;">${sl.text}</span>
                   </div>
-                  <p style="font-size:11px;color:#64748b;margin:0 0 4px;font-weight:500;">${Number(o.lastLatitude).toFixed(5)}, ${Number(o.lastLongitude).toFixed(5)}</p>
-                  <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid #f1f5f9;">
-                    <span style="font-size:11px;color:#C8102E;font-weight:700;">${speed}</span>
-                    <span style="font-size:10px;color:#94a3b8;font-weight:500;">${activity}</span>
+                  <p style="font-weight:800;margin:0;font-size:15px;color:white;letter-spacing:-.3px;">${stripHtml(o.name)}</p>
+                  <p style="font-size:11px;color:rgba(255,255,255,.7);margin:2px 0 0;font-weight:500;">${o.city?.name ?? "Unknown"}</p>
+                </div>
+                
+                <!-- Content -->
+                <div style="padding:12px 16px;background:white;">
+                  <!-- Speed & Activity -->
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                    <div style="background:linear-gradient(135deg,#fef3c7,#fef08a);border-radius:10px;padding:8px;text-align:center;border:1px solid #fde68a;">
+                      <p style="font-size:16px;font-weight:800;color:#d97706;margin:0;">${(Number(o.lastSpeedKmh ?? 0)).toFixed(0)}</p>
+                      <p style="font-size:9px;color:#92400e;font-weight:600;margin:2px 0 0;">${isMoving?'km/h':'Stationary'}</p>
+                    </div>
+                    <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:10px;padding:8px;text-align:center;border:1px solid #93c5fd;">
+                      <p style="font-size:13px;font-weight:800;color:#1e40af;margin:0;">${activity}</p>
+                      <p style="font-size:9px;color:#0c2340;font-weight:600;margin:2px 0 0;">Activity</p>
+                    </div>
+                  </div>
+                  
+                  <!-- Location & Time -->
+                  <div style="background:#f8fafc;border-radius:8px;padding:8px;margin-bottom:8px;border-left:3px solid #C8102E;">
+                    <p style="font-size:10px;color:#64748b;margin:0 0 2px;font-weight:500;">📍 Current Location</p>
+                    <p style="font-size:10px;color:#1e293b;margin:0;font-family:monospace;font-weight:600;">${Number(o.lastLatitude).toFixed(5)}, ${Number(o.lastLongitude).toFixed(5)}</p>
+                  </div>
+                  
+                  <!-- Last update -->
+                  <div style="text-align:center;padding-top:8px;border-top:1px solid #e2e8f0;">
+                    <p style="font-size:9px;color:#94a3b8;margin:0;font-weight:500;">Last ping: ${lastSeen}</p>
                   </div>
                 </div>
               </div>
+              <style>
+                @keyframes gm-pulse-new { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.6);opacity:0} }
+              </style>
             `);
             infoWindow.current?.open({ map: gmap.current!, anchor: m });
             onSelectRef.current(o);
