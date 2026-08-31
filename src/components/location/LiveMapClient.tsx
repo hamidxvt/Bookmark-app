@@ -709,14 +709,6 @@ export default function LiveMapClient() {
             navRoute={navRoute}
           />
 
-            {/* Backdrop overlay — clicking closes modal */}
-            {selected && (
-              <div
-                className="fixed inset-0 z-[1999] bg-transparent"
-                onClick={() => { setSelected(null); setTrailPoints([]); }}
-              />
-            )}
-
             {/* Selected officer detail panel */}
             {selected && (() => {
               const lat      = Number(selected.lastLatitude);
@@ -730,15 +722,12 @@ export default function LiveMapClient() {
               const sl       = statusLabel(selected.gpsStatus);
 
               return (
-                <div 
-                  className="fixed bottom-4 right-4 w-[320px] max-w-[calc(100vw-32px)] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-[2000] max-h-[calc(100vh-32px)]"
-                  onClick={(e) => e.stopPropagation()}
-                  style={{ backdropFilter: "blur(8px)" }}>
+                <div className="absolute top-3 right-3 w-[300px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-[200]" style={{ maxHeight: "calc(100% - 24px)" }}>
 
-                  {/* Header */}
-                  <div className="relative p-4 bg-gradient-to-br from-[#C8102E] to-[#7B0000]">
-                    <button onClick={(e) => { e.stopPropagation(); setSelected(null); setTrailPoints([]); }}
-                      className="absolute top-3 right-3 text-white/50 hover:text-white hover:bg-white/20 text-lg leading-none w-8 h-8 flex items-center justify-center rounded-full transition-all">×</button>
+                  {/* Header — always visible */}
+                  <div className="relative shrink-0 p-4 bg-gradient-to-br from-[#C8102E] to-[#7B0000]">
+                    <button onClick={() => { setSelected(null); setTrailPoints([]); }}
+                      className="absolute top-3 right-3 text-white/70 hover:text-white text-xl leading-none w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/20 transition-all z-10">×</button>
                     <div className="flex items-center gap-3">
                       {selected.profilePhoto ? (
                         <img src={selected.profilePhoto} alt={selected.name} className="h-11 w-11 rounded-full object-cover border-2 border-white/30 shrink-0" />

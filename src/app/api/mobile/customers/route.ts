@@ -17,7 +17,6 @@ export async function GET(req: Request) {
     const customers = await prisma.customer.findMany({
       where: {
         deletedAt: null,
-        approvalStatus: "APPROVED",
         ...(q ? { name: { contains: q, mode: "insensitive" } } : {}),
       },
       select: {
