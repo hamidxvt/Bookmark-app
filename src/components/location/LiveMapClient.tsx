@@ -274,12 +274,12 @@ function LiveMap({
               <div style="font-family:'Inter',system-ui,sans-serif;padding:0;min-width:240px;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.18);border:1px solid rgba(255,255,255,.2);">
                 <!-- Header with red gradient -->
                 <div style="background:linear-gradient(135deg,#C8102E 0%,#8B0000 100%);padding:14px 16px;position:relative;">
-                  <div style="display:flex;align-items:center;gap:2;margin-bottom:8px;">
+                  <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
                     <span style="width:8px;height:8px;border-radius:50%;background:${isActive?'#22c55e':'#cbd5e1'};${isActive?'box-shadow:0 0 0 2px rgba(34,197,94,.3);':''}animation:${isActive?'gm-pulse-new 2s infinite;':''}"></span>
-                    <span style="font-size:9px;font-weight:800;letter-spacing:.5px;color:white;text-transform:uppercase;">${sl.text}</span>
+                    <span style="font-size:10px;font-weight:800;letter-spacing:.4px;color:white;text-transform:uppercase;">${sl.text}</span>
                   </div>
-                  <p style="font-weight:800;margin:0;font-size:15px;color:white;letter-spacing:-.3px;">${stripHtml(o.name)}</p>
-                  <p style="font-size:11px;color:rgba(255,255,255,.7);margin:2px 0 0;font-weight:500;">${o.city?.name ?? "Unknown"}</p>
+                  <p style="font-weight:800;margin:0;font-size:16px;color:white;letter-spacing:-.3px;">${stripHtml(o.name)}</p>
+                  <p style="font-size:11px;color:rgba(255,255,255,.75);margin:2px 0 0;font-weight:500;">${o.designation ? `${o.designation} · ` : ''}${o.city?.name ?? "Unknown"}</p>
                 </div>
                 
                 <!-- Content -->
@@ -288,18 +288,19 @@ function LiveMap({
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
                     <div style="background:linear-gradient(135deg,#fef3c7,#fef08a);border-radius:10px;padding:8px;text-align:center;border:1px solid #fde68a;">
                       <p style="font-size:16px;font-weight:800;color:#d97706;margin:0;">${(Number(o.lastSpeedKmh ?? 0)).toFixed(0)}</p>
-                      <p style="font-size:9px;color:#92400e;font-weight:600;margin:2px 0 0;">${isMoving?'km/h':'Stationary'}</p>
+                      <p style="font-size:9px;color:#92400e;font-weight:600;margin:2px 0 0;text-transform:uppercase;letter-spacing:.3px;">${isMoving?'Speed':'Idle'}</p>
                     </div>
                     <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:10px;padding:8px;text-align:center;border:1px solid #93c5fd;">
-                      <p style="font-size:13px;font-weight:800;color:#1e40af;margin:0;">${activity}</p>
-                      <p style="font-size:9px;color:#0c2340;font-weight:600;margin:2px 0 0;">Activity</p>
+                      <p style="font-size:13px;font-weight:800;color:#1e40af;margin:0;text-transform:capitalize;">${activity}</p>
+                      <p style="font-size:9px;color:#0c2340;font-weight:600;margin:2px 0 0;text-transform:uppercase;letter-spacing:.3px;">Status</p>
                     </div>
                   </div>
                   
-                  <!-- Location & Time -->
+                  <!-- Location -->
                   <div style="background:#f8fafc;border-radius:8px;padding:8px;margin-bottom:8px;border-left:3px solid #C8102E;">
-                    <p style="font-size:10px;color:#64748b;margin:0 0 2px;font-weight:500;">📍 Current Location</p>
-                    <p style="font-size:10px;color:#1e293b;margin:0;font-family:monospace;font-weight:600;">${Number(o.lastLatitude).toFixed(5)}, ${Number(o.lastLongitude).toFixed(5)}</p>
+                    <p style="font-size:9px;color:#64748b;margin:0 0 2px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;">Location</p>
+                    <p style="font-size:10px;color:#1e293b;margin:0;font-family:monospace;font-weight:600;">${Number(o.lastLatitude).toFixed(5)}</p>
+                    <p style="font-size:10px;color:#1e293b;margin:1px 0 0;font-family:monospace;font-weight:600;">${Number(o.lastLongitude).toFixed(5)}</p>
                   </div>
                   
                   <!-- Last update -->
