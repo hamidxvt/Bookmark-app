@@ -1,98 +1,116 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
-export async function GET(req: Request) {
+const CACHE_KEY = 'products_cache';
+const CACHE_TTL = 3600 * 1000; // 1 hour in milliseconds
+
+interface CachedData {
+  timestamp: number;
+  data: any[];
+}
+
+// In-memory cache
+const memoryCache = new Map<string, CachedData>();
+
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const skip = Number(searchParams.get("start") ?? 0);
-    const take = Number(searchParams.get("length") ?? 100);
-    const type = searchParams.get("type") ?? "products";
+    const type = searchParams.get('type') || 'products';
+    const length = Math.min(parseInt(searchParams.get('length') || '200'), 500);
+    const search = searchParams.get('search') || '';
 
-    if (type === "brands") {
-      const [data, total] = await Promise.all([
-        prisma.brand.findMany({ skip, take, orderBy: { name: "asc" } }),
-        prisma.brand.count(),
-      ]);
-      return NextResponse.json({ success: true, data: { recordsTotal: total, data } });
+    // Create cache key based on params
+    const cacheKey = `${type}:${length}:${search}`;
+
+    // Check memory cache first
+    const cached = memoryCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          data: cached.data,
+          recordsTotal: cached.data.length,
+          cached: true,
+          cacheAge: Math.round((Date.now() - cached.timestamp) / 1000)
+        }
+      });
     }
 
-    if (type === "subjects") {
-      const [data, total] = await Promise.all([
-        prisma.subject.findMany({ skip, take, orderBy: { name: "asc" } }),
-        prisma.subject.count(),
-      ]);
-      return NextResponse.json({ success: true, data: { recordsTotal: total, data } });
+    // Fetch from database
+    const whereClause: any = {};
+    if (search) {
+      whereClause.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { isbn: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } }
+      ];
     }
 
-    if (type === "series") {
-      const [data, total] = await Promise.all([
-        prisma.series.findMany({
-          skip,
-          take,
-          orderBy: { name: "asc" },
-        }),
-        prisma.series.count(),
-      ]);
-      return NextResponse.json({ success: true, data: { recordsTotal: total, data } });
-    }
+    const products = await prisma.product.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        isbn: true,
+        grade: true,
+        segment: true,
+        description: true,
+        retailPrice: true,
+        isFeatured: true,
+        image: true,
+        brand: { select: { id: true, name: true } },
+        series: { select: { id: true, name: true } },
+        subject: { select: { id: true, name: true } }
+      },
+      take: length,
+      orderBy: { createdAt: 'desc' }
+    });
 
-    const [records, total] = await Promise.all([
-      prisma.product.findMany({
-        where: { visibility: "PUBLIC" },
-        skip,
-        take,
-        orderBy: { createdAt: "desc" },
-        include: {
-          brand: { select: { id: true, name: true } },
-          series: { select: { id: true, name: true } },
-          subject: { select: { id: true, name: true } },
-        },
-      }),
-      prisma.product.count({ where: { visibility: "PUBLIC" } }),
+    // Format as array for legacy compatibility
+    const formatted = products.map((p, idx) => [
+      p.id,
+      p.name,
+      p.brand?.name || '',
+      p.isbn || '',
+      p.grade || '',
+      p.retailPrice,
+      p.isFeatured ? '✓' : '',
+      p.image || ''
     ]);
+
+    // Cache the result
+    memoryCache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: formatted
+    });
 
     return NextResponse.json({
       success: true,
-      data: { recordsTotal: total, recordsFiltered: total, data: records },
-    });
-  } catch (err) {
-    console.error("[api/v1/products]", err);
-    return NextResponse.json({ success: false, error: "Failed to fetch products" }, { status: 500 });
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
-    const { name, brandId, seriesId, subjectId, isbn, grade, segment, description, retailPrice, image } = body;
-
-    if (!name?.trim()) return NextResponse.json({ success: false, error: { message: "Product name required" } }, { status: 400 });
-    if (!brandId) return NextResponse.json({ success: false, error: { message: "Brand is required" } }, { status: 400 });
-
-    const product = await prisma.product.create({
       data: {
-        name: name.trim(),
-        brandId: parseInt(String(brandId)),
-        seriesId: seriesId ? parseInt(String(seriesId)) : null,
-        subjectId: subjectId ? parseInt(String(subjectId)) : null,
-        isbn: isbn?.trim() || null,
-        grade: grade || null,
-        segment: segment || null,
-        description: description?.trim() || null,
-        retailPrice: retailPrice ? parseFloat(String(retailPrice)) : 0,
-        image: image || null,
-        visibility: "PUBLIC",
-      },
-      include: {
-        brand: { select: { id: true, name: true } },
-        series: { select: { id: true, name: true } },
-        subject: { select: { id: true, name: true } },
-      },
+        data: formatted,
+        recordsTotal: formatted.length,
+        cached: false
+      }
     });
 
-    return NextResponse.json({ success: true, data: product }, { status: 201 });
-  } catch (err: any) {
-    console.error("[api/v1/products POST]", err);
-    return NextResponse.json({ success: false, error: { message: err.message ?? "Failed" } }, { status: 500 });
+  } catch (error: any) {
+    console.error('[Products API Error]', error);
+    return NextResponse.json({
+      success: false,
+      error: {
+        code: 'PRODUCTS_ERROR',
+        message: error.message || 'Failed to fetch products'
+      }
+    }, { status: 500 });
   }
 }
+
+// Clear cache periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of memoryCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      memoryCache.delete(key);
+    }
+  }
+}, 60000); // Check every minute

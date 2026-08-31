@@ -508,13 +508,19 @@ export default function LiveMapClient() {
         });
 
         setOfficers(fresh);
-        if (selected) {
+        // Only update selected if it still exists in fresh data, don't reopen
+        if (selected && !fresh.find((o: Officer) => o.id === selected.id)) {
+          setSelected(null);
+        } else if (selected) {
           const updated = fresh.find((o: Officer) => o.id === selected.id);
-          if (updated) setSelected(updated);
+          if (updated) {
+            // Only update selected if the core data changed to avoid re-renders
+            setSelected(prev => prev && updated ? { ...prev, ...updated } : updated);
+          }
         }
       }
     } catch { /* silent */ } finally { setLoading(false); }
-  }, [selCity, selected, addEvent]);
+  }, [selCity, addEvent]);
 
   // Poll location data every 1.5s
   useEffect(() => { load(); const t = setInterval(load, 1_500); return () => clearInterval(t); }, [load]);

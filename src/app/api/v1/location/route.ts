@@ -1,10 +1,28 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+const CACHE_TTL = 60000; // 60 seconds for location data (frequent updates)
+interface CachedData {
+  timestamp: number;
+  data: any;
+}
+const memoryCache = new Map<string, CachedData>();
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const cityId = searchParams.get("cityId");
+    const cacheKey = `location:${cityId || 'all'}`;
+
+    // Check cache first (60 second TTL for real-time data)
+    const cached = memoryCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      return NextResponse.json({
+        ...cached.data,
+        cached: true,
+        cacheAge: Math.round((Date.now() - cached.timestamp) / 1000)
+      });
+    }
 
     const where: Record<string, unknown> = {};
     if (cityId) where.cityId = parseInt(cityId);
@@ -63,10 +81,18 @@ export async function GET(req: Request) {
       offline: enriched.filter((b: any) => b.gpsStatus === "OFFLINE").length,
     };
 
-    return NextResponse.json({
+    const response = {
       success: true,
       data: { bookers: enriched, counts },
+    };
+
+    // Cache the result
+    memoryCache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: response
     });
+
+    return NextResponse.json(response);
   } catch (err) {
     console.error("[api/v1/location]", err);
     return NextResponse.json({ success: false, error: "Failed to fetch locations" }, { status: 500 });
