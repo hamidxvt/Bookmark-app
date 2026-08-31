@@ -941,10 +941,12 @@ export default function LiveMapClient() {
                       </div>
                     )}
                   </div>
-                  </div>
+                </div>
                 </>
               );
             })()}
+          </>
+        )}
       </div>
 
       {/* Live Activity Feed */}
