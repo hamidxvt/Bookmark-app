@@ -109,11 +109,31 @@ final sampleDataProvider = FutureProvider.autoDispose<_SampleData>((ref) async {
 final customersSearchProvider = FutureProvider.family.autoDispose<List<Map<String, dynamic>>, String>(
   (ref, query) async {
     final dio = ref.watch(dioClientProvider);
-    final res = await dio.get('/customers', params: {'search': query, 'length': 30});
-    final d = res.data['data'];
-    if (d is Map && d['data'] is List) return (d['data'] as List).cast<Map<String, dynamic>>();
-    if (d is List) return d.cast<Map<String, dynamic>>();
-    return [];
+    try {
+      // If query is empty, fetch all customers
+      final params = query.isEmpty ? {'length': 50} : {'search': query, 'length': 50};
+      final res = await dio.get('/customers', params: params);
+      final raw = res.data;
+      
+      List<dynamic> list = [];
+      if (raw is Map) {
+        final data = raw['data'];
+        if (data is Map && data['data'] is List) {
+          list = (data['data'] as List);
+        } else if (data is List) {
+          list = data;
+        } else if (raw['success'] == false) {
+          throw Exception(raw['error'] ?? 'Failed to load customers');
+        }
+      } else if (raw is List) {
+        list = raw;
+      }
+      
+      return list.cast<Map<String, dynamic>>();
+    } catch (e) {
+      // Return empty list on error so UI shows "No customers found"
+      return [];
+    }
   },
 );
 
