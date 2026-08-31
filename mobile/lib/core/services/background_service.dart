@@ -15,26 +15,31 @@ const _kChannelName = 'GPS Tracking';
 
 /// Call once at app startup (before runApp)
 Future<void> initBackgroundService() async {
-  final service = FlutterBackgroundService();
+  try {
+    final service = FlutterBackgroundService();
 
-  await service.configure(
-    androidConfiguration: AndroidConfiguration(
-      onStart: _backgroundMain,
-      // autoStart=true: service restarts after app is swiped away, after phone reboots,
-      // and after the system kills it for memory. This is the key for persistent tracking.
-      autoStart: true,
-      isForegroundMode: true,
-      notificationChannelId: _kChannelId,
-      initialNotificationTitle: 'Bookmark SFA – Tracking Active',
-      initialNotificationContent: 'Location is being shared with your manager',
-      foregroundServiceNotificationId: 888,
-    ),
-    iosConfiguration: IosConfiguration(
-      autoStart: true,
-      onForeground: _backgroundMain,
-      onBackground: _iosBackground,
-    ),
-  );
+    await service.configure(
+      androidConfiguration: AndroidConfiguration(
+        onStart: _backgroundMain,
+        // autoStart=true: service restarts after app is swiped away, after phone reboots,
+        // and after the system kills it for memory. This is the key for persistent tracking.
+        autoStart: true,
+        isForegroundMode: true,
+        notificationChannelId: _kChannelId,
+        initialNotificationTitle: 'Bookmark SFA – Tracking Active',
+        initialNotificationContent: 'Location is being shared with your manager',
+        foregroundServiceNotificationId: 888,
+      ),
+      iosConfiguration: IosConfiguration(
+        autoStart: true,
+        onForeground: _backgroundMain,
+        onBackground: _iosBackground,
+      ),
+    );
+  } catch (e) {
+    debugPrint('[BackgroundService] Failed to initialize: $e');
+    // Continue without background service - app should still work
+  }
 }
 
 /// Start background GPS service (call after day start / login)

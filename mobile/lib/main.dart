@@ -19,14 +19,25 @@ void main() async {
 
   // Initialize Firebase (requires google-services.json to be present)
   try {
+    debugPrint('[Startup] Initializing Firebase...');
     await Firebase.initializeApp();
+    debugPrint('[Startup] Firebase initialized successfully');
     FirebaseMessaging.onBackgroundMessage(_onBackgroundMessage);
+    debugPrint('[Startup] FCM background handler registered');
   } catch (e) {
-    debugPrint('[Firebase] Init failed — push notifications disabled: $e');
+    debugPrint('[Firebase ERROR] Init failed: $e');
+    // Continue even if Firebase fails - app should still work
   }
 
   // Initialize background GPS service (must run before runApp)
-  await initBackgroundService();
+  try {
+    debugPrint('[Startup] Initializing background GPS service...');
+    await initBackgroundService();
+    debugPrint('[Startup] Background GPS service initialized');
+  } catch (e) {
+    debugPrint('[Background Service ERROR] $e');
+  }
 
+  debugPrint('[Startup] Running app...');
   runApp(const ProviderScope(child: BookmarkSFAApp()));
 }
