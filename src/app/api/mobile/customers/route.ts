@@ -8,8 +8,10 @@ export async function GET(req: Request) {
   if (!user) return unauthorized();
 
   const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q") ?? "";
-  const limit = Math.min(Number(searchParams.get("limit") ?? 20), 50);
+  // Accept both "q" and "search" query params for compatibility
+  const q = searchParams.get("search") ?? searchParams.get("q") ?? "";
+  // Accept both "limit" and "length" query params
+  const limit = Math.min(Number(searchParams.get("length") ?? searchParams.get("limit") ?? 20), 50);
 
   try {
     const customers = await prisma.customer.findMany({
@@ -31,17 +33,19 @@ export async function GET(req: Request) {
       take: limit,
     });
 
+    const formattedCustomers = customers.map(c => ({
+      id: c.id,
+      name: c.name,
+      type: c.customerType,
+      contact: c.ownerName ?? "",
+      phone: c.ownerPhone ?? "",
+      address: c.address ?? "",
+      city: c.city?.name ?? "",
+    }));
+
     return NextResponse.json({
       success: true,
-      data: customers.map(c => ({
-        id: c.id,
-        name: c.name,
-        type: c.customerType,
-        contact: c.ownerName ?? "",
-        phone: c.ownerPhone ?? "",
-        address: c.address ?? "",
-        city: c.city?.name ?? "",
-      })),
+      data: formattedCustomers,
     });
   } catch (err) {
     console.error("[mobile/customers]", err);
