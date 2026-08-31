@@ -157,7 +157,7 @@ function LiveMap({
     el.style.cssText = `position:relative;width:56px;height:90px;cursor:pointer;transform:rotate(${heading ?? 0}deg);`;
     el.innerHTML = `
       <style>
-        @keyframes gm-pulse-new { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.6);opacity:0} }
+        @keyframes gm-pulse-new { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.2);opacity:.6} }
         .marker-pulse { animation: gm-pulse-new 2s infinite; }
       </style>
       ${speedHtml}
@@ -175,7 +175,7 @@ function LiveMap({
       <!-- Pulse ring for active -->
       ${isActive ? `<div class="marker-pulse" style="position:absolute;top:16px;left:4px;width:48px;height:48px;border-radius:50%;border:2px solid ${pinColor};"></div>` : ""}
       <!-- Status dot -->
-      <span style="position:absolute;bottom:20px;right:-2px;width:14px;height:14px;border-radius:50%;border:3px solid white;background:${dotColor};box-shadow:0 0 0 2px rgba(255,255,255,.3),inset 0 0 0 2px ${dotColor};${isActive ? "animation:gm-pulse-new 2s infinite;" : ""}"></span>
+      <span style="position:absolute;bottom:20px;right:-2px;width:14px;height:14px;border-radius:50%;border:3px solid white;background:${dotColor};box-shadow:0 0 0 2px rgba(255,255,255,.3),inset 0 0 0 2px ${dotColor};${isActive ? "animation:gm-pulse-new 3s infinite;" : ""}"></span>
       <!-- Initials label -->
       <div style="position:absolute;bottom:2px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(15,20,40,.9),rgba(15,20,40,.95));color:white;font-size:10px;font-weight:700;border-radius:6px;padding:2px 7px;white-space:nowrap;max-width:84px;overflow:hidden;text-overflow:ellipsis;border:1px solid rgba(255,255,255,.1);letter-spacing:.3px;">${initials}</div>
     `;
@@ -202,7 +202,7 @@ function LiveMap({
       if (!document.querySelector("#gm-pulse-style")) {
         const s = document.createElement("style");
         s.id = "gm-pulse-style";
-        s.textContent = `@keyframes gm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(1.5)}}`;
+        s.textContent = `@keyframes gm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.15)}}`;
         document.head.appendChild(s);
       }
       setReady(true);
@@ -310,7 +310,7 @@ function LiveMap({
                 </div>
               </div>
               <style>
-                @keyframes gm-pulse-new { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.6);opacity:0} }
+                @keyframes gm-pulse-new { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.2);opacity:.6} }
               </style>
             `);
             infoWindow.current?.open({ map: gmap.current!, anchor: m });
@@ -709,6 +709,14 @@ export default function LiveMapClient() {
             navRoute={navRoute}
           />
 
+            {/* Backdrop overlay — clicking closes modal */}
+            {selected && (
+              <div
+                className="absolute inset-0 z-[1999]"
+                onClick={() => { setSelected(null); setTrailPoints([]); }}
+              />
+            )}
+
             {/* Selected officer detail panel */}
             {selected && (() => {
               const lat      = Number(selected.lastLatitude);
@@ -722,8 +730,8 @@ export default function LiveMapClient() {
               const sl       = statusLabel(selected.gpsStatus);
 
               return (
-                <div className="absolute bottom-4 right-4 w-[300px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-[2000] max-h-[500px]"
-                  style={{ backdropFilter: "blur(8px)" }}>
+                <div className="absolute bottom-4 right-4 w-[320px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-[2000] max-h-[90vh]"
+                  style={{ backdropFilter: "blur(8px)", maxWidth: "calc(100vw - 40px)" }}>
 
                   {/* Header */}
                   <div className="relative p-4 bg-gradient-to-br from-[#C8102E] to-[#7B0000]">
