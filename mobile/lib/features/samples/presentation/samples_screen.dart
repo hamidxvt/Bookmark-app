@@ -60,6 +60,12 @@ final samplesListProvider = FutureProvider.autoDispose<List<SampleRequest>>((ref
   final dio = ref.watch(dioClientProvider);
   try {
     final res = await dio.get('/samples');
+    
+    // Check if response is successful
+    if (res.statusCode != 200) {
+      throw Exception('Server error: ${res.statusCode}');
+    }
+
     final raw = res.data;
 
     // Handle multiple response shapes
@@ -72,6 +78,8 @@ final samplesListProvider = FutureProvider.autoDispose<List<SampleRequest>>((ref
         list = data['data'] as List;
       } else if (data is Map && data['samples'] is List) {
         list = data['samples'] as List;
+      } else if (raw['success'] == false) {
+        throw Exception(raw['error'] ?? 'API returned error');
       }
     } else if (raw is List) {
       list = raw;
@@ -81,8 +89,10 @@ final samplesListProvider = FutureProvider.autoDispose<List<SampleRequest>>((ref
         .cast<Map<String, dynamic>>()
         .map(SampleRequest.fromJson)
         .toList();
+  } on Exception catch (e) {
+    throw Exception('Samples not available: ${e.toString()}');
   } catch (e) {
-    return []; // Return empty list on error
+    throw Exception('Failed to load samples');
   }
 });
 
