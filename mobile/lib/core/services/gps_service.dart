@@ -11,14 +11,17 @@ import 'background_service.dart';
 
 class GpsService {
   final DioClient _dio;
-  Timer? _pingTimer;
-  StreamSubscription<Position>? _positionStream;
+  Timer? _heartbeat;
+  StreamSubscription<Position>? _posStream;
   Position? _lastPosition;
   DateTime? _lastPingAt;
+  bool _pinging = false;
 
   GpsService(this._dio);
 
-  /// Start real-time GPS: stream every 5 m of movement + 4-second fallback timer
+  /// Real-time tracking:
+  ///  • Position stream fires on any OS-provided position update (distanceFilter 0)
+  ///  • 3-second heartbeat sends last-known position so admin stays fresh even if stationary
   Future<void> startTracking({String? jwtToken}) async {
     stopTracking();
 
@@ -27,66 +30,79 @@ class GpsService {
       await prefs.setString('auth_token', jwtToken);
     }
 
-    if (!kIsWeb) {
-      await startBackgroundGps();
-    }
+    if (!kIsWeb) await startBackgroundGps();
 
-    // Position stream — fires every time device moves ≥ 5 m
-    // Gives Uber-like real-time movement updates instantly
     final perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.always ||
-        perm == LocationPermission.whileInUse) {
-      _positionStream = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 5, // fire on every 5 metres of movement
-        ),
-      ).listen(_onPosition, onError: (_) {});
+    if (perm == LocationPermission.denied ||
+        perm == LocationPermission.deniedForever) {
+      await Geolocator.requestPermission();
     }
 
-    // Fallback heartbeat every 4 s (keeps server fresh even when stationary)
-    _pingTimer = Timer.periodic(const Duration(seconds: 4), (_) => _ping());
-    _ping(); // immediate first ping
+    // Subscribe to OS position stream — fires whenever device has a new fix
+    // distanceFilter: 0 → get every single update the OS delivers
+    if (!kIsWeb) {
+      _posStream = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          distanceFilter: 0,
+        ),
+      ).listen(_onNewPosition, onError: (_) {});
+    }
+
+    // 3-second heartbeat — re-sends _lastPosition so admin never goes stale
+    _heartbeat = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (_lastPosition != null) _sendPing(_lastPosition!);
+    });
+
+    // Get first fix immediately (don't wait for stream)
+    _initPosition();
   }
 
   void stopTracking() {
-    _pingTimer?.cancel();
-    _pingTimer = null;
-    _positionStream?.cancel();
-    _positionStream = null;
-    if (!kIsWeb) {
-      stopBackgroundGps();
-    }
+    _heartbeat?.cancel();
+    _heartbeat = null;
+    _posStream?.cancel();
+    _posStream = null;
+    if (!kIsWeb) stopBackgroundGps();
   }
 
-  /// Callback for position stream — ping immediately on movement
-  void _onPosition(Position pos) {
+  void _onNewPosition(Position pos) {
     _lastPosition = pos;
-
-    // Throttle: don't send faster than every 2 s even if device fires more often
-    final now = DateTime.now();
-    if (_lastPingAt != null &&
-        now.difference(_lastPingAt!).inMilliseconds < 2000) {
-      return;
-    }
-    _lastPingAt = now;
+    // Send immediately on position change — no throttle on movement
     _sendPing(pos);
   }
 
+  Future<void> _initPosition() async {
+    if (kIsWeb) return;
+    try {
+      final perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) return;
+
+      // Quick fix with short timeout — fallback to stream
+      final pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 8),
+      );
+      _lastPosition = pos;
+      _sendPing(pos);
+    } catch (_) {}
+  }
+
   Future<Position?> getCurrentPosition() async {
+    if (_lastPosition != null) return _lastPosition;
     try {
       final perm = await Geolocator.requestPermission();
       if (perm == LocationPermission.denied ||
           perm == LocationPermission.deniedForever) return null;
-
       final pos = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
-        timeLimit: const Duration(seconds: 15),
+        timeLimit: const Duration(seconds: 10),
       );
       _lastPosition = pos;
       return pos;
     } catch (_) {
-      return _lastPosition;
+      return null;
     }
   }
 
@@ -97,46 +113,34 @@ class GpsService {
     required double targetLng,
     double radiusMeters = 200,
   }) {
-    final distance = Geolocator.distanceBetween(
+    final d = Geolocator.distanceBetween(
         currentLat, currentLng, targetLat, targetLng);
-    return distance <= radiusMeters;
-  }
-
-  Future<void> _ping() async {
-    if (kIsWeb) return;
-    try {
-      final pos = await getCurrentPosition();
-      if (pos == null) return;
-      final now = DateTime.now();
-      if (_lastPingAt != null &&
-          now.difference(_lastPingAt!).inMilliseconds < 2000) {
-        return; // stream already covered this moment
-      }
-      _lastPingAt = now;
-      _sendPing(pos);
-    } catch (_) {}
+    return d <= radiusMeters;
   }
 
   Future<void> _sendPing(Position pos) async {
+    if (kIsWeb || _pinging) return;
+    _pinging = true;
     try {
       await _dio.post(ApiConstants.gpsPing, data: {
         'lat': pos.latitude,
         'lng': pos.longitude,
         'accuracy': pos.accuracy,
         'isMock': pos.isMocked,
-        'speed_kmh':
-            double.parse((pos.speed * 3.6).toStringAsFixed(2)),
+        'speed_kmh': double.parse((pos.speed * 3.6).toStringAsFixed(2)),
         'altitude': pos.altitude,
         'heading': pos.heading >= 0 ? pos.heading : null,
         'timestamp': DateTime.now().toIso8601String(),
       });
     } on DioException {
       // silent
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      _pinging = false;
+    }
   }
 
   Position? get lastKnownPosition => _lastPosition;
-
   void dispose() => stopTracking();
 }
 
