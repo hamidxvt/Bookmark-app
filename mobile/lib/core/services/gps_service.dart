@@ -109,12 +109,16 @@ class GpsService {
   }
 
   void _sendPingAsync(Position pos) {
+    // Filter GPS noise: speeds < 1 km/h are stationary (GPS jitter)
+    final speedKmh = (pos.speed * 3.6);
+    final cleanSpeed = speedKmh < 1.0 ? 0.0 : speedKmh;
+    
     _dio.post(ApiConstants.gpsPing, data: {
       'lat': pos.latitude,
       'lng': pos.longitude,
       'accuracy': pos.accuracy,
       'isMock': pos.isMocked,
-      'speed_kmh': double.parse((pos.speed * 3.6).toStringAsFixed(2)),
+      'speed_kmh': double.parse(cleanSpeed.toStringAsFixed(2)),
       'altitude': pos.altitude,
       'heading': pos.heading >= 0 ? pos.heading : null,
       'timestamp': DateTime.now().toIso8601String(),

@@ -321,11 +321,11 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
                 border: Border.all(color: const Color(0xFFBBF7D0))),
             child: const Row(children: [
               Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
-              SizedBox(width: 8),
+              SizedBox(width: 10),
               Expanded(
-                  child: Text('Route drawn on map · ETA sent to admin',
+                  child: Text('Route calculated · ETA updated',
                       style: TextStyle(fontSize: 12, color: Color(0xFF166534),
-                          fontWeight: FontWeight.w500))),
+                          fontWeight: FontWeight.w600))),
             ]),
           ),
           const SizedBox(height: 16),
