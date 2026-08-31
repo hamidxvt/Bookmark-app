@@ -1,28 +1,28 @@
-import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
+// GET /api/v1/samples — admin list with optional ?status= filter
 export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const status = searchParams.get('status');
-    const bookerId = searchParams.get('bookerId');
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
-    const where: Record<string, unknown> = {};
-    if (status) where.status = status;
-    if (bookerId) where.bookerId = parseInt(bookerId);
+  const { searchParams } = new URL(req.url);
+  const status = searchParams.get("status");
+  const officerId = searchParams.get("officerId");
 
-    const samples = await (prisma as any).sampleRequest.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-      include: {
-        booker: { select: { id: true, name: true, email: true } },
-        customer: { select: { id: true, name: true } },
-      },
-    });
+  const samples = await prisma.sampleRequest.findMany({
+    where: {
+      ...(status && status !== "all" ? { status } : {}),
+      ...(officerId ? { bookerId: Number(officerId) } : {}),
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      booker: { select: { id: true, name: true, email: true, sampleBudget: true } },
+      customer: { select: { id: true, name: true } },
+    },
+  });
 
-    return NextResponse.json({ success: true, data: samples });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: { message: err.message } }, { status: 500 });
-  }
+  return NextResponse.json({ success: true, data: samples });
 }

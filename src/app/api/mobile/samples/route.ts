@@ -1,42 +1,82 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getMobileUser, unauthorized } from '@/lib/mobile-auth';
+import { NextResponse } from "next/server";
+import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
+import { prisma } from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
-  const booker = getMobileUser(req);
-  if (!booker) return unauthorized();
+// GET /api/mobile/samples
+// Returns officer's sample requests + their budget summary
+export async function GET(req: Request) {
+  const user = getMobileUser(req);
+  if (!user) return unauthorized();
 
-  const samples = await (prisma as any).sampleRequest.findMany({
-    where: { bookerId: booker.id },
-    orderBy: { createdAt: 'desc' },
-    include: { customer: { select: { id: true, name: true } } },
+  const [requests, booker] = await Promise.all([
+    prisma.sampleRequest.findMany({
+      where: { bookerId: user.id },
+      orderBy: { createdAt: "desc" },
+      include: { customer: { select: { id: true, name: true, address: true } } },
+    }),
+    prisma.booker.findUnique({
+      where: { id: user.id },
+      select: { sampleBudget: true },
+    }),
+  ]);
+
+  const budget = Number(booker?.sampleBudget ?? 300000);
+  const usedBudget = requests
+    .filter(r => ["approved", "delivered"].includes(r.status))
+    .reduce((sum, r) => sum + (r.price ? Number(r.price) * r.quantity : 0), 0);
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      budget: { total: budget, used: usedBudget, remaining: budget - usedBudget },
+      samples: requests.map(r => ({
+        id: r.id,
+        productName: r.productName,
+        status: r.status,
+        quantity: r.quantity,
+        price: r.price ? Number(r.price) : null,
+        totalCost: r.price ? Number(r.price) * r.quantity : null,
+        notes: r.notes,
+        adminNotes: r.adminNotes,
+        customerName: r.customer?.name ?? r.customerName,
+        customerId: r.customerId,
+        deliveredAt: r.deliveredAt,
+        createdAt: r.createdAt,
+        customer: r.customer,
+      })),
+    },
   });
-
-  return NextResponse.json({ success: true, data: samples });
 }
 
-export async function POST(req: NextRequest) {
-  const booker = getMobileUser(req);
-  if (!booker) return unauthorized();
+// POST /api/mobile/samples
+// Create a new sample request
+export async function POST(req: Request) {
+  const user = getMobileUser(req);
+  if (!user) return unauthorized();
 
   try {
-    const { productName, quantity, price, notes, customerId, customerName } = await req.json();
+    const { productName, quantity, notes, customerId, customerName, price } = await req.json();
 
-    const sample = await (prisma as any).sampleRequest.create({
+    if (!productName) {
+      return NextResponse.json({ success: false, error: "Product name is required" }, { status: 400 });
+    }
+
+    const request = await prisma.sampleRequest.create({
       data: {
-        bookerId: booker.id,
-        productName,
-        quantity: quantity ?? 1,
-        price: price ? parseFloat(price.toString()) : null,
-        notes: notes || null,
-        customerId: customerId || null,
-        customerName: customerName || null,
-        status: 'pending',
+        bookerId: user.id,
+        productName: String(productName),
+        quantity: Number(quantity ?? 1),
+        notes: notes ?? null,
+        customerId: customerId ? Number(customerId) : null,
+        customerName: customerName ?? null,
+        price: price ? Number(price) : null,
+        status: "pending",
       },
     });
 
-    return NextResponse.json({ success: true, data: sample }, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: { message: err.message } }, { status: 500 });
+    return NextResponse.json({ success: true, data: request }, { status: 201 });
+  } catch (err) {
+    console.error("[samples POST]", err);
+    return NextResponse.json({ success: false, error: "Failed to create sample request" }, { status: 500 });
   }
 }

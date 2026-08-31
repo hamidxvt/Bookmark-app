@@ -1,32 +1,58 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { getMobileUser, unauthorized } from '@/lib/mobile-auth';
+import { NextResponse } from "next/server";
+import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
+import { prisma } from "@/lib/prisma";
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const booker = getMobileUser(req);
-  if (!booker) return unauthorized();
+// PATCH /api/mobile/samples/:id — deliver with signature
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  const user = getMobileUser(req);
+  if (!user) return unauthorized();
+
+  const id = Number(params.id);
+  if (isNaN(id)) return NextResponse.json({ success: false, error: "Invalid ID" }, { status: 400 });
+
+  const sample = await prisma.sampleRequest.findFirst({
+    where: { id, bookerId: user.id },
+  });
+
+  if (!sample) return NextResponse.json({ success: false, error: "Sample not found" }, { status: 404 });
+  if (sample.status !== "approved") {
+    return NextResponse.json({ success: false, error: "Sample must be approved before delivery" }, { status: 400 });
+  }
 
   try {
-    const { id } = await params;
-    const parsedId = parseInt(id);
-    const { customerName, signatureBase64, pdfUrl, notes, quantity, customerId } = await req.json();
+    const { signatureBase64, customerName, customerId, notes } = await req.json();
 
-    const updated = await (prisma as any).sampleRequest.update({
-      where: { id: parsedId, bookerId: booker.id },
+    const updated = await prisma.sampleRequest.update({
+      where: { id },
       data: {
-        customerName: customerName || null,
-        signatureBase64: signatureBase64 || null,
-        pdfUrl: pdfUrl || null,
-        notes: notes || null,
-        quantity: quantity ?? undefined,
-        customerId: customerId || null,
+        status: "delivered",
         deliveredAt: new Date(),
-        status: 'delivered',
+        signatureBase64: signatureBase64 ?? null,
+        customerName: customerName ?? sample.customerName,
+        customerId: customerId ? Number(customerId) : sample.customerId,
+        notes: notes ?? sample.notes,
       },
     });
 
     return NextResponse.json({ success: true, data: updated });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: { message: err.message } }, { status: 500 });
+  } catch (err) {
+    console.error("[samples PATCH]", err);
+    return NextResponse.json({ success: false, error: "Failed to update sample" }, { status: 500 });
   }
+}
+
+// GET /api/mobile/samples/:id — get single sample details
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const user = getMobileUser(req);
+  if (!user) return unauthorized();
+
+  const id = Number(params.id);
+  const sample = await prisma.sampleRequest.findFirst({
+    where: { id, bookerId: user.id },
+    include: { customer: { select: { id: true, name: true, address: true } } },
+  });
+
+  if (!sample) return NextResponse.json({ success: false, error: "Not found" }, { status: 404 });
+
+  return NextResponse.json({ success: true, data: sample });
 }

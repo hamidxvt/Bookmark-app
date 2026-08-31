@@ -145,7 +145,7 @@ function LiveMap({
     const pinColor = isActive ? "#C8102E" : isMock ? "#f97316" : "#94a3b8";
     const dotColor = isActive ? "#22c55e" : isMock ? "#f97316" : "#94a3b8";
     const heading  = o.lastHeading;
-    const speed = Number(o.lastSpeedKmh ?? 0);
+    const speed = Number(o.lastSpeedKmh ?? 0) < 2 ? 0 : Number(o.lastSpeedKmh ?? 0);
     
     
     // Speed badge with gradient
@@ -262,7 +262,8 @@ function LiveMap({
         } else {
           const m = new AdvancedMarkerElement({ map: gmap.current!, position: pos, content: el });
           m.addListener("click", () => {
-            const speed = o.lastSpeedKmh != null ? `${Number(o.lastSpeedKmh).toFixed(1)} km/h` : "—";
+            const rawSpd = Number(o.lastSpeedKmh ?? 0);
+            const speed = rawSpd < 2 ? "0 km/h" : `${rawSpd.toFixed(1)} km/h`;
             const lastSeen = secondsAgo(o.lastPingAt ?? o.lastSeenAt);
             const activity = activityLabel(o.lastActivity);
             const sl = statusLabel(o.gpsStatus);
@@ -286,7 +287,7 @@ function LiveMap({
                   <!-- Speed & Activity -->
                   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
                     <div style="background:linear-gradient(135deg,#fef3c7,#fef08a);border-radius:10px;padding:8px;text-align:center;border:1px solid #fde68a;">
-                      <p style="font-size:16px;font-weight:800;color:#d97706;margin:0;">${(Number(o.lastSpeedKmh ?? 0)).toFixed(0)}</p>
+                      <p style="font-size:16px;font-weight:800;color:#d97706;margin:0;">${Number(o.lastSpeedKmh ?? 0) < 2 ? 0 : (Number(o.lastSpeedKmh ?? 0)).toFixed(0)}</p>
                       <p style="font-size:9px;color:#92400e;font-weight:600;margin:2px 0 0;text-transform:uppercase;letter-spacing:.3px;">${isMoving?'Speed':'Idle'}</p>
                     </div>
                     <div style="background:linear-gradient(135deg,#dbeafe,#bfdbfe);border-radius:10px;padding:8px;text-align:center;border:1px solid #93c5fd;">
@@ -715,7 +716,8 @@ export default function LiveMapClient() {
               const done     = officerVisits.filter(v => v.status?.toUpperCase() === "COMPLETED").length;
               const inProg   = officerVisits.filter(v => v.status?.toUpperCase() === "IN_PROGRESS").length;
               const total    = officerVisits.length;
-              const speed    = selected.lastSpeedKmh != null ? Number(selected.lastSpeedKmh) : null;
+              const rawSpeed = selected.lastSpeedKmh != null ? Number(selected.lastSpeedKmh) : null;
+            const speed    = rawSpeed != null && rawSpeed < 2 ? 0 : rawSpeed;
               const lastSeen = selected.lastPingAt ?? selected.lastSeenAt;
               const sl       = statusLabel(selected.gpsStatus);
 
@@ -932,7 +934,8 @@ export default function LiveMapClient() {
               const lat   = Number(o.lastLatitude), lng = Number(o.lastLongitude);
               const valid = lat && lng && isValidPakCoord(lat, lng);
               const sl    = statusLabel(o.gpsStatus);
-              const speed = o.lastSpeedKmh != null ? Number(o.lastSpeedKmh) : null;
+              const rawSpd2 = o.lastSpeedKmh != null ? Number(o.lastSpeedKmh) : null;
+              const speed = rawSpd2 != null && rawSpd2 < 2 ? 0 : rawSpd2;
               const isSelected = selected?.id === o.id;
               return (
                 <div key={o.id} onClick={() => valid && setSelected(o as any)}

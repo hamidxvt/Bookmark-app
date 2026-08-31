@@ -1,58 +1,41 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+// PATCH /api/v1/samples/:id — admin approve / reject
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+
+  const id = Number(params.id);
+  if (isNaN(id)) return NextResponse.json({ success: false, error: "Invalid ID" }, { status: 400 });
+
   try {
-    const { id } = await params;
-    const parsedId = parseInt(id);
     const { status, adminNotes } = await req.json();
-
-    // Fetch the sample request first
-    const sample = await (prisma as any).sampleRequest.findUnique({
-      where: { id: parsedId },
-      include: { booker: true },
-    });
-
-    if (!sample) {
-      return NextResponse.json(
-        { success: false, error: { message: 'Sample not found' } },
-        { status: 404 }
-      );
+    if (!["approved", "rejected"].includes(status)) {
+      return NextResponse.json({ success: false, error: "Invalid status. Must be approved or rejected." }, { status: 400 });
     }
 
-    // If approving, deduct from sample budget
-    let updateData: any = {
-      status,
-      adminNotes: adminNotes || null,
-      reviewedAt: new Date(),
-    };
-
-    if (status === 'approved' && sample.price) {
-      const booker = await (prisma as any).booker.findUnique({
-        where: { id: sample.bookerId },
-      });
-
-      const totalCost = parseFloat(sample.price) * sample.quantity;
-      const newBudget = parseFloat(booker.sampleBudget || 0) - totalCost;
-
-      // Update booker budget
-      await (prisma as any).booker.update({
-        where: { id: sample.bookerId },
-        data: { sampleBudget: Math.max(0, newBudget) },
-      });
-    }
-
-    const updated = await (prisma as any).sampleRequest.update({
-      where: { id: parsedId },
-      data: updateData,
+    const updated = await prisma.sampleRequest.update({
+      where: { id },
+      data: {
+        status,
+        adminNotes: adminNotes ?? null,
+        reviewedAt: new Date(),
+      },
       include: {
-        booker: { select: { id: true, name: true, email: true, sampleBudget: true } },
+        booker: { select: { id: true, name: true, email: true } },
         customer: { select: { id: true, name: true } },
       },
     });
 
     return NextResponse.json({ success: true, data: updated });
   } catch (err: any) {
-    return NextResponse.json({ success: false, error: { message: err.message } }, { status: 500 });
+    if (err.code === "P2025") {
+      return NextResponse.json({ success: false, error: "Sample request not found" }, { status: 404 });
+    }
+    console.error("[admin samples PATCH]", err);
+    return NextResponse.json({ success: false, error: "Update failed" }, { status: 500 });
   }
 }
