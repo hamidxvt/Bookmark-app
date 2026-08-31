@@ -406,7 +406,7 @@ export async function monitorOfficerActivity() {
         status: "PENDING",
       },
       include: { customer: { select: { name: true, latitude: true, longitude: true } } },
-      orderBy: { sequence: "asc" },
+      orderBy: { createdAt: "asc" },
       take: 1,
     });
 

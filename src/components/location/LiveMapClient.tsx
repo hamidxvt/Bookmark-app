@@ -515,7 +515,40 @@ export default function LiveMapClient() {
     } catch { /* silent */ } finally { setLoading(false); }
   }, [selCity, selected, addEvent]);
 
+  // Poll location data every 1.5s
   useEffect(() => { load(); const t = setInterval(load, 1_500); return () => clearInterval(t); }, [load]);
+
+  // Poll smart officer activity every 5s for notifications
+  useEffect(() => {
+    const pollActivity = async () => {
+      try {
+        const res = await fetch("/api/v1/officer-activity").then(r => r.json());
+        if (res.success && res.data?.activeActivities) {
+          const activities = res.data.activeActivities as Array<any>;
+          setActivityFeed(prev => {
+            const now = new Date();
+            const merged = [
+              ...activities.filter(a => a.officer).map((a: any) => ({
+                id: a.id,
+                iconType: a.type === "idle" ? "offline" : a.type === "completed" ? "online" : a.type === "late" ? "stopped" : "moving",
+                color: a.severity === "critical" ? "bg-red-50" : a.severity === "warning" ? "bg-amber-50" : "bg-blue-50",
+                text: `${a.officer}: ${a.title} — ${a.description}`,
+                time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              })),
+              ...prev,
+            ];
+            const seen = new Set<string>();
+            return merged.filter(a => seen.has(a.id) ? false : (seen.add(a.id), true)).slice(0, 25);
+          });
+        }
+      } catch (e) {
+        // Silent
+      }
+    };
+    pollActivity();
+    const t = setInterval(pollActivity, 5_000);
+    return () => clearInterval(t);
+  }, []);
 
   // Fetch & draw navigation route when ETA is active
   useEffect(() => {
