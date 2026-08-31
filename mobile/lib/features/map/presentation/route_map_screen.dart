@@ -181,22 +181,25 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
         // Send ETA to admin
         final dio = ref.read(dioClientProvider);
         final etaMin = (directions.durationSec / 60).ceil();
-        dio.post('/visits/${stop.visitId}/eta', data: {
-          'visitId': stop.visitId,
-          'customerName': stop.customerName,
-          'eta_minutes': etaMin,
-          'eta_walk_minutes': directions.walkDurationText != null
-              ? _parseWalkMin(directions.walkDurationText!)
-              : null,
-          'eta_timestamp': DateTime.now()
-              .add(Duration(seconds: directions.durationSec))
-              .toIso8601String(),
-          'lat': pos.latitude,
-          'lng': pos.longitude,
-          'destination_lat': stop.lat,
-          'destination_lng': stop.lng,
-          'distance_km': directions.distanceText,
-        }).catchError((_) => null);
+        // Best-effort ETA push — ignore errors silently
+        try {
+          await dio.post('/visits/${stop.visitId}/eta', data: {
+            'visitId': stop.visitId,
+            'customerName': stop.customerName,
+            'eta_minutes': etaMin,
+            'eta_walk_minutes': directions.walkDurationText != null
+                ? _parseWalkMin(directions.walkDurationText!)
+                : null,
+            'eta_timestamp': DateTime.now()
+                .add(Duration(seconds: directions.durationSec))
+                .toIso8601String(),
+            'lat': pos.latitude,
+            'lng': pos.longitude,
+            'destination_lat': stop.lat,
+            'destination_lng': stop.lng,
+            'distance_km': directions.distanceText,
+          });
+        } catch (_) {}
 
         if (mounted) {
           await _showETASheet(stop, directions);
@@ -242,23 +245,44 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
     await showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
       backgroundColor: Colors.white,
       builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 34),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 40, height: 4,
-            decoration: BoxDecoration(
-                color: Colors.grey.shade300, borderRadius: BorderRadius.circular(4)),
+          // Handle
+          Center(
+            child: Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
+            ),
           ),
           const SizedBox(height: 20),
-          Text(stop.customerName,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text(dir.distanceText,
-              style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
-          const SizedBox(height: 24),
+
+          // Destination header
+          Row(children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(stop.customerName,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                      color: Color(0xFF1E293B)),
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(dir.distanceText,
+                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500)),
+            ])),
+          ]),
+          const SizedBox(height: 20),
+
+          // ETA tiles
           Row(children: [
             Expanded(
               child: _ETATile(
@@ -269,44 +293,50 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
               ),
             ),
             if (dir.walkDurationText != null) ...[
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               Expanded(
                 child: _ETATile(
                   icon: Icons.directions_walk_rounded,
                   label: 'Walking',
                   value: dir.walkDurationText!,
-                  color: Colors.blue.shade700,
+                  color: const Color(0xFF3B82F6),
                 ),
               ),
             ],
           ]),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
+          // Info banner
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: const Color(0xFFF0FDF4),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.shade200)),
-            child: Row(children: [
-              Icon(Icons.route_rounded, color: Colors.green.shade700, size: 16),
-              const SizedBox(width: 8),
+                border: Border.all(color: const Color(0xFFBBF7D0))),
+            child: const Row(children: [
+              Icon(Icons.check_circle_rounded, color: Color(0xFF16A34A), size: 16),
+              SizedBox(width: 8),
               Expanded(
-                  child: Text('Route drawn on map. ETA sent to admin.',
-                      style: TextStyle(fontSize: 12, color: Colors.green.shade800))),
+                  child: Text('Route drawn on map · ETA sent to admin',
+                      style: TextStyle(fontSize: 12, color: Color(0xFF166534),
+                          fontWeight: FontWeight.w500))),
             ]),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+
+          // CTA
           SizedBox(
-            width: double.infinity,
-            height: 50,
+            width: double.infinity, height: 52,
             child: ElevatedButton.icon(
               onPressed: () => Navigator.pop(context),
-              icon: const Icon(Icons.navigation_rounded),
-              label: const Text('Got It', style: TextStyle(fontWeight: FontWeight.w700)),
+              icon: const Icon(Icons.navigation_rounded, size: 18),
+              label: const Text('Start Navigation',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),
             ),
           ),
@@ -350,7 +380,7 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
     final routeAsync = ref.watch(routeProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF1A0A0A),
+      backgroundColor: const Color(0xFF0F0A0A),
       body: routeAsync.when(
         loading: () => const Center(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -466,27 +496,43 @@ class _MapBodyState extends ConsumerState<_MapBody> {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.55),
+                    color: Colors.black.withOpacity(0.60),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(children: [
-                    const Icon(Icons.route_rounded, color: AppColors.primary, size: 22),
+                    GestureDetector(
+                      onTap: () => Navigator.of(context).maybePop(),
+                      child: Container(
+                        width: 34, height: 34,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white, size: 15),
+                      ),
+                    ),
                     const SizedBox(width: 10),
-                    Text('${valid.length} stops today',
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
-                    const Spacer(),
+                    const Icon(Icons.route_rounded, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('${valid.length} stops today',
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                          overflow: TextOverflow.ellipsis),
+                    ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8)),
+                          color: AppColors.primary.withOpacity(0.25),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.primary.withOpacity(0.4))),
                       child: Text(
                         '${valid.fold(0.0, (s, r) => s + r.distanceKm).toStringAsFixed(1)} km',
                         style: const TextStyle(
-                            color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 13),
+                            color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 13),
                       ),
                     ),
                   ]),
