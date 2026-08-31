@@ -351,7 +351,7 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
     );
   }
 
-  Set<Marker> _buildMarkers(List<RouteStop> stops, int selected, LatLng? myPos) {
+  Set<Marker> _buildMarkers(List<RouteStop> stops, int selected, LatLng? myPos, double? heading) {
     final ms = <Marker>{};
     if (myPos != null) {
       // Officer position with heading rotation
@@ -360,7 +360,7 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
         position: myPos,
         icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
         infoWindow: const InfoWindow(title: 'Your Location'),
-        rotation: _myHeading ?? 0, // Rotate marker based on heading
+        rotation: heading ?? 0, // Rotate marker based on heading
         zIndex: 10,
       ));
     }
@@ -415,7 +415,7 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
             }
           },
           onMapCreated: (ctrl) => _mapController = ctrl,
-          buildMarkers: (stops, myPos) => _buildMarkers(stops, _selectedStop, myPos),
+          buildMarkers: (stops, myPos) => _buildMarkers(stops, _selectedStop, myPos, _myHeading),
           onNavigate: _navigate,
         ),
       ),

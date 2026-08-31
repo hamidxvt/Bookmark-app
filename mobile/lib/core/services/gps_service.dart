@@ -86,7 +86,16 @@ class GpsService {
         timeLimit: const Duration(seconds: 5),
       ).timeout(
         const Duration(seconds: 6),
-        onTimeout: () => _lastPosition,
+        onTimeout: () => _lastPosition ?? Position(
+          latitude: 0,
+          longitude: 0,
+          timestamp: DateTime.now(),
+          accuracy: 0,
+          altitude: 0,
+          heading: 0,
+          speed: 0,
+          speedAccuracy: 0,
+        ),
       );
       return pos;
     } catch (_) {
