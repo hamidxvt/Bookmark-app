@@ -252,6 +252,7 @@ class _VisitTile extends ConsumerWidget {
               ),
             ),
             ],
+            ),
           ),
         ),
       ),
