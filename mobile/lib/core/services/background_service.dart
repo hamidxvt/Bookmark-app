@@ -20,15 +20,17 @@ Future<void> initBackgroundService() async {
   await service.configure(
     androidConfiguration: AndroidConfiguration(
       onStart: _backgroundMain,
-      autoStart: false, // We start/stop manually
+      // autoStart=true: service restarts after app is swiped away, after phone reboots,
+      // and after the system kills it for memory. This is the key for persistent tracking.
+      autoStart: true,
       isForegroundMode: true,
       notificationChannelId: _kChannelId,
-      initialNotificationTitle: 'Bookmark SFA',
-      initialNotificationContent: 'GPS tracking active',
+      initialNotificationTitle: 'Bookmark SFA – Tracking Active',
+      initialNotificationContent: 'Location is being shared with your manager',
       foregroundServiceNotificationId: 888,
     ),
     iosConfiguration: IosConfiguration(
-      autoStart: false,
+      autoStart: true,
       onForeground: _backgroundMain,
       onBackground: _iosBackground,
     ),
@@ -67,8 +69,8 @@ Future<void> _backgroundMain(ServiceInstance service) async {
     }
   });
 
-  // Ping GPS every 30 seconds
-  Timer.periodic(const Duration(seconds: 30), (_) async {
+  // Ping GPS every 10 seconds for near-real-time tracking
+  Timer.periodic(const Duration(seconds: 10), (_) async {
     await _sendGpsPing(service);
   });
 
@@ -110,7 +112,8 @@ Future<void> _sendGpsPing(ServiceInstance service) async {
         'lng': pos.longitude,
         'accuracy': pos.accuracy,
         'isMock': pos.isMocked,
-        'speed_kmh': pos.speed >= 0 ? pos.speed * 3.6 : 0,
+        // Filter GPS jitter: speeds under 1 km/h are stationary noise
+        'speed_kmh': (pos.speed * 3.6) < 1.0 ? 0.0 : double.parse((pos.speed * 3.6).toStringAsFixed(2)),
         'heading': pos.heading >= 0 ? pos.heading : null,
         'altitude': pos.altitude,
       }),
