@@ -1,9 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,11 +17,23 @@ import 'dart:io';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/dio_client.dart';
 
-// ── Model ─────────────────────────────────────────────────────────────────────
+// ── Models ────────────────────────────────────────────────────────────────────
+class SampleBudget {
+  final double total, used, remaining;
+  const SampleBudget({required this.total, required this.used, required this.remaining});
+
+  factory SampleBudget.fromJson(Map<String, dynamic> j) => SampleBudget(
+        total: (j['total'] as num?)?.toDouble() ?? 300000,
+        used: (j['used'] as num?)?.toDouble() ?? 0,
+        remaining: (j['remaining'] as num?)?.toDouble() ?? 300000,
+      );
+}
+
 class SampleRequest {
   final int id;
   final String productName, status;
   final int quantity;
+  final double? price, totalCost;
   final String? notes, customerName, adminNotes;
   final DateTime createdAt;
   final Map<String, dynamic>? customer;
@@ -33,6 +43,8 @@ class SampleRequest {
     required this.productName,
     required this.status,
     required this.quantity,
+    this.price,
+    this.totalCost,
     this.notes,
     this.customerName,
     this.adminNotes,
@@ -45,8 +57,10 @@ class SampleRequest {
         productName: j['productName'] ?? 'Sample',
         status: j['status'] ?? 'pending',
         quantity: (j['quantity'] ?? 1) as int,
+        price: (j['price'] as num?)?.toDouble(),
+        totalCost: (j['totalCost'] as num?)?.toDouble(),
         notes: j['notes'] as String?,
-        customerName: j['customerName'] as String?,
+        customerName: (j['customer'] as Map?)?['name'] as String? ?? j['customerName'] as String?,
         adminNotes: j['adminNotes'] as String?,
         createdAt: j['createdAt'] != null
             ? DateTime.tryParse(j['createdAt']) ?? DateTime.now()
@@ -55,45 +69,41 @@ class SampleRequest {
       );
 }
 
+class _SampleData {
+  final SampleBudget budget;
+  final List<SampleRequest> samples;
+  const _SampleData({required this.budget, required this.samples});
+}
+
 // ── Providers ─────────────────────────────────────────────────────────────────
-final samplesListProvider = FutureProvider.autoDispose<List<SampleRequest>>((ref) async {
+final sampleDataProvider = FutureProvider.autoDispose<_SampleData>((ref) async {
   final dio = ref.watch(dioClientProvider);
-  try {
-    final res = await dio.get('/samples');
-    
-    // Check if response is successful
-    if (res.statusCode != 200) {
-      throw Exception('Server error: ${res.statusCode}');
-    }
+  final res = await dio.get('/samples');
+  if (res.statusCode != 200) throw Exception('Server error: ${res.statusCode}');
 
-    final raw = res.data;
+  final raw = res.data;
+  SampleBudget budget = const SampleBudget(total: 300000, used: 0, remaining: 300000);
+  List<dynamic> list = [];
 
-    // Handle multiple response shapes
-    List<dynamic> list = [];
-    if (raw is Map) {
-      final data = raw['data'];
-      if (data is List) {
-        list = data;
-      } else if (data is Map && data['data'] is List) {
-        list = data['data'] as List;
-      } else if (data is Map && data['samples'] is List) {
-        list = data['samples'] as List;
-      } else if (raw['success'] == false) {
-        throw Exception(raw['error'] ?? 'API returned error');
+  if (raw is Map) {
+    final data = raw['data'];
+    if (data is Map) {
+      if (data['budget'] is Map) {
+        budget = SampleBudget.fromJson(data['budget'] as Map<String, dynamic>);
       }
-    } else if (raw is List) {
-      list = raw;
+      if (data['samples'] is List) list = data['samples'] as List;
+    } else if (data is List) {
+      list = data;
     }
-
-    return list
-        .cast<Map<String, dynamic>>()
-        .map(SampleRequest.fromJson)
-        .toList();
-  } on Exception catch (e) {
-    throw Exception('Samples not available: ${e.toString()}');
-  } catch (e) {
-    throw Exception('Failed to load samples');
+    if (raw['success'] == false) throw Exception(raw['error'] ?? 'API error');
+  } else if (raw is List) {
+    list = raw;
   }
+
+  return _SampleData(
+    budget: budget,
+    samples: list.cast<Map<String, dynamic>>().map(SampleRequest.fromJson).toList(),
+  );
 });
 
 final customersSearchProvider = FutureProvider.family.autoDispose<List<Map<String, dynamic>>, String>(
@@ -101,9 +111,7 @@ final customersSearchProvider = FutureProvider.family.autoDispose<List<Map<Strin
     final dio = ref.watch(dioClientProvider);
     final res = await dio.get('/customers', params: {'search': query, 'length': 30});
     final d = res.data['data'];
-    if (d is Map && d['data'] is List) {
-      return (d['data'] as List).cast<Map<String, dynamic>>();
-    }
+    if (d is Map && d['data'] is List) return (d['data'] as List).cast<Map<String, dynamic>>();
     if (d is List) return d.cast<Map<String, dynamic>>();
     return [];
   },
@@ -112,15 +120,16 @@ final customersSearchProvider = FutureProvider.family.autoDispose<List<Map<Strin
 // ── Screen ────────────────────────────────────────────────────────────────────
 class SamplesScreen extends ConsumerStatefulWidget {
   const SamplesScreen({super.key});
-
   @override
   ConsumerState<SamplesScreen> createState() => _SamplesScreenState();
 }
 
 class _SamplesScreenState extends ConsumerState<SamplesScreen> {
+  final _fmt = NumberFormat('#,##0', 'en_US');
+
   @override
   Widget build(BuildContext context) {
-    final async = ref.watch(samplesListProvider);
+    final async = ref.watch(sampleDataProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -132,7 +141,7 @@ class _SamplesScreenState extends ConsumerState<SamplesScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => ref.invalidate(samplesListProvider),
+            onPressed: () => ref.invalidate(sampleDataProvider),
           ),
         ],
       ),
@@ -145,59 +154,70 @@ class _SamplesScreenState extends ConsumerState<SamplesScreen> {
       ),
       body: async.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(message: e.toString(), onRetry: () => ref.invalidate(samplesListProvider)),
-        data: (samples) {
-          if (samples.isEmpty) {
-            return Center(
+        error: (e, _) => _ErrorView(message: e.toString(), onRetry: () => ref.invalidate(sampleDataProvider)),
+        data: (data) => _buildBody(data),
+      ),
+    );
+  }
+
+  Widget _buildBody(_SampleData data) {
+    final pending   = data.samples.where((s) => s.status == 'pending').toList();
+    final approved  = data.samples.where((s) => s.status == 'approved').toList();
+    final delivered = data.samples.where((s) => s.status == 'delivered').toList();
+    final rejected  = data.samples.where((s) => s.status == 'rejected').toList();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+      children: [
+        // ── Budget Dashboard ────────────────────────────────────────────────
+        _BudgetCard(budget: data.budget, fmt: _fmt)
+            .animate().fadeIn().slideY(begin: -0.04),
+        const SizedBox(height: 20),
+
+        if (data.samples.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 48),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey.shade300),
                 const SizedBox(height: 16),
-                Text('No sample requests yet', style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+                Text('No sample requests yet',
+                    style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
                 const SizedBox(height: 8),
-                Text('Tap + to request a new sample', style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                Text('Tap + to request a new sample',
+                    style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
               ]),
-            );
-          }
+            ),
+          ),
 
-          // Group: pending admin review, approved (can deliver), others
-          final pending = samples.where((s) => s.status == 'pending').toList();
-          final approved = samples.where((s) => s.status == 'approved').toList();
-          final delivered = samples.where((s) => s.status == 'delivered').toList();
-          final rejected = samples.where((s) => s.status == 'rejected').toList();
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-            children: [
-              if (approved.isNotEmpty) ...[
-                _SectionHeader('Approved — Ready to Deliver', Icons.check_circle_outline, Colors.green),
-                const SizedBox(height: 8),
-                ...approved.map((s) => _SampleCard(
-                  sample: s,
-                  onTap: () => _openDeliveryFlow(context, s),
-                ).animate().fadeIn().slideY(begin: 0.05)),
-                const SizedBox(height: 24),
-              ],
-              if (pending.isNotEmpty) ...[
-                _SectionHeader('Pending Review', Icons.hourglass_top_rounded, Colors.amber.shade700),
-                const SizedBox(height: 8),
-                ...pending.map((s) => _SampleCard(sample: s)),
-                const SizedBox(height: 24),
-              ],
-              if (delivered.isNotEmpty) ...[
-                _SectionHeader('Delivered', Icons.local_shipping_outlined, AppColors.primary),
-                const SizedBox(height: 8),
-                ...delivered.map((s) => _SampleCard(sample: s)),
-                const SizedBox(height: 24),
-              ],
-              if (rejected.isNotEmpty) ...[
-                _SectionHeader('Rejected', Icons.cancel_outlined, Colors.red.shade400),
-                const SizedBox(height: 8),
-                ...rejected.map((s) => _SampleCard(sample: s)),
-              ],
-            ],
-          );
-        },
-      ),
+        if (approved.isNotEmpty) ...[
+          _SectionHeader('Approved — Ready to Deliver', Icons.check_circle_outline, Colors.green),
+          const SizedBox(height: 8),
+          ...approved.map((s) => _SampleCard(
+            sample: s,
+            fmt: _fmt,
+            onTap: () => _openDeliveryFlow(context, s),
+          ).animate().fadeIn().slideY(begin: 0.05)),
+          const SizedBox(height: 24),
+        ],
+        if (pending.isNotEmpty) ...[
+          _SectionHeader('Pending Review', Icons.hourglass_top_rounded, Colors.amber.shade700),
+          const SizedBox(height: 8),
+          ...pending.map((s) => _SampleCard(sample: s, fmt: _fmt)),
+          const SizedBox(height: 24),
+        ],
+        if (delivered.isNotEmpty) ...[
+          _SectionHeader('Delivered', Icons.local_shipping_outlined, AppColors.primary),
+          const SizedBox(height: 8),
+          ...delivered.map((s) => _SampleCard(sample: s, fmt: _fmt)),
+          const SizedBox(height: 24),
+        ],
+        if (rejected.isNotEmpty) ...[
+          _SectionHeader('Rejected', Icons.cancel_outlined, Colors.red.shade400),
+          const SizedBox(height: 8),
+          ...rejected.map((s) => _SampleCard(sample: s, fmt: _fmt)),
+        ],
+      ],
     );
   }
 
@@ -207,9 +227,7 @@ class _SamplesScreenState extends ConsumerState<SamplesScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _NewRequestSheet(
-        onSubmitted: () {
-          if (mounted) ref.invalidate(samplesListProvider);
-        },
+        onSubmitted: () { if (mounted) ref.invalidate(sampleDataProvider); },
       ),
     );
   }
@@ -220,13 +238,82 @@ class _SamplesScreenState extends ConsumerState<SamplesScreen> {
       MaterialPageRoute(
         builder: (_) => DeliverSampleScreen(
           sample: sample,
-          onDone: () {
-            if (mounted) ref.invalidate(samplesListProvider);
-          },
+          onDone: () { if (mounted) ref.invalidate(sampleDataProvider); },
         ),
       ),
     );
   }
+}
+
+// ── Budget Card ───────────────────────────────────────────────────────────────
+class _BudgetCard extends StatelessWidget {
+  final SampleBudget budget;
+  final NumberFormat fmt;
+  const _BudgetCard({required this.budget, required this.fmt});
+
+  @override
+  Widget build(BuildContext context) {
+    final pctUsed = budget.total > 0 ? (budget.used / budget.total).clamp(0.0, 1.0) : 0.0;
+    final barColor = pctUsed > 0.8 ? Colors.red.shade600 : pctUsed > 0.5 ? Colors.amber.shade700 : Colors.green.shade600;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFC8102E), Color(0xFF8B0000)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.25), blurRadius: 16, offset: const Offset(0, 6))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.account_balance_wallet_outlined, color: Colors.white70, size: 18),
+          const SizedBox(width: 8),
+          const Text('Sample Budget', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
+          const Spacer(),
+          Text('PKR ${fmt.format(budget.total.toInt())}',
+              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
+        ]),
+        const SizedBox(height: 16),
+        Row(children: [
+          _BudgetStat('Used', fmt.format(budget.used.toInt()), Colors.white),
+          const SizedBox(width: 24),
+          _BudgetStat('Remaining', fmt.format(budget.remaining.toInt()), Colors.greenAccent.shade100),
+        ]),
+        const SizedBox(height: 16),
+        // Progress bar
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: pctUsed,
+              backgroundColor: Colors.white24,
+              valueColor: AlwaysStoppedAnimation<Color>(barColor),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text('${(pctUsed * 100).toStringAsFixed(1)}% of budget used',
+              style: const TextStyle(color: Colors.white60, fontSize: 11)),
+        ]),
+      ]),
+    );
+  }
+}
+
+class _BudgetStat extends StatelessWidget {
+  final String label, value;
+  final Color valueColor;
+  const _BudgetStat(this.label, this.value, this.valueColor);
+
+  @override
+  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
+    const SizedBox(height: 2),
+    Text('PKR $value', style: TextStyle(color: valueColor, fontSize: 16, fontWeight: FontWeight.w800)),
+  ]);
 }
 
 // ── UI Helpers ────────────────────────────────────────────────────────────────
@@ -254,12 +341,16 @@ class _ErrorView extends StatelessWidget {
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       const Icon(Icons.error_outline, size: 48, color: Colors.grey),
       const SizedBox(height: 12),
-      Text(message, textAlign: TextAlign.center),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Text(message, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade600)),
+      ),
       const SizedBox(height: 16),
       ElevatedButton.icon(
         icon: const Icon(Icons.refresh),
         label: const Text('Retry'),
         onPressed: onRetry,
+        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
       ),
     ]),
   );
@@ -267,13 +358,15 @@ class _ErrorView extends StatelessWidget {
 
 class _SampleCard extends StatelessWidget {
   final SampleRequest sample;
+  final NumberFormat fmt;
   final VoidCallback? onTap;
-  const _SampleCard({required this.sample, this.onTap});
+  const _SampleCard({required this.sample, required this.fmt, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final statusColor = _statusColor(sample.status);
     final isApproved = sample.status == 'approved';
+    final hasCost = sample.totalCost != null && sample.totalCost! > 0;
 
     return GestureDetector(
       onTap: onTap,
@@ -288,26 +381,27 @@ class _SampleCard extends StatelessWidget {
               : Border.all(color: Colors.grey.shade100),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
         ),
-        child: Row(children: [
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Container(
             width: 44, height: 44,
-            decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
+            decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
             child: Icon(Icons.inventory_2_rounded, color: statusColor, size: 22),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(sample.productName,
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              Text(sample.productName, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
               const SizedBox(height: 3),
               Text('Qty: ${sample.quantity}  ·  ${DateFormat('dd MMM yyyy').format(sample.createdAt)}',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              if (hasCost) ...[
+                const SizedBox(height: 3),
+                Text('Cost: PKR ${fmt.format(sample.totalCost!.toInt())}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+              ],
               if (sample.adminNotes != null && sample.adminNotes!.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text('Note: ${sample.adminNotes}',
+                Text('Admin: ${sample.adminNotes}',
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade400, fontStyle: FontStyle.italic)),
               ],
             ]),
@@ -316,10 +410,7 @@ class _SampleCard extends StatelessWidget {
           Column(children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
+              decoration: BoxDecoration(color: statusColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
               child: Text(
                 sample.status[0].toUpperCase() + sample.status.substring(1),
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor),
@@ -329,10 +420,7 @@ class _SampleCard extends StatelessWidget {
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  borderRadius: BorderRadius.circular(20),
-                ),
+                decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(20)),
                 child: const Text('Deliver', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w700)),
               ),
             ],
@@ -343,10 +431,10 @@ class _SampleCard extends StatelessWidget {
   }
 
   Color _statusColor(String s) => switch (s.toLowerCase()) {
-    'approved' => Colors.green,
-    'rejected' => Colors.red,
+    'approved'  => Colors.green,
+    'rejected'  => Colors.red,
     'delivered' => AppColors.primary,
-    _ => Colors.amber.shade700,
+    _           => Colors.amber.shade700,
   };
 }
 
@@ -354,15 +442,15 @@ class _SampleCard extends StatelessWidget {
 class _NewRequestSheet extends ConsumerStatefulWidget {
   final VoidCallback onSubmitted;
   const _NewRequestSheet({required this.onSubmitted});
-
   @override
   ConsumerState<_NewRequestSheet> createState() => _NewRequestSheetState();
 }
 
 class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
   final _productCtrl = TextEditingController();
-  final _notesCtrl = TextEditingController();
-  int _qty = 1;
+  final _notesCtrl   = TextEditingController();
+  final _priceCtrl   = TextEditingController();
+  int  _qty    = 1;
   bool _saving = false;
   String? _error;
 
@@ -370,7 +458,18 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
   void dispose() {
     _productCtrl.dispose();
     _notesCtrl.dispose();
+    _priceCtrl.dispose();
     super.dispose();
+  }
+
+  double? get _parsedPrice {
+    final t = _priceCtrl.text.trim();
+    return t.isEmpty ? null : double.tryParse(t);
+  }
+
+  double get _estimatedCost {
+    final p = _parsedPrice;
+    return p != null ? p * _qty : 0;
   }
 
   Future<void> _submit() async {
@@ -385,6 +484,7 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
         'productName': _productCtrl.text.trim(),
         'quantity': _qty,
         'notes': _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
+        'price': _parsedPrice,
       });
       if (mounted) {
         widget.onSubmitted();
@@ -399,6 +499,7 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final fmt = NumberFormat('#,##0', 'en_US');
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
@@ -426,18 +527,41 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
             const Spacer(),
             IconButton(
               onPressed: () { if (_qty > 1) setState(() => _qty--); },
-              icon: const Icon(Icons.remove_circle_outline),
-              color: AppColors.primary,
+              icon: const Icon(Icons.remove_circle_outline), color: AppColors.primary,
             ),
             Text('$_qty', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             IconButton(
               onPressed: () => setState(() => _qty++),
-              icon: const Icon(Icons.add_circle_outline),
-              color: AppColors.primary,
+              icon: const Icon(Icons.add_circle_outline), color: AppColors.primary,
             ),
           ]),
           const SizedBox(height: 12),
 
+          _Field(label: 'Price per unit (PKR)', child: TextField(
+            controller: _priceCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            onChanged: (_) => setState(() {}),
+            decoration: _inputDecor('e.g. 500'),
+          )),
+
+          if (_parsedPrice != null && _estimatedCost > 0) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(children: [
+                const Icon(Icons.calculate_outlined, size: 16, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text('Estimated cost: PKR ${fmt.format(_estimatedCost.toInt())}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
+              ]),
+            ),
+          ],
+
+          const SizedBox(height: 12),
           _Field(label: 'Notes (optional)', child: TextField(
             controller: _notesCtrl,
             maxLines: 2,
@@ -451,8 +575,7 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
 
           const SizedBox(height: 24),
           SizedBox(
-            width: double.infinity,
-            height: 52,
+            width: double.infinity, height: 52,
             child: ElevatedButton(
               onPressed: _saving ? null : _submit,
               style: ElevatedButton.styleFrom(
@@ -477,16 +600,14 @@ class DeliverSampleScreen extends ConsumerStatefulWidget {
   final SampleRequest sample;
   final VoidCallback onDone;
   const DeliverSampleScreen({super.key, required this.sample, required this.onDone});
-
   @override
   ConsumerState<DeliverSampleScreen> createState() => _DeliverSampleScreenState();
 }
 
 class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
-  // Step 0: select customer / 1: details / 2: signature / 3: done
   int _step = 0;
   Map<String, dynamic>? _selectedCustomer;
-  final _notesCtrl = TextEditingController();
+  final _notesCtrl  = TextEditingController();
   final _searchCtrl = TextEditingController();
   int _qty = 1;
   final _sigController = SignatureController(
@@ -519,17 +640,13 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
     }
     setState(() { _saving = true; _error = null; });
     try {
-      // Export signature as PNG bytes
-      final sigData = await _sigController.toPngBytes();
+      final sigData   = await _sigController.toPngBytes();
       final sigBase64 = sigData != null ? base64Encode(sigData) : null;
-
-      // Generate PDF
-      final pdfBytes = await _generatePdf(sigData);
+      final pdfBytes  = await _generatePdf(sigData);
       final tmp = await getTemporaryDirectory();
       final pdfFile = File('${tmp.path}/sample_delivery_${widget.sample.id}.pdf');
       await pdfFile.writeAsBytes(pdfBytes);
 
-      // Upload delivery proof
       final dio = ref.read(dioClientProvider);
       await dio.patch('/samples/${widget.sample.id}', data: {
         'customerName': _selectedCustomer?['name'],
@@ -539,7 +656,6 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
         'quantity': _qty,
       });
 
-      // Share PDF
       await Share.shareXFiles(
         [XFile(pdfFile.path, mimeType: 'application/pdf')],
         text: 'Sample Delivery Proof – ${widget.sample.productName}',
@@ -559,37 +675,60 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
     pw.MemoryImage? sigImage;
     if (sigBytes != null) sigImage = pw.MemoryImage(sigBytes);
 
+    final fmt = NumberFormat('#,##0', 'en_US');
+    final costStr = widget.sample.price != null
+        ? 'PKR ${fmt.format((widget.sample.price! * _qty).toInt())}'
+        : 'N/A';
+
     doc.addPage(pw.Page(
       pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(40),
       build: (ctx) => pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-            pw.Text('BOOKMARK', style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
-            pw.Text('Sample Delivery Proof', style: pw.TextStyle(fontSize: 12, color: PdfColors.grey600)),
+            pw.Text('BOOKMARK', style: pw.TextStyle(fontSize: 30, fontWeight: pw.FontWeight.bold, color: PdfColors.red800)),
+            pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+              pw.Text('Sample Delivery Proof', style: pw.TextStyle(fontSize: 13, fontWeight: pw.FontWeight.bold)),
+              pw.Text('Ref #${widget.sample.id}', style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+            ]),
           ]),
           pw.Divider(color: PdfColors.red800, thickness: 2),
-          pw.SizedBox(height: 16),
-          _pdfRow('Product', widget.sample.productName),
-          _pdfRow('Quantity Delivered', '${_qty} unit(s)'),
-          _pdfRow('Customer', _selectedCustomer?['name'] ?? 'N/A'),
-          _pdfRow('Delivery Date', DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())),
-          if (_notesCtrl.text.trim().isNotEmpty) _pdfRow('Notes', _notesCtrl.text.trim()),
+          pw.SizedBox(height: 20),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(14),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              borderRadius: pw.BorderRadius.circular(6),
+            ),
+            child: pw.Column(children: [
+              _pdfRow('Product', widget.sample.productName),
+              _pdfRow('Quantity Delivered', '$_qty unit(s)'),
+              _pdfRow('Price per Unit', widget.sample.price != null ? 'PKR ${fmt.format(widget.sample.price!.toInt())}' : 'N/A'),
+              _pdfRow('Total Cost', costStr),
+              _pdfRow('Customer', _selectedCustomer?['name'] ?? 'N/A'),
+              _pdfRow('Delivery Date', DateFormat('dd MMM yyyy, hh:mm a').format(DateTime.now())),
+              if (_notesCtrl.text.trim().isNotEmpty) _pdfRow('Notes', _notesCtrl.text.trim()),
+            ]),
+          ),
           pw.SizedBox(height: 32),
           pw.Text('Customer Signature', style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
           pw.SizedBox(height: 8),
-          if (sigImage != null)
-            pw.Container(
-              width: 200, height: 100,
-              decoration: pw.BoxDecoration(border: pw.Border.all(color: PdfColors.grey300)),
-              child: pw.Image(sigImage, fit: pw.BoxFit.contain),
-            )
-          else
-            pw.Container(width: 200, height: 60, color: PdfColors.grey100,
-              child: pw.Center(child: pw.Text('No signature captured'))),
-          pw.SizedBox(height: 32),
-          pw.Text('This document is auto-generated by Bookmark SFA.',
-              style: pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
+          pw.Container(
+            width: 220, height: 110,
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.grey400),
+              borderRadius: pw.BorderRadius.circular(6),
+            ),
+            child: sigImage != null
+                ? pw.Image(sigImage, fit: pw.BoxFit.contain)
+                : pw.Center(child: pw.Text('No signature captured', style: const pw.TextStyle(color: PdfColors.grey400))),
+          ),
+          pw.SizedBox(height: 24),
+          pw.Divider(color: PdfColors.grey300),
+          pw.SizedBox(height: 6),
+          pw.Text('This document is auto-generated by Bookmark SFA Field Force Manager.',
+              style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey500)),
         ],
       ),
     ));
@@ -627,23 +766,18 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
     );
   }
 
-  // ── Step 0: Select Customer ────────────────────────────────────────────────
   Widget _buildCustomerStep() {
     final asyncCustomers = ref.watch(customersSearchProvider(_searchCtrl.text.trim()));
-
     return Column(children: [
-      // Progress
       _StepProgress(step: 0),
       Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(children: [
-          TextField(
-            controller: _searchCtrl,
-            decoration: _inputDecor('Search customers by name…').copyWith(
-              prefixIcon: const Icon(Icons.search_rounded),
-            ),
+        child: TextField(
+          controller: _searchCtrl,
+          decoration: _inputDecor('Search customers by name…').copyWith(
+            prefixIcon: const Icon(Icons.search_rounded),
           ),
-        ]),
+        ),
       ),
       Expanded(
         child: asyncCustomers.when(
@@ -651,9 +785,7 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
           error: (e, _) => Center(child: Text(e.toString())),
           data: (customers) {
             if (customers.isEmpty && _searchCtrl.text.isEmpty) {
-              return Center(
-                child: Text('Type to search customers', style: TextStyle(color: Colors.grey.shade500)),
-              );
+              return Center(child: Text('Type to search customers', style: TextStyle(color: Colors.grey.shade500)));
             }
             if (customers.isEmpty) {
               return Center(child: Text('No customers found', style: TextStyle(color: Colors.grey.shade500)));
@@ -677,14 +809,9 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
                     child: Row(children: [
                       Container(
                         width: 36, height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: Text((c['name'] ?? 'C')[0].toUpperCase(),
-                              style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary)),
-                        ),
+                        decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                        child: Center(child: Text((c['name'] ?? 'C')[0].toUpperCase(),
+                            style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.primary))),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -725,14 +852,12 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
     ]);
   }
 
-  // ── Step 1: Notes + Quantity ───────────────────────────────────────────────
   Widget _buildDetailsStep() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _StepProgress(step: 1),
         const SizedBox(height: 20),
-
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -753,14 +878,9 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
             const Divider(height: 24),
             const Text('Notes', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
             const SizedBox(height: 8),
-            TextField(
-              controller: _notesCtrl,
-              maxLines: 3,
-              decoration: _inputDecor('Any delivery notes or remarks…'),
-            ),
+            TextField(controller: _notesCtrl, maxLines: 3, decoration: _inputDecor('Any delivery notes or remarks…')),
           ]),
         ),
-
         const SizedBox(height: 24),
         SizedBox(
           width: double.infinity, height: 52,
@@ -777,7 +897,6 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
     );
   }
 
-  // ── Step 2: Signature ──────────────────────────────────────────────────────
   Widget _buildSignatureStep() {
     return Column(children: [
       _StepProgress(step: 2),
@@ -798,10 +917,7 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
           child: Stack(children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(AppRadius.lg),
-              child: Signature(
-                controller: _sigController,
-                backgroundColor: Colors.white,
-              ),
+              child: Signature(controller: _sigController, backgroundColor: Colors.white),
             ),
             Positioned(
               top: 12, right: 12,
@@ -809,19 +925,14 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
                 onTap: () => _sigController.clear(),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
+                  decoration: BoxDecoration(color: Colors.black.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
                   child: const Text('Clear', style: TextStyle(fontSize: 12, color: Colors.black54)),
                 ),
               ),
             ),
             Positioned(
               bottom: 12, left: 0, right: 0,
-              child: Center(
-                child: Text('Sign here', style: TextStyle(fontSize: 12, color: Colors.grey.shade300)),
-              ),
+              child: Center(child: Text('Sign here', style: TextStyle(fontSize: 12, color: Colors.grey.shade300))),
             ),
           ]),
         ),
@@ -852,7 +963,6 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
     ]);
   }
 
-  // ── Step 3: Done ───────────────────────────────────────────────────────────
   Widget _buildDoneStep() {
     return Center(
       child: Padding(
@@ -886,7 +996,7 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
   }
 }
 
-// ── Step Progress Indicator ───────────────────────────────────────────────────
+// ── Step Progress ─────────────────────────────────────────────────────────────
 class _StepProgress extends StatelessWidget {
   final int step;
   const _StepProgress({required this.step});
@@ -900,7 +1010,7 @@ class _StepProgress extends StatelessWidget {
         if (i % 2 == 1) {
           return Expanded(child: Container(height: 2, color: i ~/ 2 < step ? AppColors.primary : Colors.grey.shade200));
         }
-        final idx = i ~/ 2;
+        final idx  = i ~/ 2;
         final done = idx < step;
         final active = idx == step;
         return Column(mainAxisSize: MainAxisSize.min, children: [
@@ -926,7 +1036,7 @@ class _StepProgress extends StatelessWidget {
   }
 }
 
-// ── Shared Helpers ─────────────────────────────────────────────────────────────
+// ── Shared Helpers ────────────────────────────────────────────────────────────
 class _Field extends StatelessWidget {
   final String label;
   final Widget child;
