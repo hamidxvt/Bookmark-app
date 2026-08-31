@@ -110,28 +110,28 @@ final customersSearchProvider = FutureProvider.family.autoDispose<List<Map<Strin
   (ref, query) async {
     final dio = ref.watch(dioClientProvider);
     try {
-      // If query is empty, fetch all customers
-      final params = query.isEmpty ? {'length': 50} : {'search': query, 'length': 50};
+      // Send search query if not empty, otherwise fetch all
+      final params = {'search': query, 'length': 50};
       final res = await dio.get('/customers', params: params);
       final raw = res.data;
       
-      List<dynamic> list = [];
-      if (raw is Map) {
-        final data = raw['data'];
-        if (data is Map && data['data'] is List) {
-          list = (data['data'] as List);
-        } else if (data is List) {
-          list = data;
-        } else if (raw['success'] == false) {
-          throw Exception(raw['error'] ?? 'Failed to load customers');
-        }
-      } else if (raw is List) {
-        list = raw;
+      // Handle response shape: { success: true, data: [...] }
+      if (raw is Map && raw['success'] == true && raw['data'] is List) {
+        return (raw['data'] as List).cast<Map<String, dynamic>>();
       }
       
-      return list.cast<Map<String, dynamic>>();
+      // Fallback for flat array or nested data
+      if (raw is Map && raw['data'] is Map && raw['data']['data'] is List) {
+        return (raw['data']['data'] as List).cast<Map<String, dynamic>>();
+      }
+      
+      if (raw is List) {
+        return raw.cast<Map<String, dynamic>>();
+      }
+      
+      throw Exception('Invalid response format');
     } catch (e) {
-      // Return empty list on error so UI shows "No customers found"
+      print('[customersSearchProvider] Error: $e');
       return [];
     }
   },
