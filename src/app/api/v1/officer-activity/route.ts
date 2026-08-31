@@ -23,10 +23,14 @@ export async function GET(req: Request) {
         designation: true,
         city: { select: { name: true } },
         lastSeenAt: true,
-        lastSpeedKmh: true,
         gpsStatus: true,
         lastLatitude: true,
         lastLongitude: true,
+        gps_pings: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { speed_kmh: true, createdAt: true },
+        },
         visits: {
           where: { visitDate: todayStart },
           select: {
@@ -58,7 +62,8 @@ export async function GET(req: Request) {
     for (const officer of officers) {
       const lastSeen = officer.lastSeenAt ? new Date(officer.lastSeenAt) : null;
       const minSincePing = lastSeen ? (now.getTime() - lastSeen.getTime()) / 60000 : 999;
-      const speed = (officer.lastSpeedKmh ?? 0) < 3 ? 0 : Number(officer.lastSpeedKmh ?? 0);
+      const lastPing = officer.gps_pings?.[0];
+      const speed = lastPing ? (Number(lastPing.speed_kmh ?? 0) < 3 ? 0 : Number(lastPing.speed_kmh ?? 0)) : 0;
 
       // ── Check GPS status ────────────────────────────────────────────
       if (minSincePing > 15) {
