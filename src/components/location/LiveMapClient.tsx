@@ -778,13 +778,22 @@ export default function LiveMapClient() {
               const sl       = statusLabel(selected.gpsStatus);
 
               return (
-                <div className="fixed bottom-6 right-6 w-[300px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-50" style={{ maxHeight: "calc(100vh - 120px)" }}>
+                <>
+                  {/* Transparent backdrop to close panel when clicking outside */}
+                  <div 
+                    className="fixed inset-0 z-40"
+                    onClick={() => { setSelected(null); setTrailPoints([]); }}
+                    style={{ pointerEvents: selected ? "auto" : "none" }}
+                  />
+                  <div className="fixed bottom-6 right-6 w-[300px] bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col z-50" style={{ maxHeight: "calc(100vh - 120px)" }}>
 
                   {/* Header — pinned, never scrolls away */}
                   <div className="relative shrink-0 p-4 bg-gradient-to-br from-[#C8102E] to-[#7B0000]">
                     <button
-                      onClick={() => { setSelected(null); setTrailPoints([]); }}
-                      className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition-all text-xl font-light z-10"
+                      onClick={(e) => { e.stopPropagation(); setSelected(null); setTrailPoints([]); }}
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/20 transition-all text-xl font-light z-50 cursor-pointer"
+                      type="button"
                     >×</button>
                     <div className="flex items-center gap-3">
                       {selected.profilePhoto ? (
@@ -933,10 +942,9 @@ export default function LiveMapClient() {
                     )}
                   </div>
                 </div>
+                </>
               );
             })()}
-          </>
-        )}
       </div>
 
       {/* Live Activity Feed */}
