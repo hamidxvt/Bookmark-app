@@ -67,7 +67,7 @@ export async function GET(
     const visitSummary = todayVisits.map((v, idx) => ({
       id: v.id,
       sequence: idx + 1,  // Calculate sequence from position in sorted list
-      status: v.status.toLowerCase(),
+      status: v.status === "CANCELLED" ? "missed" : v.status.toLowerCase(),
       customerName: v.customer?.name ?? "Unknown",
       address: v.customer?.address ?? "",
       phone: v.customer?.ownerPhone ?? "",
@@ -95,7 +95,7 @@ export async function GET(
       completed: todayVisits.filter(v => v.status === "COMPLETED").length,
       inProgress: todayVisits.filter(v => v.status === "IN_PROGRESS").length,
       pending: todayVisits.filter(v => v.status === "PENDING").length,
-      missed: todayVisits.filter(v => v.status === "MISSED").length,
+      missed: todayVisits.filter(v => v.status === "CANCELLED").length,
       targetVisits: booker.visitTargets ?? 0,
     };
 
