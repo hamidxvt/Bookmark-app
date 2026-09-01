@@ -109,6 +109,98 @@ export async function GET(req: Request) {
   }
 }
 
+/**
+ * POST /api/v1/app-version
+ * 
+ * Create a new app release
+ * Body:
+ *   - versionCode: number
+ *   - versionName: string (e.g., "1.0.0")
+ *   - downloadUrl: string
+ *   - releaseNotes: string
+ *   - isMandatory: boolean (default: false)
+ */
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { versionCode, versionName, downloadUrl, releaseNotes, isMandatory = false } = body;
+
+    if (!versionCode || !versionName || !downloadUrl) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'MISSING_FIELDS',
+            message: 'versionCode, versionName, and downloadUrl are required',
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    // Check if version already exists
+    const existing = await prisma.appRelease.findUnique({
+      where: { versionCode },
+    });
+
+    if (existing) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: {
+            code: 'VERSION_EXISTS',
+            message: `Version code ${versionCode} already exists`,
+          },
+        },
+        { status: 409 }
+      );
+    }
+
+    // Create new release
+    const release = await prisma.appRelease.create({
+      data: {
+        versionCode,
+        versionName,
+        downloadUrl,
+        releaseNotes: releaseNotes || '',
+        isMandatory,
+        releaseDate: new Date(),
+      },
+    });
+
+    // Clear cache
+    memoryCache.clear();
+
+    return NextResponse.json(
+      {
+        success: true,
+        data: {
+          id: release.id,
+          versionCode: release.versionCode,
+          versionName: release.versionName,
+          releaseDate: release.releaseDate,
+          downloadUrl: release.downloadUrl,
+          releaseNotes: release.releaseNotes,
+          isMandatory: release.isMandatory,
+        },
+      },
+      { status: 201 }
+    );
+  } catch (error: any) {
+    console.error('[POST api/v1/app-version]', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'CREATE_VERSION_ERROR',
+          message: error.message || 'Failed to create app release',
+        },
+      },
+      { status: 500 }
+    );
+  }
+}
+
 // Cleanup old cache entries every minute
 setInterval(() => {
   const now = Date.now();
