@@ -56,18 +56,23 @@ export async function POST(req: Request) {
   if (!user) return unauthorized();
 
   try {
-    const { productName, quantity, notes, customerId, customerName, price } = await req.json();
+    const { productName, quantity, notes, customerId, customerName, price, items } = await req.json();
 
     if (!productName) {
       return NextResponse.json({ success: false, error: "Product name is required" }, { status: 400 });
     }
+
+    // Store items breakdown in notes if provided
+    const itemsSuffix = items && Array.isArray(items) && items.length > 1
+      ? `\n[ITEMS:${JSON.stringify(items)}]`
+      : "";
 
     const request = await prisma.sampleRequest.create({
       data: {
         bookerId: user.id,
         productName: String(productName),
         quantity: Number(quantity ?? 1),
-        notes: notes ?? null,
+        notes: notes ? `${notes}${itemsSuffix}` : (itemsSuffix || null),
         customerId: customerId ? Number(customerId) : null,
         customerName: customerName ?? null,
         price: price ? Number(price) : null,
