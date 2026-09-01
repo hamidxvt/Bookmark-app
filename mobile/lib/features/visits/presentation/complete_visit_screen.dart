@@ -187,7 +187,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
           ],
         ),
         data: (detail) {
-          _prefillFromVisit(detail);
+          WidgetsBinding.instance.addPostFrameCallback((_) => _prefillFromVisit(detail));
           return _buildForm(detail);
         },
       ),
@@ -213,7 +213,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
             color: Colors.transparent,
             child: InkWell(
               onTap: customer['id'] != null
-                  ? () => context.push('/customers/\${customer["id"]}')
+                  ? () => context.push('/customers/${customer["id"]}')
                   : null,
               borderRadius: BorderRadius.circular(AppRadius.lg),
               splashColor: Colors.white24,
@@ -296,10 +296,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
                 if (hasGps) ...[
                   const SizedBox(height: 8),
                   GestureDetector(
-                    onTap: () => launchUrl(
-                      Uri.parse('google.navigation:q=$lat,$lng&mode=d'),
-                      mode: LaunchMode.externalApplication,
-                    ),
+                    onTap: () => context.push('/map'),
                     child: Row(
                       children: [
                         Icon(Icons.directions_rounded, color: Colors.white.withOpacity(0.7), size: 14),
@@ -485,7 +482,7 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
               side: const BorderSide(color: AppColors.error),
               minimumSize: const Size.fromHeight(48),
             ),
-            onPressed: () => context.push('/visits/\${widget.visitId}/missed'),
+            onPressed: () => context.push('/visits/${widget.visitId}/missed'),
           ).animate(delay: 300.ms).slideY(begin: 0.2).fadeIn(),
 
           const SizedBox(height: AppSpacing.lg),
