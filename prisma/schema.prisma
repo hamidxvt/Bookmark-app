@@ -564,3 +564,22 @@ model SampleRequest {
   @@index([status])
   @@map("sample_requests")
 }
+
+// ─── APP RELEASES ────────────────────────────────────────────────────────────
+model AppRelease {
+  id              Int       @id @default(autoincrement())
+  versionCode     Int       @unique @map("version_code")
+  versionName     String    @map("version_name") // e.g., "1.1.0"
+  releaseDate     DateTime  @default(now()) @map("release_date")
+  downloadUrl     String    @map("download_url")
+  releaseNotes    String    @db.Text @map("release_notes")
+  minVersionCode  Int?      @map("min_version_code") // Minimum version required (for force updates)
+  isMandatory     Boolean   @default(false) @map("is_mandatory")
+  changelogText   String?   @db.Text @map("changelog_text")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@index([versionCode])
+  @@index([releaseDate])
+  @@map("app_releases")
+}
