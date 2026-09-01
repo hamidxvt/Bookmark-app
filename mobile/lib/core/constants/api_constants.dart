@@ -47,4 +47,8 @@ class ApiConstants {
 
   // ── FCM / Push Notifications ─────────────────────────────────────────────
   static const String registerFcm = '/fcm';
+
+  // ── App Updates ───────────────────────────────────────────────────────────
+  // Note: This endpoint is on the v1 API, not the mobile API
+  static const String appVersion = 'https://bookmark-production-00c6.up.railway.app/api/v1/app-version';
 }
