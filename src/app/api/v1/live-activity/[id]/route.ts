@@ -44,7 +44,7 @@ export async function GET(
               latitude: true, longitude: true, ownerPhone: true,
             },
           },
-          missedReasons: { select: { reason: true }, take: 1 },
+          missedReason: { select: { reason: true } },
         },
       }),
 
@@ -75,7 +75,7 @@ export async function GET(
       lng: v.customer?.longitude ? Number(v.customer.longitude) : null,
       checkInAt: v.checkInAt,
       checkOutAt: v.checkOutAt,
-      missedReason: v.missedReasons?.[0]?.reason ?? null,
+      missedReason: v.missedReason?.reason ?? null,
       visitDate: v.visitDate,
     }));
 
