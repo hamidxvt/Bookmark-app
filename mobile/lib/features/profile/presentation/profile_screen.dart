@@ -171,7 +171,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           onPressed: () => context.pop(),
         ),
         title: const Text('My Profile',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout_rounded, size: 20),

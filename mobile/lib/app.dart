@@ -6,6 +6,8 @@ import 'core/services/fcm_service.dart' show navigatorKey;
 
 import 'core/constants/app_constants.dart';
 import 'features/app-update/update_notification_widget.dart';
+import 'features/app-update/app_update_notifier.dart';
+import 'features/app-update/startup_splash_screen.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_notifier.dart';
 import 'features/auth/presentation/login_screen.dart';
@@ -86,13 +88,33 @@ class _AuthNotifierListenable extends ChangeNotifier {
   }
 }
 
-class BookmarkSFAApp extends ConsumerWidget {
+class BookmarkSFAApp extends ConsumerStatefulWidget {
   const BookmarkSFAApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<BookmarkSFAApp> createState() => _BookmarkSFAAppState();
+}
+
+class _BookmarkSFAAppState extends ConsumerState<BookmarkSFAApp> {
+  bool _splashComplete = false;
+
+  @override
+  Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final router = ref.watch(_routerProvider);
+
+    // Show splash screen while checking for updates
+    if (!_splashComplete) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        home: StartupSplashScreen(
+          onComplete: () {
+            setState(() => _splashComplete = true);
+          },
+        ),
+      );
+    }
 
     if (authState.isRestoring) {
       return MaterialApp(
@@ -123,9 +145,6 @@ class BookmarkSFAApp extends ConsumerWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         routerConfig: router,
-        // navigatorKey lets FcmService show snackbars from outside widget tree
-        // MaterialApp.router exposes this through routerDelegate indirectly;
-        // we attach it on GoRouter directly below instead.
       ),
     );
   }
