@@ -565,15 +565,21 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
     try {
       final dio = ref.read(dioClientProvider);
       final notes = _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim();
-      // Submit one request per selected product
-      for (final p in _selected) {
-        await dio.post('/samples', data: {
-          'productName': p.name,
-          'quantity': p.qty,
-          'notes': notes,
-          'price': p.price > 0 ? p.price : null,
-        });
-      }
+
+      // Build a combined product name and itemsJson for one request
+      final productNames = _selected.map((p) => '${p.name} (×${p.qty})').join(', ');
+      final itemsJson = _selected.map((p) => {'name': p.name, 'qty': p.qty, 'price': p.price}).toList();
+
+      await dio.post('/samples', data: {
+        'productName': productNames,
+        'quantity': _selected.fold<int>(0, (sum, p) => sum + p.qty),
+        'notes': notes,
+        'items': itemsJson,
+        'price': _selected.isNotEmpty && _selected.first.price > 0
+            ? _selected.fold<double>(0, (sum, p) => sum + p.price * p.qty) /
+              _selected.fold<int>(0, (sum, p) => sum + p.qty)
+            : null,
+      });
       if (mounted) {
         widget.onSubmitted();
         Navigator.pop(context);
