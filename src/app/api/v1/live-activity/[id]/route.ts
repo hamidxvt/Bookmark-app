@@ -36,7 +36,7 @@ export async function GET(
       // All of today's visits
       prisma.visit.findMany({
         where: { bookerId, visitDate: { gte: todayStart } },
-        orderBy: { dailySequence: "asc" },
+        orderBy: { id: "asc" },
         include: {
           customer: {
             select: {
@@ -64,9 +64,9 @@ export async function GET(
     if (!booker) return NextResponse.json({ success: false, error: "Officer not found" }, { status: 404 });
 
     // Summarise today's visits
-    const visitSummary = todayVisits.map(v => ({
+    const visitSummary = todayVisits.map((v, idx) => ({
       id: v.id,
-      sequence: v.dailySequence,
+      sequence: idx + 1,  // Calculate sequence from position in sorted list
       status: v.status.toLowerCase(),
       customerName: v.customer?.name ?? "Unknown",
       address: v.customer?.address ?? "",
