@@ -27,11 +27,8 @@ class StartupSplashScreen extends ConsumerStatefulWidget {
   ConsumerState<StartupSplashScreen> createState() => _StartupSplashScreenState();
 }
 
-class _StartupSplashScreenState extends ConsumerState<StartupSplashScreen>
-    with SingleTickerProviderStateMixin {
+class _StartupSplashScreenState extends ConsumerState<StartupSplashScreen> {
   late String _currentQuote;
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
   String _statusMessage = 'Checking for updates...';
   double _progress = 0.0;
 
@@ -41,17 +38,6 @@ class _StartupSplashScreenState extends ConsumerState<StartupSplashScreen>
     _currentQuote = _motivationalQuotes[
         DateTime.now().microsecond % _motivationalQuotes.length
     ];
-
-    _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
-    );
-
-    _fadeController.forward();
     _checkUpdateAndInitialize();
   }
 
@@ -104,7 +90,6 @@ class _StartupSplashScreenState extends ConsumerState<StartupSplashScreen>
 
   @override
   void dispose() {
-    _fadeController.dispose();
     super.dispose();
   }
 
@@ -112,126 +97,132 @@ class _StartupSplashScreenState extends ConsumerState<StartupSplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.primary,
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: AppColors.primaryGradient,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: AppColors.primaryGradient,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Top - Logo/Title
-              Padding(
-                padding: EdgeInsets.only(top: 80),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.bookmark_rounded,
-                      size: 64,
-                      color: Colors.white,
-                    ),
-                    SizedBox(height: AppSpacing.md),
-                    Text(
-                      'Bookmark SFA',
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Field Force Management',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withOpacity(0.8),
-                          ),
-                    ),
-                  ],
+        ),
+        child: SingleChildScrollView(
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // Top - Logo/Title
+                Padding(
+                  padding: EdgeInsets.only(top: 80),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.bookmark_rounded,
+                        size: 64,
+                        color: Colors.white,
+                      ),
+                      SizedBox(height: AppSpacing.md),
+                      Text(
+                        'Bookmark SFA',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Field Force Management',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Colors.white.withOpacity(0.8),
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
 
-              // Middle - Quote
-              Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: AppSpacing.lg,
-                  vertical: AppSpacing.xl,
+                // Middle - Quote
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: AppSpacing.lg,
+                    vertical: AppSpacing.xl,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.format_quote_rounded,
+                        size: 32,
+                        color: Colors.white.withOpacity(0.6),
+                      ),
+                      SizedBox(height: AppSpacing.md),
+                      Text(
+                        _currentQuote,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontStyle: FontStyle.italic,
+                              height: 1.6,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.format_quote_rounded,
-                      size: 32,
-                      color: Colors.white.withOpacity(0.6),
-                    ),
-                    SizedBox(height: AppSpacing.md),
-                    Text(
-                      _currentQuote,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.white,
-                            fontStyle: FontStyle.italic,
-                            height: 1.6,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
 
-              // Bottom - Progress
-              Padding(
-                padding: EdgeInsets.only(
-                  left: AppSpacing.lg,
-                  right: AppSpacing.lg,
-                  bottom: 60,
-                ),
-                child: Column(
-                  children: [
-                    // Progress bar
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: _progress > 0 ? _progress : null,
-                        minHeight: 6,
-                        backgroundColor: Colors.white.withOpacity(0.2),
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white.withOpacity(0.9),
+                // Bottom - Progress
+                Padding(
+                  padding: EdgeInsets.only(
+                    left: AppSpacing.lg,
+                    right: AppSpacing.lg,
+                    bottom: 60,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      // Progress bar
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: _progress > 0 ? _progress : null,
+                          minHeight: 6,
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white.withOpacity(0.9),
+                          ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: AppSpacing.md),
+                      SizedBox(height: AppSpacing.md),
 
-                    // Status text
-                    Text(
-                      _statusMessage,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white.withOpacity(0.85),
-                            fontWeight: FontWeight.w500,
+                      // Status text
+                      Text(
+                        _statusMessage,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.white.withOpacity(0.85),
+                              fontWeight: FontWeight.w500,
+                            ),
+                      ),
+
+                      // Spinner
+                      SizedBox(height: AppSpacing.md),
+                      SizedBox(
+                        height: 24,
+                        width: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white.withOpacity(0.9),
                           ),
-                    ),
-
-                    // Spinner
-                    SizedBox(height: AppSpacing.md),
-                    SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Colors.white.withOpacity(0.9),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
