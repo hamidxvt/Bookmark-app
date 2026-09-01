@@ -9,6 +9,7 @@ import 'dart:io';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/dio_client.dart';
 import '../../auth/presentation/auth_notifier.dart';
+import '../../app-update/app_update_notifier.dart';
 
 // ── Model ─────────────────────────────────────────────────────────────────────
 class ProfileData {
@@ -317,6 +318,53 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   _InfoRow(icon: Icons.payments_rounded,       label: 'Net Salary',    value: 'Rs ${_fmt(p.netSalary)}',  highlight: true),
                   _InfoRow(icon: Icons.star_rounded,           label: 'Reward Points', value: '${p.rewardPoints} pts'),
                 ]),
+                const SizedBox(height: 24),
+
+                // App Update Option
+                Consumer(
+                  builder: (ctx, ref, _) {
+                    final updateState = ref.watch(appUpdateProvider);
+                    return GestureDetector(
+                      onTap: () {
+                        if (updateState.availableVersion != null && !updateState.isDownloading) {
+                          ref.read(appUpdateProvider.notifier).downloadAndInstall();
+                        } else if (updateState.availableVersion == null) {
+                          ref.read(appUpdateProvider.notifier).checkForUpdates();
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                        ),
+                        child: Row(children: [
+                          const Icon(Icons.system_update_rounded, color: Colors.blue, size: 20),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Text('App Update', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                              Text(
+                                updateState.availableVersion != null
+                                    ? 'Version ${updateState.availableVersion!.versionName} available'
+                                    : 'You are up to date',
+                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                              ),
+                            ]),
+                          ),
+                          if (updateState.availableVersion != null && !updateState.isDownloading)
+                            const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey)
+                          else if (updateState.isDownloading)
+                            SizedBox(
+                              width: 16, height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, value: updateState.downloadProgress / 100.0),
+                            ),
+                        ]),
+                      ),
+                    );
+                  },
+                ),
                 const SizedBox(height: 28),
               ]),
             ),

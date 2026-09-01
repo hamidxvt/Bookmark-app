@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'core/services/fcm_service.dart' show navigatorKey;
 
 import 'core/constants/app_constants.dart';
+import 'features/app-update/update_notification_widget.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_notifier.dart';
 import 'features/auth/presentation/login_screen.dart';
@@ -113,14 +114,19 @@ class BookmarkSFAApp extends ConsumerWidget {
       );
     }
 
-    return MaterialApp.router(
-      title: AppConstants.appName,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      routerConfig: router,
-      // navigatorKey lets FcmService show snackbars from outside widget tree
-      // MaterialApp.router exposes this through routerDelegate indirectly;
-      // we attach it on GoRouter directly below instead.
+    // Trigger update check on app startup
+    ref.listen(checkUpdatesOnStartupProvider, (_, __) {});
+
+    return UpdateNotificationListener(
+      child: MaterialApp.router(
+        title: AppConstants.appName,
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light,
+        routerConfig: router,
+        // navigatorKey lets FcmService show snackbars from outside widget tree
+        // MaterialApp.router exposes this through routerDelegate indirectly;
+        // we attach it on GoRouter directly below instead.
+      ),
     );
   }
 }
