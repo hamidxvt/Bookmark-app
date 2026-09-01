@@ -49,6 +49,7 @@ export async function PATCH(
       visitTargets, ratesPerVisit,
       basicSalary, securityDepositPct, sampleBudget,
       newPassword,  // admin setting a new password for officer
+      profilePhoto,
     } = body;
 
     const data: Record<string, unknown> = {};
@@ -64,6 +65,7 @@ export async function PATCH(
     if (basicSalary !== undefined)       data.basicSalary = basicSalary ? Number(basicSalary) : null;
     if (securityDepositPct !== undefined) data.securityDepositPct = securityDepositPct ? Number(securityDepositPct) : null;
     if (sampleBudget !== undefined)      data.sampleBudget = sampleBudget ? Number(sampleBudget) : 300000;
+    if (profilePhoto !== undefined)      data.profilePhoto = profilePhoto ?? null;
 
     // Password reset by admin
     if (newPassword && typeof newPassword === "string" && newPassword.length >= 6) {

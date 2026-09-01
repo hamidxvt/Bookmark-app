@@ -21,7 +21,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   try {
-    const { signatureBase64, customerName, customerId, notes } = await req.json();
+    const { signatureBase64, customerName, customerId, notes, pdfBase64, quantity } = await req.json();
 
     const updated = await prisma.sampleRequest.update({
       where: { id },
@@ -29,9 +29,11 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         status: "delivered",
         deliveredAt: new Date(),
         signatureBase64: signatureBase64 ?? null,
+        pdfUrl: pdfBase64 ?? null,
         customerName: customerName ?? sample.customerName,
         customerId: customerId ? Number(customerId) : sample.customerId,
         notes: notes ?? sample.notes,
+        quantity: quantity ? Number(quantity) : sample.quantity,
       },
     });
 

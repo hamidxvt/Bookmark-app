@@ -43,6 +43,7 @@ export async function GET(req: Request) {
         deliveredAt: r.deliveredAt,
         createdAt: r.createdAt,
         customer: r.customer,
+        pdfUrl: r.pdfUrl ?? null,
       })),
     },
   });

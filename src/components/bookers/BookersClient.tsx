@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-  Search, Eye, MapPin, RefreshCw, CheckCircle, Clock, XCircle,
-  Plus, Trash2, X, Navigation, KeyRound, Pencil, Filter, ChevronDown,
+  Search, Eye, EyeOff, MapPin, RefreshCw, CheckCircle, Clock, XCircle,
+  Plus, Trash2, X, Navigation, KeyRound, Pencil, Filter, ChevronDown, Camera,
 } from "lucide-react";
 
 interface Booker {
@@ -13,6 +13,7 @@ interface Booker {
   lastSeenAt: string | null; lastLatitude: number | null; lastLongitude: number | null;
   visitTargets: number | null; ratesPerVisit: number | null;
   basicSalary?: number | null; sampleBudget?: number | null;
+  profilePhoto?: string | null;
   createdAt: string; city: { id: number; name: string } | null;
   region: { id: number; name: string } | null;
 }
@@ -53,8 +54,24 @@ function OfficerModal({
     jobStatus: booker?.jobStatus ?? "NOT_ACTIVE",
     cityId: booker?.city?.id ?? "",
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoBase64, setPhotoBase64] = useState<string | null>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const result = ev.target?.result as string;
+      setPhotoPreview(result);
+      setPhotoBase64(result);
+    };
+    reader.readAsDataURL(file);
+  }
 
   useEffect(() => {
     fetch("/api/v1/cities").then(r => r.json()).then(d => {
@@ -82,6 +99,7 @@ function OfficerModal({
         cityId: form.cityId ? parseInt(String(form.cityId)) : null,
       };
       if (!isEdit && form.password) body.password = form.password;
+      if (photoBase64) body.profilePhoto = photoBase64;
       const res = await fetch(url, {
         method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
       }).then(r => r.json());
@@ -99,6 +117,27 @@ function OfficerModal({
         </div>
         <form onSubmit={submit} className="p-6 space-y-4">
           {error && <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">{error}</p>}
+
+          {/* Photo Upload */}
+          <div className="flex items-center gap-4">
+            <div
+              className="relative h-16 w-16 rounded-full border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#C8102E] transition-colors bg-slate-50"
+              onClick={() => photoInputRef.current?.click()}
+            >
+              {photoPreview
+                ? <img src={photoPreview} alt="preview" className="h-full w-full object-cover" />
+                : <Camera className="h-5 w-5 text-slate-300" />}
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-700">Officer Photo</p>
+              <p className="text-xs text-slate-400 mt-0.5">Click to upload (JPG, PNG)</p>
+              <button type="button" onClick={() => photoInputRef.current?.click()}
+                className="mt-1 text-xs text-[#C8102E] font-medium hover:underline">
+                {photoPreview ? "Change Photo" : "Upload Photo"}
+              </button>
+            </div>
+            <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             {[
@@ -120,9 +159,22 @@ function OfficerModal({
             {!isEdit && (
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-slate-600 mb-1">Password</label>
-                <input type="password" value={form.password} required={!isEdit}
-                  onChange={e => set("password", e.target.value)} placeholder="Min 6 characters"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]" />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={form.password} required={!isEdit}
+                    onChange={e => set("password", e.target.value)}
+                    placeholder="Min 6 characters"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -438,9 +490,11 @@ export default function BookersClient() {
               <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
                 <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#0f1e3c] to-[#1a5276] text-xs font-bold text-white">
-                      {r.name?.[0]?.toUpperCase() ?? "B"}
+                    <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 shrink-0 rounded-full overflow-hidden border border-slate-200">
+                      {r.profilePhoto
+                        ? <img src={r.profilePhoto} alt={r.name} className="h-full w-full object-cover" />
+                        : <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#0f1e3c] to-[#1a5276] text-xs font-bold text-white">{r.name?.[0]?.toUpperCase() ?? "B"}</div>}
                     </div>
                     <div>
                       <p className="text-xs font-medium text-slate-800">{r.name}</p>

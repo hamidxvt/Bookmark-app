@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Navigation, UserCheck, ClipboardList, Users,
   Package, ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen, X,
-  Clock, AlertTriangle, Banknote, Download, Zap, MapPin, MessageSquare, Database,
+  Clock, AlertTriangle, Banknote, Download, Zap, MapPin, MessageSquare, Database, Activity,
 } from "lucide-react";
 import { useState } from "react";
 import { signOut } from "next-auth/react";
@@ -16,8 +16,9 @@ const NAV = [
   {
     section: "GENERAL",
     items: [
-      { icon: LayoutDashboard, label: "Home",          href: "/dashboard" },
-      { icon: Navigation,      label: "Live Location", href: "/location"  },
+      { icon: LayoutDashboard, label: "Home",          href: "/dashboard"     },
+      { icon: Activity,        label: "Live Activity", href: "/live-activity" },
+      { icon: Navigation,      label: "Live Location", href: "/location"      },
     ],
   },
   {

@@ -36,6 +36,7 @@ export async function GET(req: Request) {
           ratesPerVisit: true,
           basicSalary: true,
           sampleBudget: true,
+          profilePhoto: true,
           createdAt: true,
           city: { select: { id: true, name: true } },
           region: { select: { id: true, name: true } },

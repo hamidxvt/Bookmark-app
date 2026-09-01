@@ -9,7 +9,7 @@ export async function POST(req: Request) {
       name, email, password, phone,
       designation, basicSalary, ratesPerVisit,
       visitTargets, sampleBudget, adminApproved,
-      jobStatus, cityId,
+      jobStatus, cityId, profilePhoto,
     } = body;
 
     if (!name || !email || !password || !phone) {
@@ -48,6 +48,7 @@ export async function POST(req: Request) {
     if (basicSalary) createData.basicSalary = parseFloat(String(basicSalary));
     if (ratesPerVisit) createData.ratesPerVisit = parseFloat(String(ratesPerVisit));
     if (sampleBudget) createData.sampleBudget = parseFloat(String(sampleBudget));
+    if (profilePhoto) createData.profilePhoto = String(profilePhoto);
 
     const booker = await prisma.booker.create({
       data: createData,
