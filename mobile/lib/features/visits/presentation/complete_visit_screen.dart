@@ -9,11 +9,36 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/mock_location_guard.dart';
 import '../data/visit_repository.dart';
 
-// Provider to load single visit details
+// Provider to load single visit details — falls back to cached list data
 final visitDetailProvider = FutureProvider.family<Map<String, dynamic>?, int>(
   (ref, visitId) async {
     final repo = ref.read(visitRepositoryProvider);
-    return repo.getVisitDetail(visitId);
+    final detail = await repo.getVisitDetail(visitId);
+    if (detail != null) return detail;
+
+    // Fallback: build a minimal map from the already-loaded visit list
+    final cached = ref.read(visitListProvider).valueOrNull;
+    final match = cached?.where((v) => v.id == visitId).firstOrNull;
+    if (match == null) return null;
+    return {
+      'id': match.id,
+      'customerId': match.customerId,
+      'customerName': match.locationName,
+      'address': '',
+      'contact': match.contactPerson ?? '',
+      'phone': match.contactPhone ?? '',
+      'notes': match.notes ?? '',
+      'visitType': match.visitType ?? 'regular',
+      'latitude': match.customerLat,
+      'longitude': match.customerLng,
+      'customer': {
+        'id': match.customerId,
+        'name': match.locationName,
+        'ownerName': match.contactPerson ?? '',
+        'ownerPhone': match.contactPhone ?? '',
+        'address': '',
+      },
+    };
   },
 );
 
@@ -34,6 +59,23 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
   bool _isSubmitting = false;
   bool _prefilled = false;
   DateTime? _followUpDate;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start visit in background — records check-in time + GPS
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startVisit());
+  }
+
+  Future<void> _startVisit() async {
+    try {
+      await ref.read(visitRepositoryProvider).startVisit(widget.visitId);
+      // Refresh list so the status badge updates
+      ref.read(visitListProvider.notifier).refresh();
+    } catch (_) {
+      // Ignore — visit may already be in_progress or completed
+    }
+  }
 
   @override
   void dispose() {
@@ -117,7 +159,33 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
       ),
       body: detailAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => _buildForm(null),
+        error: (err, _) => Column(
+          children: [
+            // Non-blocking offline banner — form + buttons still fully usable
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: AppColors.warning.withOpacity(0.12),
+              child: Row(
+                children: [
+                  const Icon(Icons.wifi_off_rounded, color: AppColors.warning, size: 16),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Offline mode — customer info unavailable',
+                      style: TextStyle(fontSize: 12, color: AppColors.warning),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => ref.invalidate(visitDetailProvider(widget.visitId)),
+                    child: const Text('Retry',
+                        style: TextStyle(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.w700)),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: _buildForm(null)),
+          ],
+        ),
         data: (detail) {
           _prefillFromVisit(detail);
           return _buildForm(detail);
@@ -228,7 +296,10 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
                 if (hasGps) ...[
                   const SizedBox(height: 8),
                   GestureDetector(
-                    onTap: () => launchUrl(Uri.parse('https://maps.google.com/?q=$lat,$lng')),
+                    onTap: () => launchUrl(
+                      Uri.parse('google.navigation:q=$lat,$lng&mode=d'),
+                      mode: LaunchMode.externalApplication,
+                    ),
                     child: Row(
                       children: [
                         Icon(Icons.directions_rounded, color: Colors.white.withOpacity(0.7), size: 14),

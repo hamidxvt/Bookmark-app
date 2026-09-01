@@ -6,7 +6,6 @@ import 'core/services/fcm_service.dart' show navigatorKey;
 
 import 'core/constants/app_constants.dart';
 import 'features/app-update/update_notification_widget.dart';
-import 'features/app-update/app_update_notifier.dart';
 import 'features/app-update/startup_splash_screen.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/auth_notifier.dart';
@@ -103,14 +102,14 @@ class _BookmarkSFAAppState extends ConsumerState<BookmarkSFAApp> {
     final authState = ref.watch(authProvider);
     final router = ref.watch(_routerProvider);
 
-    // Show splash screen while checking for updates
+    // Show splash screen (quotes + update check) before main app
     if (!_splashComplete) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         home: StartupSplashScreen(
           onComplete: () {
-            setState(() => _splashComplete = true);
+            if (mounted) setState(() => _splashComplete = true);
           },
         ),
       );
@@ -135,9 +134,6 @@ class _BookmarkSFAAppState extends ConsumerState<BookmarkSFAApp> {
         ),
       );
     }
-
-    // Trigger update check on app startup
-    ref.listen(checkUpdatesOnStartupProvider, (_, __) {});
 
     return UpdateNotificationListener(
       child: MaterialApp.router(

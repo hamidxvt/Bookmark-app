@@ -21,9 +21,9 @@ Future<void> initBackgroundService() async {
     await service.configure(
       androidConfiguration: AndroidConfiguration(
         onStart: _backgroundMain,
-        // autoStart=true: service restarts after app is swiped away, after phone reboots,
-        // and after the system kills it for memory. This is the key for persistent tracking.
-        autoStart: true,
+        // autoStart=false: prevents ForegroundServiceStartNotAllowedException on Android 14+.
+        // GPS tracking is started explicitly when the officer begins their day.
+        autoStart: false,
         isForegroundMode: true,
         notificationChannelId: _kChannelId,
         initialNotificationTitle: 'Bookmark SFA – Tracking Active',

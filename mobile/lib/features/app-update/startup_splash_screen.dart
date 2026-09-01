@@ -29,7 +29,7 @@ class StartupSplashScreen extends ConsumerStatefulWidget {
 
 class _StartupSplashScreenState extends ConsumerState<StartupSplashScreen> {
   late String _currentQuote;
-  String _statusMessage = 'Checking for updates...';
+  String _statusMessage = 'Initializing...';
   double _progress = 0.0;
 
   @override
@@ -42,49 +42,54 @@ class _StartupSplashScreenState extends ConsumerState<StartupSplashScreen> {
   }
 
   Future<void> _checkUpdateAndInitialize() async {
+    // Always finish within this deadline — never block app startup
+    const maxWait = Duration(seconds: 6);
+    final deadline = Future.delayed(maxWait);
+
+    final work = _doUpdateCheck();
+
+    // Race: whichever finishes first wins
+    await Future.any([work, deadline]);
+
+    if (mounted) {
+      setState(() { _statusMessage = 'Ready!'; _progress = 1.0; });
+      await Future.delayed(const Duration(milliseconds: 400));
+      if (mounted) widget.onComplete();
+    }
+  }
+
+  Future<void> _doUpdateCheck() async {
     try {
-      // Check for updates
-      setState(() => _statusMessage = 'Checking for updates...');
-      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+      setState(() { _statusMessage = 'Checking for updates...'; _progress = 0.2; });
 
       final notifier = ref.read(appUpdateProvider.notifier);
-      await notifier.checkForUpdates();
 
-      final state = ref.read(appUpdateProvider);
-      if (state.availableVersion != null && state.availableVersion!.isMandatory) {
-        // Mandatory update available - show update dialog
-        setState(() => _statusMessage = 'Update required. Downloading...');
-        await Future.delayed(const Duration(milliseconds: 500));
+      // Timeout the network check at 4s so slow devices don't hang
+      await notifier.checkForUpdates().timeout(
+        const Duration(seconds: 4),
+        onTimeout: () {},
+      );
+
+      if (!mounted) return;
+      final updateState = ref.read(appUpdateProvider);
+
+      if (updateState.availableVersion != null && updateState.availableVersion!.isMandatory) {
+        setState(() { _statusMessage = 'Mandatory update found — downloading...'; _progress = 0.5; });
+        // Fire-and-forget: don't block splash on download
         notifier.downloadAndInstall();
-        // Wait for download to complete
-        await Future.delayed(const Duration(seconds: 5));
-      } else if (state.availableVersion != null) {
-        // Optional update available
-        setState(() {
-          _statusMessage = 'Optional update available';
-          _progress = 0.5;
-        });
-        await Future.delayed(const Duration(milliseconds: 1000));
-      }
-
-      // Complete initialization
-      setState(() {
-        _statusMessage = 'Ready!';
-        _progress = 1.0;
-      });
-
-      await Future.delayed(const Duration(milliseconds: 600));
-      if (mounted) {
-        widget.onComplete();
+        await Future.delayed(const Duration(seconds: 2));
+      } else if (updateState.availableVersion != null) {
+        setState(() { _statusMessage = 'Update available!'; _progress = 0.7; });
+        await Future.delayed(const Duration(milliseconds: 800));
+      } else {
+        setState(() { _statusMessage = 'All good, loading app...'; _progress = 0.9; });
+        await Future.delayed(const Duration(milliseconds: 500));
       }
     } catch (e) {
-      debugPrint('[Startup Splash] Error: $e');
-      // Continue anyway
-      setState(() => _statusMessage = 'Ready!');
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (mounted) {
-        widget.onComplete();
-      }
+      // Any crash: log and continue — never block startup
+      debugPrint('[Splash] Update check error (non-fatal): $e');
+      if (mounted) setState(() => _statusMessage = 'Starting app...');
     }
   }
 
