@@ -28,6 +28,16 @@ subprojects {
     project.evaluationDependsOn(':app')
 }
 
+// Gradle 8 incompatibility workaround for flutter_background_service and other plugins
+// whose lint model tasks fail because their output directory doesn't exist yet
+subprojects {
+    project.tasks.configureEach { task ->
+        if (task.name.contains('LintModel') || task.name.contains('generateLint')) {
+            task.enabled = false
+        }
+    }
+}
+
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
