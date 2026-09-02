@@ -61,12 +61,23 @@ export async function GET(req: Request) {
 
     for (const officer of officers) {
       const lastSeen = officer.lastSeenAt ? new Date(officer.lastSeenAt) : null;
-      const minSincePing = lastSeen ? (now.getTime() - lastSeen.getTime()) / 60000 : 999;
+      const minSincePing = lastSeen ? (now.getTime() - lastSeen.getTime()) / 60000 : Infinity;
       const lastPing = officer.gps_pings?.[0];
       const speed = lastPing ? (Number(lastPing.speed_kmh ?? 0) < 3 ? 0 : Number(lastPing.speed_kmh ?? 0)) : 0;
 
       // ── Check GPS status ────────────────────────────────────────────
       if (minSincePing > 15) {
+        // Format time since last ping: convert to hours if > 60 mins
+        let pingTimeStr: string;
+        if (!lastSeen) {
+          pingTimeStr = "never";
+        } else if (minSincePing >= 60) {
+          const hrs = Math.floor(minSincePing / 60);
+          pingTimeStr = `${hrs} hour${hrs > 1 ? 's' : ''}`;
+        } else {
+          pingTimeStr = `${Math.round(minSincePing)} minute${Math.round(minSincePing) !== 1 ? 's' : ''}`;
+        }
+
         activities.push({
           id: `gps_${officer.id}`,
           type: "idle",
@@ -74,7 +85,7 @@ export async function GET(req: Request) {
           designation: officer.designation,
           city: officer.city?.name,
           title: "GPS Inactive",
-          description: `No GPS ping for ${Math.round(minSincePing)} minutes`,
+          description: `No GPS ping for ${pingTimeStr}`,
           timestamp: lastSeen || now,
           severity: minSincePing > 30 ? "critical" : "warning",
           lat: officer.lastLatitude ? Number(officer.lastLatitude) : undefined,
