@@ -74,16 +74,6 @@ android {
             shrinkResources false
         }
     }
-
-    // Produce per-ABI APKs so each device gets the smallest correct binary
-    splits {
-        abi {
-            enable true
-            reset()
-            include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
-            universalApk true   // also emit a fat universal APK
-        }
-    }
 }
 
 flutter {
