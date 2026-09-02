@@ -144,13 +144,14 @@ export async function GET(
           gpsStatus: booker.gpsStatus,
           isOffline,
           isIdle,
-          lastSeenAt: booker.lastSeenAt,
-          currentLat: booker.lastLatitude ? Number(booker.lastLatitude) : null,
-          currentLng: booker.lastLongitude ? Number(booker.lastLongitude) : null,
-          activityLabel,
-          currentSpeed: Math.round(currentSpeed),
-          heading: lastPing?.heading ?? null,
-        },
+        lastSeenAt: booker.lastSeenAt,
+        currentLat: booker.lastLatitude ? Number(booker.lastLatitude) : null,
+        currentLng: booker.lastLongitude ? Number(booker.lastLongitude) : null,
+        activityLabel,
+        currentSpeed: Math.round(currentSpeed),
+        heading: lastPing?.heading ?? null,
+        lastSeenAgo: booker.lastSeenAt ? formatTimeAgo(new Date(booker.lastSeenAt), now) : "Never",
+      },
         stats: {
           ...stats,
           distanceKm: Math.round(distanceKm * 10) / 10,
@@ -175,4 +176,13 @@ function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): nu
     Math.sin(dLat / 2) ** 2 +
     Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatTimeAgo(date: Date, now: Date): string {
+  const secs = Math.floor((now.getTime() - date.getTime()) / 1000);
+  if (secs < 60) return `${secs}s ago`;
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  return `${hrs}h ago`;
 }
