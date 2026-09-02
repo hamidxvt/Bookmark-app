@@ -191,7 +191,7 @@ function OfficerDetailDrawer({ officerId, onClose }: { officerId: number; onClos
                   target="_blank" rel="noopener noreferrer"
                   className="mt-1 flex items-center gap-1 text-xs text-[#C8102E] hover:underline"
                 >
-                  <Navigation className="h-3 w-3" /> Open full map
+                  <MapPin className="h-3 w-3" /> Open full map
                 </a>
               </div>
             )}
