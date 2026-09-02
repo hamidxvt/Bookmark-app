@@ -5,6 +5,7 @@ export async function GET() {
   try {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
     const [
       totalBookers,
@@ -16,10 +17,12 @@ export async function GET() {
       pendingLeaves,
       pendingMissedVisits,
     ] = await Promise.all([
-      prisma.booker.count({ where: { adminApproved: "APPROVED" } }),
+      // Match the same criteria as live-activity: approved + not deleted
+      prisma.booker.count({ where: { adminApproved: "APPROVED", deletedAt: null } }),
       prisma.customer.count({ where: { deletedAt: null } }),
       prisma.visit.count(),
-      prisma.visit.count({ where: { visitDate: today } }),
+      // Use a proper date range so all visits within today are counted
+      prisma.visit.count({ where: { visitDate: { gte: today, lt: tomorrow } } }),
       prisma.product.count(),
       prisma.request.count({ where: { status: "PENDING" } }),
       prisma.leaveRequest.count({ where: { status: "pending" } }),

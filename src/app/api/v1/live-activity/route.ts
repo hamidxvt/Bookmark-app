@@ -16,9 +16,11 @@ export async function GET() {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    // Get all non-deleted bookers with their city and latest GPS data
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+
+    // Get all approved, non-deleted bookers
     const bookers = await prisma.booker.findMany({
-      where: { deletedAt: null },
+      where: { deletedAt: null, adminApproved: "APPROVED" },
       select: {
         id: true,
         name: true,
@@ -41,7 +43,7 @@ export async function GET() {
       prisma.visit.findMany({
         where: {
           bookerId: { in: bookerIds },
-          visitDate: { gte: todayStart },
+          visitDate: { gte: todayStart, lt: todayEnd },
         },
         select: {
           id: true,
@@ -175,7 +177,8 @@ export async function GET() {
 
     const summary = {
       total: activities.length,
-      active: activities.filter(a => !a.isOffline).length,
+      // "active" = online AND not idle — consistent with the frontend "Active" filter
+      active: activities.filter(a => !a.isOffline && !a.isIdle).length,
       idle: activities.filter(a => a.isIdle && !a.isOffline).length,
       offline: activities.filter(a => a.isOffline).length,
       alerts: activities.filter(a => a.idleAlert).length,

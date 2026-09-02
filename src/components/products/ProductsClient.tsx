@@ -19,8 +19,10 @@ export default function ProductsClient() {
     try {
       const res = await fetch("/api/v1/products?type=products&length=200").then(r => r.json());
       if (res.success) {
-        setRows(res.data?.data ?? []);
-        setTotal(res.data?.recordsTotal ?? 0);
+        // API returns data as a flat array, not nested under data.data
+        const rows = Array.isArray(res.data) ? res.data : [];
+        setRows(rows);
+        setTotal(rows.length);
       }
     } catch (e) { console.error(e); }
     finally { setLoading(false); }

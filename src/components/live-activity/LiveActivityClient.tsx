@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Activity, AlertTriangle, Car, CheckCircle, Clock, MapPin,
   RefreshCw, User, Wifi, WifiOff, Zap, X, Phone, Mail,
-  TrendingUp, Navigation, Circle, ChevronRight,
+  Circle, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -281,25 +281,27 @@ function OfficerDetailDrawer({ officerId, onClose }: { officerId: number; onClos
 
 // ── Officer Card (summary) ─────────────────────────────────────────────────────
 function OfficerCard({ officer, onSelect }: { officer: OfficerActivity; onSelect: () => void }) {
-  const mapUrl = officer.latitude && officer.longitude
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${officer.longitude - 0.005},${officer.latitude - 0.005},${officer.longitude + 0.005},${officer.latitude + 0.005}&layer=mapnik&marker=${officer.latitude},${officer.longitude}`
-    : null;
+  const progressPct = officer.stats.totalToday > 0
+    ? Math.round((officer.stats.completedToday / officer.stats.totalToday) * 100)
+    : 0;
 
   return (
     <div
       className={cn(
         "rounded-2xl border bg-white p-4 shadow-xs transition-all cursor-pointer hover:shadow-md",
-        officer.idleAlert ? "border-amber-300 shadow-amber-100 shadow-md" : "border-slate-200",
+        officer.idleAlert ? "border-amber-300 shadow-amber-100 shadow-md" :
+        !officer.isOffline && !officer.isIdle ? "border-emerald-200" : "border-slate-200",
       )}
       onClick={onSelect}
     >
       {officer.idleAlert && (
         <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 mb-3 text-xs text-amber-700 font-medium">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-          Stationary 5+ min — tap for details
+          Stationary 5+ min — tap for full details
         </div>
       )}
 
+      {/* Header row */}
       <div className="flex items-start gap-3">
         <div className="relative shrink-0">
           {officer.profilePhoto
@@ -325,6 +327,7 @@ function OfficerCard({ officer, onSelect }: { officer: OfficerActivity; onSelect
         </div>
       </div>
 
+      {/* Active visit banner */}
       {officer.activeVisit && (
         <div className="mt-3 rounded-lg bg-emerald-50 border border-emerald-100 px-3 py-2 flex items-start gap-2">
           <MapPin className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
@@ -332,19 +335,46 @@ function OfficerCard({ officer, onSelect }: { officer: OfficerActivity; onSelect
             <p className="text-xs font-semibold text-emerald-700 truncate">{officer.activeVisit.customerName}</p>
             {officer.activeVisit.address && <p className="text-[10px] text-emerald-500 truncate">{officer.activeVisit.address}</p>}
             {officer.activeVisit.checkInAt && (
-              <p className="text-[10px] text-emerald-400">Check-in: {new Date(officer.activeVisit.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</p>
+              <p className="text-[10px] text-emerald-400">
+                Check-in: {new Date(officer.activeVisit.checkInAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </p>
             )}
+          </div>
+          <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-600 font-semibold shrink-0">
+            <Circle className="h-2 w-2 fill-emerald-500 text-emerald-500 animate-pulse" /> LIVE
+          </span>
+        </div>
+      )}
+
+      {/* Speed / movement */}
+      {!officer.isOffline && officer.speed_kmh > 3 && (
+        <div className="mt-2 flex items-center gap-2 text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-1.5">
+          <Car className="h-3.5 w-3.5 shrink-0" />
+          <span className="font-semibold">{Math.round(officer.speed_kmh)} km/h</span>
+          {officer.heading != null && (
+            <span className="text-blue-400">· {headingLabel(officer.heading)}</span>
+          )}
+          <span className="text-blue-300 ml-auto">En route</span>
+        </div>
+      )}
+
+      {/* Visit progress bar */}
+      {officer.stats.totalToday > 0 && (
+        <div className="mt-3">
+          <div className="flex justify-between items-center mb-1">
+            <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wide">Visit Progress</p>
+            <p className="text-[10px] font-semibold text-slate-600">{officer.stats.completedToday}/{officer.stats.totalToday} · {progressPct}%</p>
+          </div>
+          <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+            <div
+              className={cn("h-full rounded-full transition-all", progressPct === 100 ? "bg-emerald-500" : "bg-[#C8102E]")}
+              style={{ width: `${progressPct}%` }}
+            />
           </div>
         </div>
       )}
 
-      {!officer.isOffline && officer.speed_kmh > 3 && (
-        <div className="mt-2 flex items-center gap-1.5 text-xs text-blue-600">
-          <Car className="h-3.5 w-3.5" />{Math.round(officer.speed_kmh)} km/h
-          {officer.heading != null && <span className="text-blue-400">· {Math.round(officer.heading)}°</span>}
-        </div>
-      )}
-
+      {/* Stats row */}
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         {[
           { label: "Done",  value: officer.stats.completedToday, color: "text-emerald-600" },
@@ -358,15 +388,18 @@ function OfficerCard({ officer, onSelect }: { officer: OfficerActivity; onSelect
         ))}
       </div>
 
-      {mapUrl && (
-        <div className="mt-3 overflow-hidden rounded-xl border border-slate-100 h-24">
-          <iframe src={mapUrl} className="w-full h-full pointer-events-none" title={`${officer.name} location`} />
-        </div>
-      )}
-
-      <p className="text-[10px] text-slate-300 text-right mt-2">{officer.lastSeenText} · tap for full details</p>
+      {/* Last seen footer */}
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[10px] text-slate-300">{officer.lastSeenText}</span>
+        <span className="text-[10px] text-[#C8102E] font-medium">Tap for full details →</span>
+      </div>
     </div>
   );
+}
+
+function headingLabel(deg: number): string {
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return dirs[Math.round(deg / 45) % 8];
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
