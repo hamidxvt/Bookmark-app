@@ -4,6 +4,7 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, MapPin, Users, ClipboardList, Navigation } from "lucide-react";
+import Image from "next/image";
 
 export default function LoginPage() {
   const [email, setEmail]       = useState("");
@@ -62,12 +63,15 @@ export default function LoginPage() {
         <div className="relative flex flex-col h-full px-14 py-12">
           {/* Logo */}
           <div className="flex items-center gap-4">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/bookmark-logo.png"
-              alt="Bookmark"
-              className="h-14 w-14 rounded-xl object-contain bg-white p-1.5 shadow-md"
-            />
+            <div className="relative h-14 w-14 shrink-0">
+              <Image
+                src="/bookmark-logo.png"
+                alt="Bookmark"
+                fill
+                priority
+                className="rounded-xl object-contain bg-white p-1.5 shadow-md"
+              />
+            </div>
             <div>
               <p className="text-xl font-black text-white leading-none tracking-[0.2em]">BOOKMARK</p>
               <p className="text-xs text-red-200/70 mt-1 font-medium tracking-widest uppercase">Field Force Manager</p>
@@ -119,8 +123,15 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/bookmark-logo.png" alt="Bookmark" className="h-10 w-10 rounded-xl object-contain bg-white p-1 border border-slate-100 shadow-sm" />
+            <div className="relative h-10 w-10 shrink-0">
+              <Image
+                src="/bookmark-logo.png"
+                alt="Bookmark"
+                fill
+                priority
+                className="rounded-xl object-contain bg-white p-1 border border-slate-100 shadow-sm"
+              />
+            </div>
             <div>
               <p className="text-base font-black text-slate-900 tracking-widest">BOOKMARK</p>
               <p className="text-xs text-slate-400 tracking-wider uppercase">Field Force Manager</p>
@@ -176,6 +187,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPass(!showPass)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                  title="Toggle password visibility"
                 >
                   {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
