@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 const CACHE_KEY = 'products_cache';
@@ -27,70 +29,84 @@ export async function GET(req: NextRequest) {
     if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
       return NextResponse.json({
         success: true,
-        data: {
-          data: cached.data,
-          recordsTotal: cached.data.length,
-          cached: true,
-          cacheAge: Math.round((Date.now() - cached.timestamp) / 1000)
-        }
+        data: cached.data,
+        cached: true,
+        cacheAge: Math.round((Date.now() - cached.timestamp) / 1000)
       });
     }
 
-    // Fetch from database
-    const whereClause: any = {};
-    if (search) {
-      whereClause.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { isbn: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
-      ];
+    // Handle different types: brands, subjects, series, products
+    let data: any[] = [];
+
+    if (type === 'brands') {
+      data = await prisma.brand.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' }
+      });
+    } else if (type === 'subjects') {
+      data = await prisma.subject.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' }
+      });
+    } else if (type === 'series') {
+      data = await prisma.series.findMany({
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' }
+      });
+    } else {
+      // Fetch products
+      const whereClause: any = {};
+      if (search) {
+        whereClause.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { isbn: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      const products = await prisma.product.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          name: true,
+          isbn: true,
+          grade: true,
+          segment: true,
+          description: true,
+          retailPrice: true,
+          isFeatured: true,
+          image: true,
+          brand: { select: { id: true, name: true } },
+          series: { select: { id: true, name: true } },
+          subject: { select: { id: true, name: true } }
+        },
+        take: length,
+        orderBy: { createdAt: 'desc' }
+      });
+
+      // Format as array for legacy compatibility
+      data = products.map((p) => [
+        p.id,
+        p.name,
+        p.brand?.name || '',
+        p.isbn || '',
+        p.grade || '',
+        p.retailPrice,
+        p.isFeatured ? '✓' : '',
+        p.image || ''
+      ]);
     }
-
-    const products = await prisma.product.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        name: true,
-        isbn: true,
-        grade: true,
-        segment: true,
-        description: true,
-        retailPrice: true,
-        isFeatured: true,
-        image: true,
-        brand: { select: { id: true, name: true } },
-        series: { select: { id: true, name: true } },
-        subject: { select: { id: true, name: true } }
-      },
-      take: length,
-      orderBy: { createdAt: 'desc' }
-    });
-
-    // Format as array for legacy compatibility
-    const formatted = products.map((p, idx) => [
-      p.id,
-      p.name,
-      p.brand?.name || '',
-      p.isbn || '',
-      p.grade || '',
-      p.retailPrice,
-      p.isFeatured ? '✓' : '',
-      p.image || ''
-    ]);
 
     // Cache the result
     memoryCache.set(cacheKey, {
       timestamp: Date.now(),
-      data: formatted
+      data
     });
 
     return NextResponse.json({
       success: true,
-      data: {
-        data: formatted,
-        recordsTotal: formatted.length,
-        cached: false
-      }
+      data,
+      cached: false
     });
 
   } catch (error: any) {
@@ -105,12 +121,80 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// Clear cache periodically
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of memoryCache.entries()) {
-    if (now - value.timestamp > CACHE_TTL) {
-      memoryCache.delete(key);
-    }
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    return NextResponse.json(
+      { success: false, error: 'Unauthorized' },
+      { status: 401 }
+    );
   }
-}, 60000); // Check every minute
+
+  try {
+    const body = await req.json();
+    const {
+      brandId,
+      subjectId,
+      seriesId,
+      name,
+      isbn,
+      segment,
+      grade,
+      description,
+      retailPrice,
+      image,
+    } = body;
+
+    if (!brandId || !name || retailPrice === undefined) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required fields: brandId, name, retailPrice' },
+        { status: 400 }
+      );
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        brandId,
+        subjectId: subjectId || null,
+        seriesId: seriesId || null,
+        name,
+        isbn: isbn || null,
+        segment: segment || null,
+        grade: grade || null,
+        description: description || null,
+        retailPrice: parseFloat(retailPrice),
+        image: image || null,
+      },
+      select: {
+        id: true,
+        name: true,
+        isbn: true,
+        retailPrice: true,
+        brand: { select: { id: true, name: true } },
+      },
+    });
+
+    // Clear product cache
+    memoryCache.delete('products:*');
+    for (const key of memoryCache.keys()) {
+      if (key.startsWith('products:')) memoryCache.delete(key);
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: product,
+    });
+  } catch (error: any) {
+    console.error('[Product Create Error]', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: 'PRODUCT_CREATE_ERROR',
+          message: error.message || 'Failed to create product',
+        },
+      },
+      { status: 500 }
+    );
+  }
+}
