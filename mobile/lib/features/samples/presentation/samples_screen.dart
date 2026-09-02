@@ -172,30 +172,51 @@ class _SamplesScreenState extends ConsumerState<SamplesScreen> {
     final async = ref.watch(sampleDataProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Sample Management'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.pop(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Header ─────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Samples',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
+                  ),
+                  GestureDetector(
+                    onTap: () => ref.invalidate(sampleDataProvider),
+                    child: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.outline),
+                      ),
+                      child: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.primary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: async.when(
+                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                error: (e, _) => _ErrorView(message: e.toString(), onRetry: () => ref.invalidate(sampleDataProvider)),
+                data: (data) => _buildBody(data),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => ref.invalidate(sampleDataProvider),
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showNewRequestSheet(context),
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Request Sample'),
+        label: const Text('Request Sample', style: TextStyle(fontWeight: FontWeight.w800)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-      ),
-      body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(message: e.toString(), onRetry: () => ref.invalidate(sampleDataProvider)),
-        data: (data) => _buildBody(data),
+        elevation: 4,
       ),
     );
   }
@@ -212,6 +233,22 @@ class _SamplesScreenState extends ConsumerState<SamplesScreen> {
         // ── Budget Dashboard ────────────────────────────────────────────────
         _BudgetCard(budget: data.budget, fmt: _fmt)
             .animate().fadeIn().slideY(begin: -0.04),
+        const SizedBox(height: 14),
+
+        // ── Status Stats Grid ────────────────────────────────────────────────
+        Row(children: [
+          _StatPill(icon: Icons.check_rounded, label: 'Approved',
+              value: approved.length, color: AppColors.primary),
+          const SizedBox(width: 8),
+          _StatPill(icon: Icons.hourglass_top_rounded, label: 'Pending',
+              value: pending.length, color: AppColors.warning),
+          const SizedBox(width: 8),
+          _StatPill(icon: Icons.local_shipping_outlined, label: 'Delivered',
+              value: delivered.length, color: AppColors.success),
+          const SizedBox(width: 8),
+          _StatPill(icon: Icons.close_rounded, label: 'Rejected',
+              value: rejected.length, color: AppColors.textMuted),
+        ]).animate().fadeIn(delay: 100.ms),
         const SizedBox(height: 20),
 
         if (data.samples.isEmpty)
@@ -294,49 +331,75 @@ class _BudgetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pctUsed = budget.total > 0 ? (budget.used / budget.total).clamp(0.0, 1.0) : 0.0;
-    final barColor = pctUsed > 0.8 ? Colors.red.shade600 : pctUsed > 0.5 ? Colors.amber.shade700 : Colors.green.shade600;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFC8102E), Color(0xFF8B0000)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.25), blurRadius: 16, offset: const Offset(0, 6))],
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        border: Border.all(color: AppColors.outline),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 3))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Title row
         Row(children: [
-          const Icon(Icons.account_balance_wallet_outlined, color: Colors.white70, size: 18),
-          const SizedBox(width: 8),
-          const Text('Sample Budget', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
-          const Spacer(),
-          Text('PKR ${fmt.format(budget.total.toInt())}',
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
-        ]),
-        const SizedBox(height: 16),
-        Row(children: [
-          _BudgetStat('Used', fmt.format(budget.used.toInt()), Colors.white),
-          const SizedBox(width: 24),
-          _BudgetStat('Remaining', fmt.format(budget.remaining.toInt()), Colors.greenAccent.shade100),
-        ]),
-        const SizedBox(height: 16),
-        // Progress bar
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: pctUsed,
-              backgroundColor: Colors.white24,
-              valueColor: AlwaysStoppedAnimation<Color>(barColor),
-              minHeight: 8,
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.primary, size: 18),
           ),
-          const SizedBox(height: 6),
-          Text('${(pctUsed * 100).toStringAsFixed(1)}% of budget used',
-              style: const TextStyle(color: Colors.white60, fontSize: 11)),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Sample Budget',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
+              Text('Financial year 2026',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+            ]),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(AppRadius.full),
+            ),
+            child: Text('${(pctUsed * 100).toStringAsFixed(1)}% Used',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
+          ),
+        ]),
+
+        const SizedBox(height: 16),
+
+        // Remaining amount
+        Text('PKR ${fmt.format(budget.remaining.toInt())}',
+            style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.onSurface, letterSpacing: -0.5)),
+        Text('Remaining of PKR ${fmt.format(budget.total.toInt())} total',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+
+        const SizedBox(height: 14),
+
+        // Progress bar
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          child: LinearProgressIndicator(
+            value: pctUsed,
+            backgroundColor: AppColors.outline,
+            valueColor: AlwaysStoppedAnimation<Color>(
+                pctUsed > 0.8 ? AppColors.missed : AppColors.primary),
+            minHeight: 10,
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // Used / Available
+        Row(children: [
+          Expanded(child: _BudgetStat('Used', fmt.format(budget.used.toInt()), false)),
+          const SizedBox(width: 10),
+          Expanded(child: _BudgetStat('Available', fmt.format(budget.remaining.toInt()), true)),
         ]),
       ]),
     );
@@ -345,15 +408,57 @@ class _BudgetCard extends StatelessWidget {
 
 class _BudgetStat extends StatelessWidget {
   final String label, value;
-  final Color valueColor;
-  const _BudgetStat(this.label, this.value, this.valueColor);
+  final bool highlight;
+  const _BudgetStat(this.label, this.value, this.highlight);
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
-    const SizedBox(height: 2),
-    Text('PKR $value', style: TextStyle(color: valueColor, fontSize: 16, fontWeight: FontWeight.w800)),
-  ]);
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    decoration: BoxDecoration(
+      color: highlight ? AppColors.successLight : AppColors.background,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.5,
+              color: highlight ? AppColors.success : AppColors.textMuted)),
+      const SizedBox(height: 3),
+      Text('PKR $value',
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
+    ]),
+  );
+}
+
+class _StatPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int value;
+  final Color color;
+  const _StatPill({required this.icon, required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.outline),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6)],
+      ),
+      child: Column(children: [
+        Container(
+          width: 32, height: 32,
+          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(11)),
+          child: Icon(icon, size: 15, color: color),
+        ),
+        const SizedBox(height: 6),
+        Text('$value', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.onSurface, letterSpacing: -0.3)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+      ]),
+    ),
+  );
 }
 
 // ── UI Helpers ────────────────────────────────────────────────────────────────
@@ -425,11 +530,11 @@ class _SampleCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           border: isApproved
-              ? Border.all(color: Colors.green.shade300, width: 1.5)
-              : Border.all(color: Colors.grey.shade100),
+              ? Border.all(color: AppColors.success.withOpacity(0.4), width: 1.5)
+              : Border.all(color: AppColors.outline),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [

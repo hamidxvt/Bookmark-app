@@ -11,56 +11,152 @@ import '../../../core/constants/api_constants.dart';
 import '../data/visit_models.dart';
 import '../data/visit_repository.dart';
 
-class VisitListScreen extends ConsumerWidget {
+class VisitListScreen extends ConsumerStatefulWidget {
   const VisitListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<VisitListScreen> createState() => _VisitListScreenState();
+}
+
+class _VisitListScreenState extends ConsumerState<VisitListScreen> {
+  String _filter = 'All';
+  final _filters = ['All', 'Pending', 'Completed', 'Missed'];
+
+  List<Visit> _applyFilter(List<Visit> visits) {
+    return switch (_filter) {
+      'Pending'   => visits.where((v) => v.isPlanned).toList(),
+      'Completed' => visits.where((v) => v.isCompleted).toList(),
+      'Missed'    => visits.where((v) => v.status == 'MISSED' || v.status == 'missed').toList(),
+      _           => visits,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context, ) {
     final visitsAsync = ref.watch(visitListProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Today\'s Visits'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.pop(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Sticky header ────────────────────────────────────────
+            Container(
+              color: AppColors.background,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Visits',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
+                  ),
+                  GestureDetector(
+                    onTap: () => ref.read(visitListProvider.notifier).refresh(),
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.outline),
+                      ),
+                      child: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.primary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: visitsAsync.when(
+                loading: () => const _VisitShimmer(),
+                error: (err, _) => _ErrorView(
+                  message: err.toString(),
+                  onRetry: () => ref.read(visitListProvider.notifier).refresh(),
+                ),
+                data: (allVisits) {
+                  final done = allVisits.where((v) => v.isCompleted).length;
+                  final total = allVisits.length;
+                  final filtered = _applyFilter(allVisits);
+                  return RefreshIndicator(
+                    onRefresh: () => ref.read(visitListProvider.notifier).refresh(),
+                    color: AppColors.primary,
+                    child: CustomScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                            child: Column(
+                              children: [
+                                // ── Route Hero Card ──────────────────
+                                _RouteHeroCard(total: total, done: done),
+                                const SizedBox(height: 14),
+                                // ── Filter chips ─────────────────────
+                                SizedBox(
+                                  height: 38,
+                                  child: ListView(
+                                    scrollDirection: Axis.horizontal,
+                                    children: _filters.map((f) {
+                                      final active = _filter == f;
+                                      return GestureDetector(
+                                        onTap: () => setState(() => _filter = f),
+                                        child: AnimatedContainer(
+                                          duration: 200.ms,
+                                          margin: const EdgeInsets.only(right: 8),
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: active ? AppColors.primary : AppColors.card,
+                                            borderRadius: BorderRadius.circular(AppRadius.full),
+                                            border: Border.all(color: active ? AppColors.primary : AppColors.outline),
+                                            boxShadow: active
+                                                ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 3))]
+                                                : null,
+                                          ),
+                                          child: Text(f,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: active ? Colors.white : AppColors.textSecondary,
+                                              )),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        if (filtered.isEmpty)
+                          const SliverFillRemaining(child: _EmptyFilterState())
+                        else
+                          SliverPadding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                            sliver: SliverList.separated(
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) => const SizedBox(height: 10),
+                              itemBuilder: (ctx, i) => _VisitCard(visit: filtered[i], index: i),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => ref.read(visitListProvider.notifier).refresh(),
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showAdhocSheet(context, ref),
-        icon: const Icon(Icons.add_location_alt_rounded),
-        label: const Text('Ad-hoc Visit'),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('New Visit', style: TextStyle(fontWeight: FontWeight.w800)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-      ),
-      body: visitsAsync.when(
-        loading: () => _VisitShimmer(),
-        error: (err, _) => _ErrorView(
-          message: err.toString(),
-          onRetry: () => ref.read(visitListProvider.notifier).refresh(),
-        ),
-        data: (visits) => visits.isEmpty
-            ? _EmptyState(onAdhoc: () => _showAdhocSheet(context, ref))
-            : RefreshIndicator(
-                onRefresh: () => ref.read(visitListProvider.notifier).refresh(),
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.md, AppSpacing.md, AppSpacing.md, 100),
-                  itemCount: visits.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (ctx, i) => _VisitTile(
-                    visit: visits[i],
-                    index: i,
-                  ),
-                ),
-              ),
+        elevation: 4,
       ),
     );
   }
@@ -77,28 +173,159 @@ class VisitListScreen extends ConsumerWidget {
   }
 }
 
-class _VisitTile extends ConsumerWidget {
+// ─────────────────────────────────────────────────────────────────────────────
+// Route Hero Card
+// ─────────────────────────────────────────────────────────────────────────────
+class _RouteHeroCard extends StatelessWidget {
+  final int total;
+  final int done;
+  const _RouteHeroCard({required this.total, required this.done});
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = total > 0 ? (done / total * 100).round() : 0;
+    final remaining = total - done;
+    final stops = total.clamp(2, 8);
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: AppColors.primaryGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.4),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -30,
+            top: -30,
+            child: Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.07),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("TODAY'S ROUTE",
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white.withOpacity(0.75),
+                              letterSpacing: 1.0,
+                            )),
+                        const SizedBox(height: 3),
+                        Text('$total Stops',
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            )),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                    ),
+                    child: Text('$pct%',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // Progress dots
+              Row(
+                children: List.generate(stops, (i) {
+                  final isDone = i < done;
+                  final isCur = i == done;
+                  return Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isDone || isCur ? Colors.white : Colors.white.withOpacity(0.35),
+                            boxShadow: isCur ? [BoxShadow(color: Colors.white.withOpacity(0.5), blurRadius: 6, spreadRadius: 1)] : null,
+                          ),
+                        ),
+                        if (i < stops - 1)
+                          Expanded(
+                            child: Container(
+                              height: 3,
+                              color: isDone ? Colors.white : Colors.white.withOpacity(0.25),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('$done Completed',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white.withOpacity(0.8))),
+                  Text('$remaining Remaining',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white.withOpacity(0.8))),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Visit Card (new design)
+// ─────────────────────────────────────────────────────────────────────────────
+class _VisitCard extends ConsumerWidget {
   final Visit visit;
   final int index;
-
-  const _VisitTile({required this.visit, required this.index});
+  const _VisitCard({required this.visit, required this.index});
 
   Future<void> _onTap(BuildContext context, WidgetRef ref) async {
-    // Enforce 1 active visit at a time
     if (visit.isPlanned) {
       final visits = ref.read(visitListProvider).valueOrNull ?? [];
-      final hasActiveVisit = visits.any((v) => v.isInProgress);
-      if (hasActiveVisit) {
+      final hasActive = visits.any((v) => v.isInProgress);
+      if (hasActive) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: const Row(children: [
               Icon(Icons.warning_amber_rounded, color: Colors.white, size: 18),
               SizedBox(width: 8),
-              Expanded(child: Text('Please complete your current active visit first!')),
+              Expanded(child: Text('Complete your active visit first!')),
             ]),
             backgroundColor: AppColors.warning,
             behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
         return;
@@ -110,167 +337,261 @@ class _VisitTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isActionable = visit.isPlanned || visit.isInProgress;
+    final statusColor = _statusColor(visit.status);
+    final n = (index + 1).toString().padLeft(2, '0');
 
     return GestureDetector(
       onTap: isActionable ? () => _onTap(context, ref) : null,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(color: AppColors.outline.withOpacity(0.6), width: 0.5),
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          border: Border.all(color: AppColors.outline),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           child: IntrinsicHeight(
             child: Row(
               children: [
-                // Status accent bar
-                Container(
-                  width: 4,
-                  color: _statusColor(visit.status),
-                ),
+                // Left accent bar
+                Container(width: 5, color: statusColor),
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(14),
-                    child: Row(
-            children: [
-              // Sequence number
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: _statusColor(visit.status).withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    '${visit.dailySequence}',
-                    style: TextStyle(
-                      color: _statusColor(visit.status),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            // Number / check badge
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: statusColor.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                              child: Center(
+                                child: visit.isCompleted
+                                    ? Icon(Icons.check_rounded, size: 18, color: statusColor)
+                                    : Text(n,
+                                        style: TextStyle(
+                                          color: statusColor,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                        )),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(visit.locationName,
+                                            style: const TextStyle(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.onSurface,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis),
+                                      ),
+                                      _StatusChip(status: visit.status),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        visit.locationType == 'bookshop'
+                                            ? Icons.store_outlined
+                                            : Icons.school_outlined,
+                                        size: 13,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        visit.locationType == 'bookshop' ? 'Bookshop' : 'School',
+                                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                                      ),
+                                      if (visit.isAdhoc) ...[
+                                        const SizedBox(width: 8),
+                                        _SmallBadge('Ad-hoc', Colors.orange),
+                                      ],
+                                      if (visit.isCarryForward) ...[
+                                        const SizedBox(width: 6),
+                                        _SmallBadge('Carry ${visit.carryForwardCount}/5', AppColors.warning),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        // Action buttons
+                        if (isActionable) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => context.push('/map'),
+                                  child: Container(
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.background,
+                                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.navigation_rounded, size: 15, color: AppColors.onSurface),
+                                        SizedBox(width: 6),
+                                        Text('Navigate',
+                                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                                                color: AppColors.onSurface)),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _onTap(context, ref),
+                                  child: Container(
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.navy,
+                                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                                    ),
+                                    child: const Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Text('View Details',
+                                            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
+                                        SizedBox(width: 4),
+                                        Icon(Icons.chevron_right_rounded, size: 16, color: Colors.white),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        // Missed reason prompt
+                        if (visit.status == 'MISSED' || visit.status == 'missed') ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: AppColors.missed.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(AppRadius.md),
+                            ),
+                            child: const Text('Reason required — add why this visit was missed',
+                                style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.missed)),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 12),
-
-              // Details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: visit.customerId != null
-                                ? () => context.push('/customers/${visit.customerId}')
-                                : null,
-                            child: Text(
-                              visit.locationName,
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    decoration: visit.isCompleted
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                    color: visit.customerId != null && !visit.isCompleted
-                                        ? AppColors.primary
-                                        : visit.isCompleted
-                                            ? AppColors.onBackground
-                                            : AppColors.onSurface,
-                                  ),
-                            ),
-                          ),
-                        ),
-                        StatusBadge(status: visit.status),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          visit.locationType == 'bookshop'
-                              ? Icons.store_outlined
-                              : Icons.school_outlined,
-                          size: 13,
-                          color: AppColors.onBackground,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          visit.locationType == 'bookshop' ? 'Bookshop' : 'School',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        if (visit.isAdhoc) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Text('Ad-hoc', style: TextStyle(fontSize: 10, color: Colors.orange, fontWeight: FontWeight.w600)),
-                          ),
-                        ],
-                        if (visit.isCarryForward) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.warning.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              'Carry ${visit.carryForwardCount}/5',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: AppColors.warning,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-                  // Arrow
-                  if (isActionable)
-                    Icon(
-                      Icons.chevron_right_rounded,
-                      color: AppColors.outline,
-                    ),
-                ]),
-              ),
-            ),
-            ],
+              ],
             ),
           ),
         ),
       ),
     )
         .animate(delay: (index * 60).ms)
-        .slideX(begin: 0.1, end: 0, duration: 400.ms, curve: Curves.easeOut)
-        .fadeIn(duration: 400.ms);
+        .slideX(begin: 0.08, end: 0, duration: 350.ms, curve: Curves.easeOut)
+        .fadeIn(duration: 350.ms);
   }
 
-  Color _statusColor(String status) => switch (status) {
-        'completed' => AppColors.success,
-        'in_progress' => AppColors.warning,
-        'missed' => AppColors.error,
-        _ => AppColors.info,
-      };
+  Color _statusColor(String status) => switch (status.toLowerCase()) {
+    'completed' => AppColors.success,
+    'in_progress' => AppColors.warning,
+    'missed' => AppColors.missed,
+    _ => AppColors.info,
+  };
+}
+
+class _StatusChip extends StatelessWidget {
+  final String status;
+  const _StatusChip({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, label, icon) = switch (status.toLowerCase()) {
+      'completed'   => (AppColors.success, 'Completed', Icons.check_rounded),
+      'in_progress' => (AppColors.warning, 'Active', Icons.radio_button_checked),
+      'missed'      => (AppColors.missed, 'Missed', Icons.close_rounded),
+      _             => (AppColors.info, 'Pending', Icons.access_time_rounded),
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppRadius.full),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 3),
+          Text(label, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SmallBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _SmallBadge(this.label, this.color);
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(label, style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600)),
+      );
+}
+
+class _EmptyFilterState extends StatelessWidget {
+  const _EmptyFilterState();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.filter_list_off_rounded, size: 56, color: AppColors.textMuted),
+          SizedBox(height: 12),
+          Text('No visits match this filter', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+        ],
+      ),
+    );
+  }
 }
 
 class _VisitShimmer extends StatelessWidget {
+  const _VisitShimmer();
+
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
@@ -278,50 +599,15 @@ class _VisitShimmer extends StatelessWidget {
       highlightColor: Colors.grey[100]!,
       child: ListView.separated(
         padding: const EdgeInsets.all(16),
-        itemCount: 7,
+        itemCount: 6,
         separatorBuilder: (_, __) => const SizedBox(height: 10),
         itemBuilder: (_, __) => Container(
-          height: 80,
+          height: 90,
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  final VoidCallback? onAdhoc;
-  const _EmptyState({this.onAdhoc});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.route_rounded, size: 72, color: AppColors.outline),
-          const SizedBox(height: 16),
-          Text(
-            'No visits planned today',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'You can add an ad-hoc visit below,\nor ask your admin to run the scheduler.',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 24),
-          if (onAdhoc != null)
-            FilledButton.icon(
-              icon: const Icon(Icons.add_location_alt_rounded),
-              label: const Text('Start Ad-hoc Visit'),
-              onPressed: onAdhoc,
-            ),
-        ],
       ),
     );
   }
@@ -645,19 +931,34 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.cloud_off_rounded, size: 64, color: AppColors.error),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.missed.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.cloud_off_rounded, size: 36, color: AppColors.missed),
+            ),
             const SizedBox(height: 16),
-            Text('Failed to load visits',
-                style: Theme.of(context).textTheme.titleMedium),
+            const Text('Failed to load visits',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
             const SizedBox(height: 8),
             Text(message,
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall),
+                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             const SizedBox(height: 24),
-            FilledButton.icon(
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Try Again'),
-              onPressed: onRetry,
+            GestureDetector(
+              onTap: onRetry,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                ),
+                child: const Text('Try Again',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+              ),
             ),
           ],
         ),

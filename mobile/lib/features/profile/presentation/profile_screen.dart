@@ -158,217 +158,214 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(profileProvider);
-    final auth = ref.watch(authProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6F8),
-      appBar: AppBar(
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-          onPressed: () => context.pop(),
-        ),
-        title: const Text('My Profile',
-            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.white)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, size: 20),
-            onPressed: () {
-              ref.read(authProvider.notifier).logout();
-              context.go('/login');
-            },
-          ),
-        ],
-      ),
-      body: profileAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
-        error: (e, _) => Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 48),
-            const SizedBox(height: 12),
-            Text('Failed to load profile', style: const TextStyle(color: AppColors.error)),
-            const SizedBox(height: 12),
-            ElevatedButton.icon(
-              onPressed: () => ref.invalidate(profileProvider),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-            ),
-          ]),
-        ),
-        data: (p) => SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(children: [
-            // ── Red header with avatar ─────────────────────────────────────
-            Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: AppColors.primaryGradient,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: profileAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+          error: (e, _) => Center(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 64, height: 64,
+                decoration: BoxDecoration(color: AppColors.missed.withOpacity(0.1), shape: BoxShape.circle),
+                child: const Icon(Icons.error_outline_rounded, color: AppColors.missed, size: 32),
+              ),
+              const SizedBox(height: 16),
+              const Text('Failed to load profile',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
+              const SizedBox(height: 20),
+              GestureDetector(
+                onTap: () => ref.invalidate(profileProvider),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(AppRadius.lg)),
+                  child: const Text('Retry', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
                 ),
               ),
-              child: Column(children: [
-                const SizedBox(height: 28),
+            ]),
+          ),
+          data: (p) => SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
-                // Avatar with edit button
-                Stack(
-                  children: [
-                    GestureDetector(
-                      onTap: _pickAndUploadPhoto,
-                      child: Container(
-                        width: 90, height: 90,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 12, offset: const Offset(0, 4))],
-                        ),
-                        child: ClipOval(
-                          child: _buildAvatar(p),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 0, right: 0,
-                      child: GestureDetector(
-                        onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
-                        child: Container(
-                          width: 28, height: 28,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6)],
-                          ),
-                          child: _uploadingPhoto
-                              ? const Padding(
-                                  padding: EdgeInsets.all(6),
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
-                              : const Icon(Icons.camera_alt_rounded, size: 16, color: AppColors.primary),
-                        ),
-                      ),
-                    ),
+              // ── Header row ───────────────────────────────────────────────
+              const Row(children: [
+                Expanded(
+                  child: Text('My Profile',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
+                ),
+              ]),
+
+              const SizedBox(height: 20),
+
+              // ── User Card ─────────────────────────────────────────────────
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(AppRadius.xxl),
+                  border: Border.all(color: AppColors.outline),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))
                   ],
                 ),
-
-                const SizedBox(height: 14),
-                Text(p.name,
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.3)),
-                const SizedBox(height: 4),
-                Text(p.designation,
-                    style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.75))),
-                const SizedBox(height: 8),
-
-                // Status chip
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.3)),
-                  ),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Container(width: 7, height: 7, decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle)),
-                    const SizedBox(width: 6),
-                    Text(p.jobStatus, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
-                  ]),
-                ),
-                const SizedBox(height: 24),
-
-                // Stats row
-                Container(
-                  margin: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
-                  ),
-                  child: Row(children: [
-                    _HeroStat(value: '${p.completedVisits}', label: 'Completed'),
-                    _Divider(),
-                    _HeroStat(value: '${p.totalVisits}', label: 'This Month'),
-                    _Divider(),
-                    _HeroStat(value: '${p.shiftsWorked}', label: 'Days Worked'),
-                  ]),
-                ),
-                const SizedBox(height: 24),
-              ]),
-            ),
-
-            // ── Content ────────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(children: [
-
-                // Contact info
-                _Section(title: 'Contact Info', icon: Icons.person_outline_rounded, children: [
-                  _InfoRow(icon: Icons.alternate_email_rounded, label: 'Email',  value: p.email),
-                  _InfoRow(icon: Icons.phone_rounded,           label: 'Phone',  value: p.phone),
-                  _InfoRow(icon: Icons.location_city_rounded,   label: 'City',   value: p.city),
-                ]),
-                const SizedBox(height: 12),
-
-                // Salary
-                _Section(title: 'This Month Earnings', icon: Icons.account_balance_wallet_rounded, children: [
-                  _InfoRow(icon: Icons.attach_money_rounded,   label: 'Basic Salary',  value: 'Rs ${_fmt(p.basicSalary)}'),
-                  _InfoRow(icon: Icons.trending_up_rounded,    label: 'Visit Earnings', value: 'Rs ${_fmt(p.runningPay)}'),
-                  _InfoRow(icon: Icons.payments_rounded,       label: 'Net Salary',    value: 'Rs ${_fmt(p.netSalary)}',  highlight: true),
-                  _InfoRow(icon: Icons.star_rounded,           label: 'Reward Points', value: '${p.rewardPoints} pts'),
-                ]),
-                const SizedBox(height: 24),
-
-                // App Update Option
-                Consumer(
-                  builder: (ctx, ref, _) {
-                    final updateState = ref.watch(appUpdateProvider);
-                    return GestureDetector(
-                      onTap: () {
-                        if (updateState.availableVersion != null && !updateState.isDownloading) {
-                          ref.read(appUpdateProvider.notifier).downloadAndInstall();
-                        } else if (updateState.availableVersion == null) {
-                          ref.read(appUpdateProvider.notifier).checkForUpdates();
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.05),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.blue.withOpacity(0.2)),
-                        ),
-                        child: Row(children: [
-                          const Icon(Icons.system_update_rounded, color: Colors.blue, size: 20),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              const Text('App Update', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                              Text(
-                                updateState.availableVersion != null
-                                    ? 'Version ${updateState.availableVersion!.versionName} available'
-                                    : 'You are up to date',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                              ),
-                            ]),
+                child: Row(children: [
+                  GestureDetector(
+                    onTap: _pickAndUploadPhoto,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        Container(
+                          width: 56, height: 56,
+                          decoration: BoxDecoration(
+                            color: AppColors.navy,
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          if (updateState.availableVersion != null && !updateState.isDownloading)
-                            const Icon(Icons.arrow_forward_ios_rounded, size: 16, color: Colors.grey)
-                          else if (updateState.isDownloading)
-                            SizedBox(
-                              width: 16, height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2, value: updateState.downloadProgress / 100.0),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20),
+                            child: _buildAvatar(p),
+                          ),
+                        ),
+                        Positioned(
+                          bottom: -2, right: -2,
+                          child: Container(
+                            width: 22, height: 22,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: AppColors.outline, width: 1.5),
                             ),
-                        ]),
+                            child: _uploadingPhoto
+                                ? const Padding(padding: EdgeInsets.all(5),
+                                    child: CircularProgressIndicator(strokeWidth: 1.5, color: AppColors.primary))
+                                : const Icon(Icons.camera_alt_rounded, size: 13, color: AppColors.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(p.name,
+                          style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.w800, color: AppColors.onSurface),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text('${p.designation} · EMP-${p.id}',
+                          style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                        ),
+                        child: Text(p.city,
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                                color: AppColors.primary, letterSpacing: 0.3)),
                       ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 28),
+                    ]),
+                  ),
+                ]),
+              ),
+
+              const SizedBox(height: 14),
+
+              // ── Stats Grid ────────────────────────────────────────────────
+              Row(children: [
+                Expanded(child: _StatCard(value: '${p.completedVisits}', label: 'Visits')),
+                const SizedBox(width: 10),
+                Expanded(child: _StatCard(value: '${p.shiftsWorked}', label: 'Days')),
+                const SizedBox(width: 10),
+                Expanded(child: _StatCard(
+                  value: p.totalVisits > 0
+                      ? '${(p.completedVisits / p.totalVisits * 100).round()}%'
+                      : '—',
+                  label: 'Target',
+                )),
               ]),
-            ),
-          ]).animate().fadeIn(duration: 400.ms),
+
+              const SizedBox(height: 20),
+
+              // ── Contact Info Card ─────────────────────────────────────────
+              _MenuCard(children: [
+                _MenuRow(icon: Icons.alternate_email_rounded, label: 'Email', value: p.email),
+                _MenuRow(icon: Icons.phone_rounded, label: 'Phone', value: p.phone),
+                _MenuRow(icon: Icons.location_city_rounded, label: 'City', value: p.city),
+              ]),
+
+              const SizedBox(height: 12),
+
+              // ── Earnings Card ─────────────────────────────────────────────
+              _MenuCard(children: [
+                _MenuRow(icon: Icons.account_balance_wallet_outlined, label: 'Earnings', value: '',
+                    onTap: () => context.push('/payroll')),
+                _MenuRow(icon: Icons.calendar_month_outlined, label: 'Attendance & Leave', value: '',
+                    onTap: () => context.push('/leaves')),
+                _MenuRow(icon: Icons.science_outlined, label: 'Sample Requests', value: '',
+                    onTap: () => context.push('/samples')),
+              ]),
+
+              const SizedBox(height: 12),
+
+              // ── App Update Row ────────────────────────────────────────────
+              Consumer(builder: (ctx, ref, _) {
+                final updateState = ref.watch(appUpdateProvider);
+                return _MenuCard(children: [
+                  _MenuRow(
+                    icon: Icons.system_update_rounded,
+                    label: 'App Update',
+                    value: updateState.availableVersion != null
+                        ? 'v${updateState.availableVersion!.versionName} available'
+                        : 'Up to date',
+                    valueColor: updateState.availableVersion != null ? AppColors.primary : null,
+                    trailing: updateState.isDownloading
+                        ? SizedBox(width: 16, height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, value: updateState.downloadProgress / 100.0,
+                                color: AppColors.primary))
+                        : null,
+                    onTap: () {
+                      if (updateState.availableVersion != null && !updateState.isDownloading) {
+                        ref.read(appUpdateProvider.notifier).downloadAndInstall();
+                      } else {
+                        ref.read(appUpdateProvider.notifier).checkForUpdates();
+                      }
+                    },
+                  ),
+                ]);
+              }),
+
+              const SizedBox(height: 20),
+
+              // ── Sign Out ──────────────────────────────────────────────────
+              GestureDetector(
+                onTap: () {
+                  ref.read(authProvider.notifier).logout();
+                  context.go('/login');
+                },
+                child: Container(
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.card,
+                    borderRadius: BorderRadius.circular(AppRadius.xl),
+                    border: Border.all(color: AppColors.outline),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.logout_rounded, size: 18, color: AppColors.primary),
+                      SizedBox(width: 8),
+                      Text('Sign Out',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                    ],
+                  ),
+                ),
+              ),
+            ]).animate().fadeIn(duration: 400.ms),
+          ),
         ),
       ),
     );
@@ -403,85 +400,101 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]},');
 }
 
-// ── Widgets ───────────────────────────────────────────────────────────────────
-class _HeroStat extends StatelessWidget {
+// ── New UI Widgets ─────────────────────────────────────────────────────────────
+
+class _StatCard extends StatelessWidget {
   final String value;
   final String label;
-  const _HeroStat({required this.value, required this.label});
+  const _StatCard({required this.value, required this.label});
 
   @override
-  Widget build(BuildContext context) => Expanded(
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(vertical: 14),
+    decoration: BoxDecoration(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(AppRadius.xl),
+      border: Border.all(color: AppColors.outline),
+      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+    ),
     child: Column(children: [
-      Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: -0.5)),
-      const SizedBox(height: 2),
-      Text(label, style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.7))),
+      Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.onSurface, letterSpacing: -0.5)),
+      const SizedBox(height: 3),
+      Text(label, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
     ]),
   );
 }
 
-class _Divider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 1, height: 36,
-    color: Colors.white.withOpacity(0.25),
-  );
-}
-
-class _Section extends StatelessWidget {
-  final String title;
-  final IconData icon;
+class _MenuCard extends StatelessWidget {
   final List<Widget> children;
-  const _Section({required this.title, required this.icon, required this.children});
+  const _MenuCard({required this.children});
 
   @override
   Widget build(BuildContext context) => Container(
     decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: const Color(0xFFEEF0F2)),
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(AppRadius.xl),
+      border: Border.all(color: AppColors.outline),
+      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
     ),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-        child: Row(children: [
-          Icon(icon, size: 16, color: AppColors.primary),
-          const SizedBox(width: 7),
-          Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
-        ]),
-      ),
-      const Divider(height: 1, color: Color(0xFFF1F3F5)),
-      ...children,
-    ]),
+    child: Column(
+      children: children.asMap().entries.map((e) {
+        final isLast = e.key == children.length - 1;
+        return Column(
+          children: [
+            e.value,
+            if (!isLast) const Divider(height: 1, color: AppColors.outline),
+          ],
+        );
+      }).toList(),
+    ),
   );
 }
 
-class _InfoRow extends StatelessWidget {
+class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
-  final bool highlight;
-  const _InfoRow({required this.icon, required this.label, required this.value, this.highlight = false});
+  final Color? valueColor;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+  const _MenuRow({
+    required this.icon,
+    required this.label,
+    this.value = '',
+    this.valueColor,
+    this.trailing,
+    this.onTap,
+  });
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    child: Row(children: [
-      Container(
-        padding: const EdgeInsets.all(7),
-        decoration: BoxDecoration(
-          color: highlight ? AppColors.primary.withOpacity(0.1) : const Color(0xFFF5F6F8),
-          borderRadius: BorderRadius.circular(8),
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(children: [
+        Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Icon(icon, size: 18, color: AppColors.onSurface),
         ),
-        child: Icon(icon, size: 16, color: highlight ? AppColors.primary : const Color(0xFF64748B)),
-      ),
-      const SizedBox(width: 12),
-      Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
-      const Spacer(),
-      Text(value, style: TextStyle(
-        fontSize: 13,
-        fontWeight: highlight ? FontWeight.w800 : FontWeight.w600,
-        color: highlight ? AppColors.primary : const Color(0xFF1E293B),
-      )),
-    ]),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(label,
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
+        ),
+        if (value.isNotEmpty)
+          Text(value,
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                  color: valueColor ?? AppColors.textSecondary)),
+        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+        if (onTap != null) ...[
+          const SizedBox(width: 6),
+          const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textMuted),
+        ],
+      ]),
+    ),
   );
 }

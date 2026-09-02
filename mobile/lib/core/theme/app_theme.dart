@@ -5,31 +5,39 @@ import 'package:google_fonts/google_fonts.dart';
 /// Primary: Bookmark Red #C8102E  Accent: Dark Red #9B0B22  Background: White
 abstract class AppColors {
   static const primary = Color(0xFFC8102E);
+  static const primaryDeep = Color(0xFF9B0B22);
+  static const primaryGlow = Color(0xFFE8304A);
   static const primaryContainer = Color(0xFF9B0B22);
   static const secondary = Color(0xFFE63946);
   static const secondaryContainer = Color(0xFFFF6B7A);
   static const accent = Color(0xFFC8102E);
   static const surface = Color(0xFFFFFFFF);
-  static const background = Color(0xFFF5F6F8);
+  static const card = Color(0xFFFFFFFF);
+  static const background = Color(0xFFF2F4F7);
   static const error = Color(0xFF9B0B22);
   static const onPrimary = Color(0xFFFFFFFF);
   static const onSecondary = Color(0xFFFFFFFF);
-  static const onSurface = Color(0xFF1A0A0A);
-  static const onBackground = Color(0xFF3D1515);
-  static const outline = Color(0xFFEECCCC);
-  static const success = Color(0xFF16A34A);
-  static const warning = Color(0xFFD97706);
-  static const info = Color(0xFF0EA5E9);
-  static const textMuted = Color(0xFF9B6B6B);
+  static const onSurface = Color(0xFF1C1B1F);
+  static const onBackground = Color(0xFF44474F);
+  static const outline = Color(0xFFE5E8ED);
+  static const outlineStrong = Color(0xFFCDD1D9);
+  static const success = Color(0xFF22C55E);
+  static const successLight = Color(0xFFDCFCE7);
+  static const warning = Color(0xFFF59E0B);
+  static const warningLight = Color(0xFFFEF3C7);
+  static const info = Color(0xFF3B82F6);
+  static const navy = Color(0xFF1C2340);
+  static const textMuted = Color(0xFF94A3B8);
+  static const textSecondary = Color(0xFF64748B);
 
   // Status badge colors
-  static const planned = Color(0xFF0EA5E9);
-  static const inProgress = Color(0xFFD97706);
-  static const completed = Color(0xFF16A34A);
+  static const planned = Color(0xFF3B82F6);
+  static const inProgress = Color(0xFFF59E0B);
+  static const completed = Color(0xFF22C55E);
   static const missed = Color(0xFFC8102E);
 
   // Gradient pairs
-  static const List<Color> primaryGradient = [Color(0xFFC8102E), Color(0xFF9B0B22)];
+  static const List<Color> primaryGradient = [Color(0xFFE8304A), Color(0xFFC8102E), Color(0xFF9B0B22)];
   static const List<Color> accentGradient = [Color(0xFFE63946), Color(0xFFC8102E)];
   static const List<Color> cardGradient = [Color(0xFFFFFFFF), Color(0xFFFFF5F5)];
 }
@@ -44,10 +52,12 @@ abstract class AppSpacing {
 }
 
 abstract class AppRadius {
-  static const double sm = 8;
-  static const double md = 12;
-  static const double lg = 16;
-  static const double xl = 24;
+  static const double xs = 6;
+  static const double sm = 10;
+  static const double md = 14;
+  static const double lg = 18;
+  static const double xl = 22;
+  static const double xxl = 26;
   static const double full = 999;
 }
 
@@ -140,13 +150,14 @@ class AppTheme {
         titleTextStyle: textTheme.titleLarge,
         shadowColor: AppColors.outline.withOpacity(0.5),
       ),
-      cardTheme: const CardTheme(
+      cardTheme: CardTheme(
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(AppRadius.lg)),
-          side: BorderSide(color: AppColors.outline, width: 0.5),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(AppRadius.xl)),
+          side: BorderSide(color: AppColors.outline, width: 0.8),
         ),
-        color: AppColors.surface,
+        color: AppColors.card,
+        shadowColor: Colors.black.withOpacity(0.08),
         margin: EdgeInsets.zero,
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -216,11 +227,11 @@ class AppTheme {
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         elevation: 0,
-        backgroundColor: AppColors.surface,
+        backgroundColor: AppColors.card,
         selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.outline,
-        selectedLabelStyle: textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
-        unselectedLabelStyle: textTheme.labelSmall,
+        unselectedItemColor: AppColors.textMuted,
+        selectedLabelStyle: textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700, fontSize: 10.5),
+        unselectedLabelStyle: textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600, fontSize: 10.5),
         showSelectedLabels: true,
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
