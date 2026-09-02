@@ -305,7 +305,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 _MenuRow(icon: Icons.calendar_month_outlined, label: 'Attendance & Leave', value: '',
                     onTap: () => context.push('/leaves')),
                 _MenuRow(icon: Icons.science_outlined, label: 'Sample Requests', value: '',
-                    onTap: () => context.push('/samples')),
+                    onTap: () => context.go('/samples')),
               ]),
 
               const SizedBox(height: 12),

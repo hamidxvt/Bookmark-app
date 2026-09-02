@@ -25,13 +25,13 @@ import 'features/payroll/presentation/payroll_screen.dart';
 import 'features/map/presentation/route_map_screen.dart';
 import 'features/profile/presentation/profile_screen.dart';
 
-final _rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+// Use FCM navigatorKey as the root so push notifications can navigate
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
 
 final _routerProvider = Provider<GoRouter>((ref) {
   final notifier = _AuthNotifierListenable(ref);
   return GoRouter(
-    navigatorKey: _rootNavigatorKey,
+    navigatorKey: navigatorKey,
     refreshListenable: notifier,
     initialLocation: '/login',
     redirect: (context, state) {

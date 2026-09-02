@@ -142,15 +142,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     Consumer(builder: (_, ref, __) {
                       final visitsAsync = ref.watch(visitListProvider);
                       final visits = visitsAsync.valueOrNull ?? [];
-                      final done = visits.where((v) => v.status == 'COMPLETED').length;
+                      final done = visits.where((v) => v.isCompleted).length;
                       final total = visits.length;
-                      final pending = visits.where((v) => v.status == 'PENDING').length;
-                      final next = visits.where((v) => v.status == 'PENDING').firstOrNull;
+                      final plannedList = visits.where((v) => v.isPlanned).toList();
+                      final nextVisit = plannedList.isEmpty ? null : plannedList.first;
                       return _MissionHeroCard(
                         totalVisits: total,
                         doneVisits: done,
-                        pendingVisits: pending,
-                        nextVisitName: next?.locationName,
+                        pendingVisits: plannedList.length,
+                        nextVisitName: nextVisit?.locationName,
                       );
                     }),
 
@@ -161,7 +161,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                       final s = ref.watch(workdayStatusProvider).valueOrNull;
                       final visitsAsync = ref.watch(visitListProvider);
                       final visits = visitsAsync.valueOrNull ?? [];
-                      final done = visits.where((v) => v.status == 'COMPLETED').length;
+                      final done = visits.where((v) => v.isCompleted).length;
                       final total = visits.length;
                       return _GpsStatusCard(
                         active: s?.dayStarted ?? false,
@@ -822,12 +822,12 @@ class _QuickActionsGrid extends StatelessWidget {
     final actions = [
       _QAction('My Visits', Icons.checklist_rtl_rounded,
           'Today\'s schedule', '/visits', AppColors.primary),
-      _QAction('Customers', Icons.people_outline_rounded,
-          'Schools & contacts', '/customers', const Color(0xFF6366F1)),
       _QAction('Samples', Icons.science_outlined,
           'Track requests', '/samples', const Color(0xFF059669)),
       _QAction('Route Map', Icons.map_outlined,
           'Navigate visits', '/map', const Color(0xFF8B5CF6)),
+      _QAction('Earnings', Icons.account_balance_wallet_outlined,
+          'Commission & pay', '/payroll', const Color(0xFFF59E0B)),
     ];
 
     return GridView.builder(

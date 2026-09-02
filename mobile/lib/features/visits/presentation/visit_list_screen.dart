@@ -26,13 +26,13 @@ class _VisitListScreenState extends ConsumerState<VisitListScreen> {
     return switch (_filter) {
       'Pending'   => visits.where((v) => v.isPlanned).toList(),
       'Completed' => visits.where((v) => v.isCompleted).toList(),
-      'Missed'    => visits.where((v) => v.status == 'MISSED' || v.status == 'missed').toList(),
+      'Missed'    => visits.where((v) => v.isMissed).toList(),
       _           => visits,
     };
   }
 
   @override
-  Widget build(BuildContext context, ) {
+  Widget build(BuildContext context) {
     final visitsAsync = ref.watch(visitListProvider);
 
     return Scaffold(
@@ -490,7 +490,7 @@ class _VisitCard extends ConsumerWidget {
                         ],
 
                         // Missed reason prompt
-                        if (visit.status == 'MISSED' || visit.status == 'missed') ...[
+                        if (visit.isMissed) ...[
                           const SizedBox(height: 10),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
