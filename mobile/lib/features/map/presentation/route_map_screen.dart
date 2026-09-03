@@ -95,15 +95,17 @@ final routeProvider = FutureProvider.autoDispose<List<RouteStop>>((ref) async {
   final gps = ref.watch(gpsServiceProvider);
   final pos = await gps.getCurrentPosition();
 
-  final q = [
-    if (pos != null) 'lat=${pos.latitude}',
-    if (pos != null) 'lng=${pos.longitude}',
-  ].join('&');
-
-  final res = await dio.get('/route${q.isNotEmpty ? '?$q' : ''}');
+  final res = await dio.get('/visits/today');
   final data = (res.data['data'] as Map<String, dynamic>? ?? res.data ?? {});
-  return ((data['stops'] as List?) ?? [])
-      .map((e) => RouteStop.fromJson(e as Map<String, dynamic>))
+  
+  return ((data['visits'] as List?) ?? [])
+      .map((e) => RouteStop(
+        visitId: e['id'] ?? 0,
+        sequence: e['sequence'] ?? 0,
+        customerName: e['customerName'] ?? 'Unknown',
+        lat: (e['latitude'] as num?)?.toDouble() ?? 0,
+        lng: (e['longitude'] as num?)?.toDouble() ?? 0,
+      ))
       .where((s) => s.lat != 0 && s.lng != 0)
       .toList();
 });

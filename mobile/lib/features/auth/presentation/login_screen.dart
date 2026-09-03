@@ -383,7 +383,7 @@ class _InputField extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.only(right: 16),
                     child: Icon(
-                      obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                      obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
                       size: 19,
                       color: const Color(0xFF6B7280),
                     ),
