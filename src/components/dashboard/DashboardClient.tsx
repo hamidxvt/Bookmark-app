@@ -1,18 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import axios from "axios";
 import {
-  Users, UserCheck, ClipboardList, Package,
-  AlertCircle, Activity, MapPin, RefreshCw,
-  CalendarX, FileText, TrendingUp, ArrowUpRight,
-} from "lucide-react";
-import { timeAgo } from "@/lib/utils";
-import {
-  AreaChart, Area, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
+  CartesianGrid, Cell, Legend, Line, LineChart,
+  Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
+import {
+  Activity, Boxes, Building2, CalendarCheck, CalendarPlus,
+  CheckCircle2, Clock, Download, FileText, MapPinned, Package,
+  Route as RouteIcon, UserPlus, UserRound, Users,
+} from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { SectionCard, StatCard, StatusPill, EmptyState } from "@/components/shared/ui-bits";
+import { cn } from "@/lib/utils";
 
-interface Stats {
+// ─── types ────────────────────────────────────────────────────────────────────
+interface DashSummary {
   totalBookers: number;
   totalCustomers: number;
   totalVisits: number;
@@ -20,320 +26,402 @@ interface Stats {
   totalProducts: number;
   pendingRequests: number;
   pendingLeaves: number;
-  pendingMissedVisits: number;
+  missedVisits: number;
+  monthlyVisits: { month: string; completed: number; pending: number }[];
+  customersByCity: { city: string; count: number }[];
+  recentVisits: {
+    id: string;
+    bookerName: string;
+    customerName: string;
+    status: string;
+    visitDate: string;
+    city?: string;
+  }[];
 }
 
-interface TrendPoint { month: string; completed: number; pending: number; }
-interface CityPoint { name: string; value: number; color: string; }
-interface Visit {
-  id: number;
-  visitDate: string;
-  status: string;
-  booker: { name: string };
-  customer: { name: string; customerType: string };
+interface Officer {
+  id: string;
+  name: string;
+  city?: string;
+  isOffline: boolean;
+  isIdle: boolean;
+  visitsDone: number;
+  visitsTotal: number;
 }
 
-const STATUS_STYLES: Record<string, { bg: string; text: string; dot: string }> = {
-  COMPLETED:   { bg: "bg-emerald-50",  text: "text-emerald-700",  dot: "bg-emerald-500"  },
-  PENDING:     { bg: "bg-blue-50",     text: "text-blue-700",     dot: "bg-blue-500"     },
-  CANCELLED:   { bg: "bg-red-50",      text: "text-red-700",      dot: "bg-red-500"      },
-  IN_PROGRESS: { bg: "bg-amber-50",    text: "text-amber-700",    dot: "bg-amber-500"    },
-};
+// ─── constants ─────────────────────────────────────────────────────────────────
+const RANGES = ["Today", "Week", "Month", "Year"] as const;
 
-function VisitBadge({ status }: { status: string }) {
-  const key = Object.keys(STATUS_STYLES).find(k => status?.toUpperCase().includes(k)) ?? "PENDING";
-  const s = STATUS_STYLES[key];
-  const label = key.replace("_", " ").charAt(0) + key.replace("_", " ").slice(1).toLowerCase();
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${s.bg} ${s.text}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-      {label}
-    </span>
-  );
+const PIE_COLORS = [
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+];
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+function initials(name: string) {
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
-function KpiCard({ icon: Icon, label, value, sub, href }: {
-  icon: React.ElementType; label: string; value: number | string; sub?: string; href?: string;
-}) {
-  const formatted = typeof value === "number" ? value.toLocaleString() : value;
-  const content = (
-    <div className="group relative overflow-hidden rounded-2xl bg-white border border-slate-100 p-5 shadow-sm hover:shadow-md hover:border-red-100 transition-all duration-200">
-      <div className="flex items-start justify-between">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-[#C8102E]">
-          <Icon className="h-5 w-5" />
-        </div>
-        {href && (
-          <ArrowUpRight className="h-4 w-4 text-slate-300 group-hover:text-[#C8102E] transition-colors" />
-        )}
-      </div>
-      <p className="mt-4 text-2xl font-bold text-slate-900 tabular-nums tracking-tight">{formatted}</p>
-      <p className="mt-0.5 text-sm font-medium text-slate-500">{label}</p>
-      {sub && <p className="mt-0.5 text-xs text-slate-400">{sub}</p>}
-      {/* Brand accent bottom bar */}
-      <div className="absolute bottom-0 left-0 h-0.5 w-0 bg-[#C8102E] group-hover:w-full transition-all duration-300" />
-    </div>
-  );
-  return href ? <a href={href}>{content}</a> : content;
+function officerStatus(o: Officer) {
+  if (o.isOffline) return "offline";
+  if (o.isIdle)    return "idle";
+  return "active";
 }
 
+// ─── main component ────────────────────────────────────────────────────────────
 export default function DashboardClient() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [visits, setVisits] = useState<Visit[]>([]);
-  const [trend, setTrend] = useState<TrendPoint[]>([]);
-  const [cityData, setCityData] = useState<CityPoint[]>([]);
+  const router = useRouter();
+  const [summary, setSummary] = useState<DashSummary | null>(null);
+  const [officers, setOfficers] = useState<Officer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [lastRefresh, setLastRefresh] = useState(new Date());
+  const [range, setRange] = useState<(typeof RANGES)[number]>("Week");
+  const [seed, setSeed] = useState(0);
 
-  async function load() {
-    setLoading(true);
+  const load = useCallback(async () => {
     try {
-      const [statsRes, visitsRes, trendRes] = await Promise.all([
-        fetch("/api/v1/dashboard").then(r => r.json()),
-        fetch("/api/v1/visits?length=8").then(r => r.json()),
-        fetch("/api/v1/visits/trend").then(r => r.json()),
+      const [sRes, aRes] = await Promise.all([
+        axios.get("/api/v1/dashboard"),
+        axios.get("/api/v1/live-activity"),
       ]);
-      if (statsRes.success) setStats(statsRes.data);
-      if (visitsRes.success) setVisits(visitsRes.data?.data ?? []);
-      if (trendRes.success) {
-        setTrend(trendRes.data.trend ?? []);
-        setCityData(trendRes.data.cityBreakdown ?? []);
-      }
-      setLastRefresh(new Date());
-    } catch (err) {
-      console.error("Dashboard load error:", err);
+      setSummary(sRes.data?.data ?? sRes.data);
+      const raw: Record<string, unknown>[] = aRes.data?.data ?? aRes.data ?? [];
+      setOfficers(
+        raw.map((o) => ({
+          id:          String(o.id),
+          name:        String(o.name),
+          city:        o.city ? String(o.city) : undefined,
+          isOffline:   Boolean(o.isOffline),
+          isIdle:      Boolean(o.isIdle),
+          visitsDone:  Number(o.visitsDone  ?? 0),
+          visitsTotal: Number(o.visitsTotal ?? 0),
+        })),
+      );
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 60000);
-    return () => clearInterval(interval);
   }, []);
 
-  const KPI_CARDS = [
-    { icon: UserCheck,   label: "Field Officers",    value: stats?.totalBookers      ?? "—", sub: "Approved & active",   href: "/bookers"       },
-    { icon: Users,       label: "Total Customers",   value: stats?.totalCustomers    ?? "—", sub: "Schools & bookshops", href: "/customers"     },
-    { icon: ClipboardList,label:"Total Visits",      value: stats?.totalVisits       ?? "—", sub: "All time",            href: "/visits"        },
-    { icon: Activity,    label: "Today's Visits",    value: stats?.visitsToday       ?? "—", sub: "Scheduled today",     href: "/visits"        },
-    { icon: Package,     label: "Products",          value: stats?.totalProducts     ?? "—", sub: "In catalog",          href: "/products"      },
-    { icon: AlertCircle, label: "Pending Requests",  value: stats?.pendingRequests   ?? "—", sub: "Need attention",      href: "/requests"      },
-    { icon: CalendarX,   label: "Pending Leaves",    value: stats?.pendingLeaves     ?? "—", sub: "Awaiting review",     href: "/leaves"        },
-    { icon: FileText,    label: "Missed Reviews",    value: stats?.pendingMissedVisits?? "—", sub: "Pending approval",   href: "/missed-visits" },
+  useEffect(() => { load(); }, [load, seed]);
+  useEffect(() => {
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, [load]);
+
+  // ── quick actions ────────────────────────────────────────────────────────────
+  const quickActions = [
+    { label: "Add Customer", icon: UserPlus,     action: () => router.push("/customers/add") },
+    { label: "Add Officer",  icon: Users,         action: () => router.push("/bookers") },
+    { label: "Create Visit", icon: CalendarPlus,  action: () => router.push("/visits") },
+    { label: "View Map",     icon: MapPinned,     action: () => router.push("/location") },
+    { label: "Reports",      icon: FileText,      action: () => router.push("/reports") },
+    { label: "Attendance",   icon: CalendarCheck, action: () => router.push("/attendance") },
   ];
 
+  // ── recentActivity (from recentVisits) ───────────────────────────────────────
+  const recentActivity = (summary?.recentVisits ?? []).slice(0, 6).map((v) => ({
+    type:   v.status === "COMPLETED" ? "visit" : "visit",
+    title:  v.customerName,
+    detail: `${v.bookerName} · ${v.status}`,
+    by:     v.bookerName,
+    time:   new Date(v.visitDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" }),
+  }));
+
+  const activityIconMap: Record<string, React.ElementType> = {
+    customer: UserRound, visit: RouteIcon, sample: Package, request: CheckCircle2, attendance: CalendarCheck,
+  };
+
+  // ── chart data (use monthlyVisits, filter by range) ──────────────────────────
+  const chartData = (() => {
+    const all = summary?.monthlyVisits ?? [];
+    if (range === "Today") return all.slice(-1);
+    if (range === "Week")  return all.slice(-2);
+    if (range === "Month") return all.slice(-4);
+    return all;
+  })().map((m) => ({ label: m.month, completed: m.completed, pending: m.pending }));
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm font-medium text-muted-foreground">Loading dashboard…</p>
+        </div>
+      </div>
+    );
+  }
+
+  const s = summary!;
+  const liveOfficers = officers.slice(0, 8);
+
   return (
-    <div className="space-y-6">
+    <div key={seed} className="space-y-6 px-6 py-6 lg:px-8">
 
-      {/* ── Page Header ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <TrendingUp className="h-5 w-5 text-[#C8102E]" />
-            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Dashboard</h2>
-          </div>
-          <p className="text-sm text-slate-400 mt-0.5 ml-7">
-            Live data · Last refreshed {timeAgo(lastRefresh)}
-          </p>
-        </div>
-        <button
-          onClick={load}
-          disabled={loading}
-          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50 shadow-sm"
+      {/* ── KPI row ── */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Today's Visits"
+          value={s.visitsToday}
+          trend="Scheduled today"
+          href="/visits"
+          icon={<Activity className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Field Officers"
+          value={s.totalBookers}
+          href="/bookers"
+          icon={<Users className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Customers"
+          value={s.totalCustomers}
+          href="/customers"
+          icon={<Building2 className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Total Visits"
+          value={s.totalVisits}
+          href="/visits"
+          icon={<RouteIcon className="h-5 w-5" />}
+        />
+      </div>
+
+      {/* ── Charts ── */}
+      <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+        <SectionCard
+          title="Visit Performance"
+          description="Completed vs pending visits"
+          action={
+            <div className="flex rounded-xl bg-muted p-1">
+              {RANGES.map((r) => (
+                <button
+                  key={r}
+                  onClick={() => setRange(r)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200",
+                    range === r
+                      ? "bg-card text-foreground shadow-card"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          }
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin text-[#C8102E]" : ""}`} />
-          Refresh
-        </button>
-      </div>
-
-      {/* ── KPI Grid ─────────────────────────────────────────────── */}
-      {loading && !stats ? (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-4">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="rounded-2xl bg-white border border-slate-100 p-5 animate-pulse">
-              <div className="h-10 w-10 rounded-xl bg-slate-100" />
-              <div className="mt-4 h-7 w-16 rounded-md bg-slate-100" />
-              <div className="mt-1 h-4 w-24 rounded bg-slate-100" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-4">
-          {KPI_CARDS.map((card) => (
-            <KpiCard key={card.label} {...card} />
-          ))}
-        </div>
-      )}
-
-      {/* ── Charts ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Visit Trend */}
-        <div className="col-span-2 rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
-          <div className="mb-4 flex items-start justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-800">Visit Trend</h3>
-              <p className="text-xs text-slate-400 mt-0.5">6-month completed vs pending</p>
-            </div>
-            <span className="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-semibold text-[#C8102E] uppercase tracking-wider">
-              Live
-            </span>
-          </div>
-          {trend.length === 0 && !loading ? (
-            <p className="py-16 text-center text-sm text-slate-400">No visit data yet</p>
-          ) : (
-            <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={trend}>
-                <defs>
-                  <linearGradient id="cg" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#C8102E" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#C8102E" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="pg" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#9B0B22" stopOpacity={0.12} />
-                    <stop offset="95%" stopColor="#9B0B22" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData} margin={{ left: -18, right: 8, top: 8 }}>
+                <CartesianGrid strokeDasharray="4 4" stroke="var(--color-border)" vertical={false} />
+                <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} stroke="var(--color-muted-foreground)" />
+                <YAxis tickLine={false} axisLine={false} fontSize={12} stroke="var(--color-muted-foreground)" />
                 <Tooltip
-                  contentStyle={{ borderRadius: "10px", border: "1px solid #fecdd3", fontSize: 12, boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }}
-                  cursor={{ stroke: "#C8102E", strokeWidth: 1, strokeDasharray: "4 4" }}
+                  contentStyle={{
+                    borderRadius: 14, border: "1px solid var(--color-border)",
+                    background: "var(--color-card)", fontSize: 12,
+                  }}
                 />
-                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-                <Area type="monotone" dataKey="completed" name="Completed" stroke="#C8102E" strokeWidth={2.5} fill="url(#cg)" dot={false} activeDot={{ r: 4, fill: "#C8102E" }} />
-                <Area type="monotone" dataKey="pending"   name="Pending"   stroke="#9B0B22" strokeWidth={2} fill="url(#pg)"   dot={false} activeDot={{ r: 4, fill: "#9B0B22" }} />
-              </AreaChart>
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <Line
+                  type="monotone" dataKey="completed" name="Completed Visits"
+                  stroke="var(--color-chart-1)" strokeWidth={3}
+                  dot={{ r: 3 }} activeDot={{ r: 5 }}
+                />
+                <Line
+                  type="monotone" dataKey="pending" name="Pending Visits"
+                  stroke="var(--color-chart-3)" strokeWidth={3}
+                  strokeDasharray="6 4" dot={{ r: 3 }}
+                />
+              </LineChart>
             </ResponsiveContainer>
-          )}
-        </div>
-
-        {/* City Breakdown */}
-        <div className="rounded-2xl bg-white border border-slate-100 p-5 shadow-sm">
-          <div className="mb-2">
-            <h3 className="text-sm font-semibold text-slate-800">Customers by City</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {(stats?.totalCustomers ?? 0).toLocaleString()} total
-            </p>
           </div>
-          {cityData.length === 0 ? (
-            <p className="py-10 text-center text-sm text-slate-400">No city data yet</p>
-          ) : (
-            <>
-              <ResponsiveContainer width="100%" height={160}>
-                <PieChart>
-                  <Pie data={cityData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
-                    {cityData.map((e) => <Cell key={e.name} fill={e.color} />)}
-                  </Pie>
-                  <Tooltip
-                    formatter={(v) => [Number(v).toLocaleString(), "Customers"]}
-                    contentStyle={{ borderRadius: "10px", fontSize: 12 }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="mt-3 space-y-2">
-                {cityData.map((c) => (
-                  <div key={c.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                      <span className="text-xs text-slate-500 truncate max-w-[100px]">{c.name}</span>
-                    </div>
-                    <span className="text-xs font-bold text-slate-800">{c.value.toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
+        </SectionCard>
+
+        <SectionCard title="Customer Distribution" description="Customers by city">
+          <div className="h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={s.customersByCity.slice(0, 5)}
+                  dataKey="count"
+                  nameKey="city"
+                  innerRadius={62}
+                  outerRadius={92}
+                  paddingAngle={3}
+                  stroke="none"
+                >
+                  {s.customersByCity.slice(0, 5).map((_, i) => (
+                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: 14, border: "1px solid var(--color-border)",
+                    background: "var(--color-card)", fontSize: 12,
+                  }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <ul className="mt-4 space-y-2">
+            {s.customersByCity.slice(0, 5).map((c, i) => (
+              <li key={c.city} className="flex items-center gap-2 text-sm">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                <span className="flex-1 text-muted-foreground">{c.city}</span>
+                <span className="font-semibold">{c.count.toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
+        </SectionCard>
       </div>
 
-      {/* ── Recent Visits ─────────────────────────────────────────── */}
-      <div className="rounded-2xl bg-white border border-slate-100 shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-50">
-          <h3 className="text-sm font-semibold text-slate-800">Recent Visits</h3>
-          <a href="/visits" className="flex items-center gap-1 text-xs font-semibold text-[#C8102E] hover:text-[#9B0B22] transition-colors">
-            View all <ArrowUpRight className="h-3 w-3" />
-          </a>
-        </div>
-        {loading ? (
-          <div className="divide-y divide-slate-50">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-5 py-3.5">
-                <div className="h-9 w-9 rounded-full bg-slate-100 animate-pulse" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-36 rounded bg-slate-100 animate-pulse" />
-                  <div className="h-2.5 w-24 rounded bg-slate-100 animate-pulse" />
-                </div>
-                <div className="h-5 w-20 rounded-full bg-slate-100 animate-pulse" />
-              </div>
-            ))}
-          </div>
+      {/* ── Live officers ── */}
+      <SectionCard
+        title="Live Field Officers"
+        description="Officers currently in the field"
+        action={
+          <Link
+            href="/live-activity"
+            className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-brand transition hover:opacity-90"
+          >
+            <MapPinned className="h-4 w-4" /> Open Live Tracking
+          </Link>
+        }
+      >
+        {liveOfficers.length === 0 ? (
+          <EmptyState title="No officers with GPS data right now" />
         ) : (
-          <div className="divide-y divide-slate-50">
-            {visits.length === 0 && (
-              <p className="px-5 py-10 text-center text-sm text-slate-400">No visits found</p>
-            )}
-            {visits.map((v) => (
-              <div key={v.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-50 text-sm font-bold text-[#C8102E] border border-red-100">
-                  {(v.customer?.name ?? "?")[0].toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-slate-800 truncate">{v.customer?.name ?? "Unknown"}</p>
-                  <p className="text-xs text-slate-400 truncate">
-                    {v.booker?.name} · {new Date(v.visitDate).toLocaleDateString("en-PK")}
-                  </p>
-                </div>
-                <VisitBadge status={v.status} />
-              </div>
-            ))}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {liveOfficers.map((o) => {
+              const status = officerStatus(o);
+              const pct = o.visitsTotal > 0 ? (o.visitsDone / o.visitsTotal) * 100 : 0;
+              return (
+                <Link
+                  key={o.id}
+                  href={`/bookers`}
+                  className="rounded-2xl border border-border/70 p-4 transition-all duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-elevated"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-navy text-sm font-bold text-navy-foreground">
+                      {initials(o.name)}
+                      <span
+                        className={cn(
+                          "absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-card",
+                          status === "active"  ? "bg-success"
+                          : status === "idle" ? "bg-warning"
+                          : "bg-muted-foreground",
+                        )}
+                      />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-foreground">{o.name}</p>
+                      <p className="text-xs text-muted-foreground">{o.city ?? "—"}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <StatusPill value={status} />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {o.visitsDone}/{o.visitsTotal} visits
+                    </span>
+                  </div>
+                  <Progress value={pct} className="mt-3 h-1.5" />
+                </Link>
+              );
+            })}
           </div>
         )}
+      </SectionCard>
+
+      {/* ── Activity + Quick Actions ── */}
+      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+        <SectionCard title="Recent Activity" description="Latest events across the field force">
+          {recentActivity.length === 0 ? (
+            <EmptyState title="No activity yet" />
+          ) : (
+            <ol className="relative space-y-5 pl-7">
+              <span className="absolute left-[11px] top-2 h-[calc(100%-1rem)] w-px bg-border" />
+              {recentActivity.map((a, i) => {
+                const Icon = activityIconMap[a.type] ?? Activity;
+                return (
+                  <li key={i} className="relative">
+                    <span className="absolute -left-7 flex h-6 w-6 items-center justify-center rounded-full bg-primary-soft text-primary ring-4 ring-card">
+                      <Icon className="h-3 w-3" />
+                    </span>
+                    <p className="text-sm font-semibold text-foreground">{a.title}</p>
+                    <p className="text-sm text-muted-foreground">{a.detail}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground/80">{a.by} · {a.time}</p>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+        </SectionCard>
+
+        <SectionCard title="Quick Actions" description="Jump straight into common tasks">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {quickActions.map((q) => (
+              <button
+                key={q.label}
+                onClick={q.action}
+                className="group flex items-center gap-3 rounded-2xl border border-border/70 p-3.5 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary-soft"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-soft text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                  <q.icon className="h-4 w-4" />
+                </span>
+                <span className="text-sm font-medium text-foreground">{q.label}</span>
+              </button>
+            ))}
+          </div>
+          <button
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-muted/50 hover:text-foreground"
+            onClick={() => router.push("/reports")}
+          >
+            <Download className="h-4 w-4" /> Export daily summary
+          </button>
+        </SectionCard>
       </div>
 
-      {/* ── Quick Links ───────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-2xl bg-gradient-to-br from-[#C8102E]/5 to-[#9B0B22]/8 border border-red-100 p-5">
-          <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-[#C8102E]" />
-            Field Operations
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: "Live Location",  icon: MapPin,      href: "/location"      },
-              { label: "Attendance",     icon: Activity,    href: "/attendance"    },
-              { label: "Missed Visits",  icon: FileText,    href: "/missed-visits" },
-              { label: "Payroll",        icon: Users,       href: "/payroll"       },
-            ].map((a) => (
-              <a key={a.label} href={a.href}
-                className="flex items-center gap-2.5 rounded-xl bg-white px-3 py-2.5 text-xs font-medium text-slate-700 hover:text-[#C8102E] hover:shadow-sm border border-white hover:border-red-100 transition-all shadow-sm">
-                <a.icon className="h-3.5 w-3.5 text-[#C8102E]" />
-                {a.label}
-              </a>
-            ))}
-          </div>
-        </div>
-
-        <div className="rounded-2xl bg-slate-50/80 border border-slate-100 p-5">
-          <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <UserCheck className="h-4 w-4 text-slate-600" />
-            Management
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: "Officers",     icon: UserCheck,    href: "/bookers"          },
-              { label: "Cities",       icon: MapPin,       href: "/locations/cities" },
-              { label: "Customers",    icon: Users,        href: "/customers"        },
-              { label: "Products",     icon: Package,      href: "/products"         },
-            ].map((a) => (
-              <a key={a.label} href={a.href}
-                className="flex items-center gap-2.5 rounded-xl bg-white px-3 py-2.5 text-xs font-medium text-slate-600 hover:text-slate-900 hover:shadow-sm border border-slate-100 hover:border-slate-200 transition-all shadow-sm">
-                <a.icon className="h-3.5 w-3.5 text-slate-400" />
-                {a.label}
-              </a>
-            ))}
-          </div>
-        </div>
+      {/* ── Pending alerts row ── */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {[
+          { label: "Pending Sample Requests", value: s.pendingRequests, href: "/requests",    icon: Package },
+          { label: "Pending Leave Requests",  value: s.pendingLeaves,   href: "/attendance",  icon: CalendarCheck },
+          { label: "Missed Visit Reviews",    value: s.missedVisits,    href: "/missed-visits", icon: Clock },
+        ].map(({ label, value, href, icon: Icon }) => (
+          <Link
+            key={label}
+            href={href}
+            className={cn(
+              "surface flex items-center gap-4 p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-elevated",
+              value > 0 && "border border-destructive/25 bg-destructive/5",
+            )}
+          >
+            <span
+              className={cn(
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl",
+                value > 0 ? "bg-destructive/15 text-destructive" : "bg-primary-soft text-primary",
+              )}
+            >
+              <Icon className="h-5 w-5" />
+            </span>
+            <div>
+              <p className={cn("text-2xl font-bold", value > 0 ? "text-destructive" : "text-foreground")}>
+                {value}
+              </p>
+              <p className="text-sm text-muted-foreground">{label}</p>
+            </div>
+          </Link>
+        ))}
       </div>
     </div>
   );

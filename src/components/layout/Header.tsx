@@ -1,35 +1,13 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { Bell, LogOut, RefreshCw, Search, Settings, UserRound, Menu } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { signOut, useSession } from "next-auth/react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, User, ChevronDown, Menu, LogOut, CalendarOff, FileQuestion } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
-import { signOut } from "next-auth/react";
-import { useSidebar } from "./SidebarContext";
-import { usePathname } from "next/navigation";
+import axios from "axios";
 import { cn } from "@/lib/utils";
-
-function getBreadcrumbs(pathname: string): { label: string; href?: string }[] {
-  const segments = pathname.split("/").filter(Boolean);
-  const crumbs: { label: string; href?: string }[] = [{ label: "Home", href: "/dashboard" }];
-  let path = "";
-  const labels: Record<string, string> = {
-    dashboard: "Dashboard", bookers: "Sales Team", customers: "Customers",
-    visits: "Visits", products: "Products",
-    location: "Live Location", locations: "Locations", cities: "Cities",
-    zones: "Zones", areas: "Areas", add: "Add", today: "Today",
-    brands: "Brands", subjects: "Subjects", series: "Series", profile: "Profile",
-    scheduler: "Run Schedulers", migrate: "Migrate Data", reports: "Export Data",
-    attendance: "Attendance", payroll: "Payroll",
-    "missed-visits": "Missed Visits",
-  };
-  for (const seg of segments) {
-    path += "/" + seg;
-    if (seg === "dashboard") continue;
-    crumbs.push({ label: labels[seg] ?? seg, href: path });
-  }
-  return crumbs;
-}
+import { useSidebar } from "./SidebarContext";
 
 type Notif = {
   id: string;
@@ -38,198 +16,238 @@ type Notif = {
   subtitle: string;
   href: string;
   time: string;
+  unread?: boolean;
 };
 
-const typeIcon = {
-  leave: <CalendarOff className="h-3.5 w-3.5 text-amber-500" />,
-  missed: <FileQuestion className="h-3.5 w-3.5 text-rose-500" />,
-  request: <Bell className="h-3.5 w-3.5 text-[#C8102E]" />,
-};
-
-export default function Header() {
+export default function Header({
+  title,
+  subtitle,
+  onRefresh,
+}: {
+  title?: string;
+  subtitle?: string;
+  onRefresh?: () => void;
+}) {
   const { data: session } = useSession();
   const { toggleOpen } = useSidebar();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  const [query, setQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
-  const [bellOpen, setBellOpen] = useState(false);
   const [notifs, setNotifs] = useState<Notif[]>([]);
   const [unread, setUnread] = useState(0);
-  const pathname = usePathname();
-  const crumbs = getBreadcrumbs(pathname);
-  const dropRef = useRef<HTMLDivElement>(null);
-  const bellRef = useRef<HTMLDivElement>(null);
+
+  const notifRef = useRef<HTMLDivElement>(null);
+  const userRef = useRef<HTMLDivElement>(null);
+
+  // derive page title from path when not explicitly passed
+  const pageTitle = title ?? (() => {
+    const labels: Record<string, string> = {
+      dashboard: "Dashboard", bookers: "Sales Team", customers: "Customers",
+      visits: "Visits", products: "Products", location: "Live Location",
+      "live-activity": "Live Activity", attendance: "Attendance", payroll: "Payroll",
+      "missed-visits": "Missed Visits", samples: "Samples", requests: "Support Tickets",
+      reports: "Export Data", "data-import": "Data Import", notifications: "Notifications",
+      scheduler: "Run Schedulers", profile: "Edit Profile", settings: "Settings", "live-shifts": "Live Shifts",
+      "adhoc-visits": "Ad-hoc Visits", "locations": "City Management",
+    };
+    const seg = pathname.split("/").filter(Boolean)[0] ?? "dashboard";
+    return labels[seg] ?? seg.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+  })();
 
   // Close dropdowns on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (dropRef.current && !dropRef.current.contains(e.target as Node)) setUserOpen(false);
-      if (bellRef.current && !bellRef.current.contains(e.target as Node)) setBellOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setNotifOpen(false);
+      if (userRef.current && !userRef.current.contains(e.target as Node)) setUserOpen(false);
     }
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Real-time notifications via SSE
+  // Load notifications
   useEffect(() => {
-    // First load full notifs list
-    fetch("/api/v1/notifications").then(r => r.json()).then(data => {
-      setNotifs(data.notifications ?? []);
-      setUnread(data.unread ?? 0);
-    }).catch(() => {});
+    fetch("/api/v1/notifications")
+      .then(r => r.json())
+      .then(d => { setNotifs(d.notifications ?? []); setUnread(d.unread ?? 0); })
+      .catch(() => {});
 
-    // SSE for live count updates
     let es: EventSource | null = null;
     try {
       es = new EventSource("/api/v1/notifications/stream");
-      es.onmessage = (event) => {
-        try {
-          const counts: { leaves: number; requests: number; missed: number; total: number } = JSON.parse(event.data);
-          setUnread(counts.total);
-        } catch {}
+      es.onmessage = (e) => {
+        try { const c = JSON.parse(e.data); setUnread(c.total ?? 0); } catch {}
       };
-      es.onerror = () => { es?.close(); };
+      es.onerror = () => es?.close();
     } catch {}
-
-    return () => { es?.close(); };
+    return () => es?.close();
   }, []);
 
-  const pageTitle = crumbs[crumbs.length - 1]?.label ?? "Dashboard";
+  const refresh = () => {
+    setRefreshing(true);
+    onRefresh?.();
+    setTimeout(() => setRefreshing(false), 700);
+  };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-slate-200/80 bg-white/90 backdrop-blur-md px-4 sm:px-6">
-      {/* Hamburger — mobile */}
-      <button
-        onClick={toggleOpen}
-        className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors lg:hidden"
-        aria-label="Open menu"
-      >
-        <Menu className="h-4.5 w-4.5" />
-      </button>
+    <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 backdrop-blur-xl">
+      <div className="flex flex-wrap items-center gap-3 px-6 py-4 lg:px-8">
+        {/* Mobile hamburger */}
+        <button
+          onClick={toggleOpen}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card shadow-card transition hover:shadow-elevated lg:hidden"
+          aria-label="Open menu"
+        >
+          <Menu className="h-4.5 w-4.5" />
+        </button>
 
-      {/* Breadcrumbs */}
-      <div className="hidden sm:flex items-center gap-1.5 text-sm min-w-0 flex-1">
-        {crumbs.map((c, i) => (
-          <span key={i} className="flex items-center gap-1.5 min-w-0">
-            {i > 0 && <span className="text-slate-300 text-xs">/</span>}
-            {c.href && i < crumbs.length - 1 ? (
-              <Link href={c.href} className="text-slate-400 hover:text-slate-700 transition-colors truncate">
-                {c.label}
-              </Link>
-            ) : (
-              <span className="font-semibold text-slate-800 truncate">{c.label}</span>
-            )}
-          </span>
-        ))}
-      </div>
+        {/* Title */}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-2xl font-bold tracking-tight text-foreground">{pageTitle}</h1>
+          {subtitle && <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p>}
+        </div>
 
-      {/* Mobile: page title */}
-      <span className="sm:hidden flex-1 text-sm font-semibold text-slate-800 truncate">{pageTitle}</span>
+        {/* Search */}
+        <form
+          className="relative hidden xl:block"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const q = query.trim();
+            if (!q) return;
+            router.push("/customers");
+          }}
+        >
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search officers, customers, visits…"
+            className="h-10 w-72 rounded-xl border border-transparent bg-card pl-9 pr-4 text-sm shadow-card outline-none placeholder:text-muted-foreground focus:border-primary/30 focus:ring-0"
+          />
+        </form>
 
-      {/* Right side actions */}
-      <div className="flex items-center gap-1.5 ml-auto">
+        {/* Refresh */}
+        <button
+          onClick={refresh}
+          className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card shadow-card transition hover:shadow-elevated"
+          aria-label="Refresh"
+        >
+          <RefreshCw className={cn("h-4 w-4 text-muted-foreground", refreshing && "animate-spin")} />
+        </button>
 
-        {/* Notification Bell */}
-        <div className="relative" ref={bellRef}>
+        {/* Notifications */}
+        <div className="relative" ref={notifRef}>
           <button
-            onClick={() => setBellOpen(!bellOpen)}
-            className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-colors"
+            onClick={() => setNotifOpen(!notifOpen)}
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card shadow-card transition hover:shadow-elevated"
             aria-label="Notifications"
           >
-            <Bell className="h-4 w-4" />
+            <Bell className="h-4 w-4 text-muted-foreground" />
             {unread > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white">
+              <span className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
                 {unread > 9 ? "9+" : unread}
               </span>
             )}
           </button>
 
-          {bellOpen && (
-            <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/80 z-50 animate-in fade-in slide-in-from-top-1 duration-150 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-800">Pending Actions</p>
-                {unread > 0 && (
-                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-600">
-                    {unread} new
-                  </span>
-                )}
+          {notifOpen && (
+            <div className="absolute right-0 mt-2 w-96 overflow-hidden rounded-2xl border border-border bg-card p-0 shadow-elevated z-50">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <p className="text-sm font-semibold text-foreground">Notifications</p>
+                <button
+                  className="text-xs font-medium text-primary hover:underline"
+                  onClick={() => setUnread(0)}
+                >
+                  Mark all read
+                </button>
               </div>
-              <div className="max-h-72 overflow-y-auto divide-y divide-slate-50">
+              <div className="max-h-80 overflow-y-auto">
                 {notifs.length === 0 ? (
-                  <p className="px-4 py-6 text-center text-xs text-slate-400">All caught up! No pending actions.</p>
+                  <p className="p-6 text-center text-sm text-muted-foreground">You're all caught up.</p>
                 ) : (
                   notifs.slice(0, 8).map((n) => (
                     <Link
                       key={n.id}
                       href={n.href}
-                      onClick={() => setBellOpen(false)}
-                      className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50 transition-colors"
+                      onClick={() => setNotifOpen(false)}
+                      className={cn(
+                        "flex w-full gap-3 border-b border-border px-4 py-3 text-left transition-colors last:border-0 hover:bg-muted/60",
+                        n.unread && "bg-primary-soft/60",
+                      )}
                     >
-                      <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 flex-shrink-0">
-                        {typeIcon[n.type]}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-800 truncate">{n.title}</p>
-                        <p className="text-[10px] text-slate-400 truncate mt-0.5">{n.subtitle}</p>
-                      </div>
+                      <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", n.unread ? "bg-primary" : "bg-border")} />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-foreground">{n.title}</span>
+                        <span className="block truncate text-xs text-muted-foreground">{n.subtitle}</span>
+                        <span className="mt-1 block text-[11px] text-muted-foreground/80">{n.time}</span>
+                      </span>
                     </Link>
                   ))
                 )}
               </div>
-              {notifs.length > 0 && (
-                <div className="px-4 py-2.5 border-t border-slate-100">
-                  <Link
-                    href="/missed-visits"
-                    onClick={() => setBellOpen(false)}
-                    className="text-xs text-[#C8102E] hover:text-[#C8102E] font-medium"
-                  >
-                    View all pending →
-                  </Link>
-                </div>
-              )}
+              <div className="border-t border-border px-4 py-3">
+                <Link
+                  href="/notifications"
+                  onClick={() => setNotifOpen(false)}
+                  className="text-xs font-semibold text-primary hover:underline"
+                >
+                  View all notifications →
+                </Link>
+              </div>
             </div>
           )}
         </div>
 
         {/* User dropdown */}
-        <div className="relative" ref={dropRef}>
+        <div className="relative" ref={userRef}>
           <button
             onClick={() => setUserOpen(!userOpen)}
-            className="flex items-center gap-2.5 rounded-xl border border-slate-200 pl-1.5 pr-3 py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"
+            className="flex items-center gap-3 rounded-xl bg-card px-3 py-2 shadow-card transition hover:shadow-elevated cursor-pointer"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#C8102E] to-[#9B0B22] text-xs font-bold text-white shadow-sm">
-              {session?.user?.name?.[0]?.toUpperCase() ?? "A"}
-            </div>
-            <div className="hidden sm:block text-left">
-              <p className="text-xs font-semibold text-slate-800 leading-none">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-navy text-xs font-bold text-navy-foreground">
+              {session?.user?.name?.slice(0, 2).toUpperCase() ?? "AD"}
+            </span>
+            <span className="hidden text-left leading-tight sm:block">
+              <span className="block text-sm font-semibold text-foreground">
                 {session?.user?.name?.split(" ")[0] ?? "Admin"}
-              </p>
-              <p className="text-[10px] text-slate-500 mt-0.5">Administrator</p>
-            </div>
-            <ChevronDown className={cn("h-3.5 w-3.5 text-slate-400 transition-transform duration-200", userOpen && "rotate-180")} />
+              </span>
+              <span className="block text-[11px] text-muted-foreground">Super Admin</span>
+            </span>
           </button>
 
           {userOpen && (
-            <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-200/80 py-1.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-              <div className="px-4 py-2.5 border-b border-slate-100">
-                <p className="text-xs font-semibold text-slate-800">{session?.user?.name}</p>
-                <p className="text-[10px] text-slate-400 truncate mt-0.5">{session?.user?.email}</p>
+            <div className="absolute right-0 mt-2 w-52 overflow-hidden rounded-xl border border-border bg-card shadow-elevated z-50">
+              <div className="border-b border-border px-4 py-2.5">
+                <p className="text-xs text-muted-foreground truncate">{session?.user?.email ?? "admin@bookmark.com.pk"}</p>
               </div>
               <div className="py-1">
                 <Link
                   href="/profile"
                   onClick={() => setUserOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer"
+                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors"
                 >
-                  <User className="h-4 w-4 text-slate-400" />
-                  Edit Profile
+                  <UserRound className="h-4 w-4 text-muted-foreground" />
+                  Profile
+                </Link>
+                <Link
+                  href="/settings"
+                  onClick={() => setUserOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-foreground hover:bg-muted/60 transition-colors"
+                >
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                  Settings
                 </Link>
               </div>
-              <div className="border-t border-slate-100 pt-1">
+              <div className="border-t border-border py-1">
                 <button
                   onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors cursor-pointer"
+                  className="flex w-full items-center gap-2.5 px-4 py-2 text-sm text-destructive hover:bg-destructive/8 transition-colors cursor-pointer"
                 >
                   <LogOut className="h-4 w-4" />
-                  Sign out
+                  Logout
                 </button>
               </div>
             </div>
