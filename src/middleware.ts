@@ -20,7 +20,8 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith("/api/setup") ||
     pathname.startsWith("/api/mobile") ||
     pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon")
+    pathname.startsWith("/favicon") ||
+    /\.[a-zA-Z0-9]+$/.test(pathname) // static files served from /public (images, robots.txt, etc.)
   ) {
     return NextResponse.next();
   }
