@@ -23,18 +23,18 @@ const CATEGORIES_SCHOOL = ["A+","A","B","O LEVEL"];
 const CATEGORIES_SHOP   = ["BOOKSHOPS","BOOKSHELF INSTALLED","RETAILER","STOCKIST","NETWORKS","DEPARTMENTAL STORE","ONLINE AGENT","Other"];
 const TYPES_SHOP        = ["School","Distributor","Retailer","Other"];
 
-const INPUT  = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition-all placeholder:text-slate-400";
+const INPUT  = "w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-muted-foreground";
 const SELECT = INPUT + " appearance-none cursor-pointer";
 
 function Field({ num, label, required, children }: { num?: number; label: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div className="flex gap-3">
       {num !== undefined && (
-        <div className="flex h-7 w-7 shrink-0 mt-0.5 items-center justify-center rounded-lg bg-[#C8102E]/10 text-xs font-bold text-[#C8102E]">{num}</div>
+        <div className="flex h-7 w-7 shrink-0 mt-0.5 items-center justify-center rounded-lg bg-primary-soft text-xs font-bold text-primary">{num}</div>
       )}
       <div className="flex-1">
-        <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-          {label} {required && <span className="text-[#C8102E]">*</span>}
+        <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">
+          {label} {required && <span className="text-primary">*</span>}
         </label>
         {children}
       </div>
@@ -57,7 +57,7 @@ function SelectField({ value, onChange, options, placeholder }: {
           return <option key={val} value={val}>{lbl}</option>;
         })}
       </select>
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
     </div>
   );
 }
@@ -157,12 +157,12 @@ export default function AddCustomerPage() {
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3">
           <button onClick={() => router.back()}
-            className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-muted/60 transition-colors">
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-slate-900">Add Customer</h1>
-            <p className="text-xs text-slate-500">Choose the type of customer to register</p>
+            <h1 className="text-xl font-bold text-foreground">Add Customer</h1>
+            <p className="text-xs text-muted-foreground">Choose the type of customer to register</p>
           </div>
         </div>
 
@@ -171,16 +171,16 @@ export default function AddCustomerPage() {
             <button
               key={key}
               onClick={() => setRegType(key)}
-              className="flex items-center gap-5 rounded-2xl border-2 border-slate-200 bg-white p-5 text-left hover:border-[#C8102E] hover:bg-red-50/30 transition-all group shadow-sm"
+              className="surface group flex items-center gap-5 rounded-2xl border-2 border-border p-5 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:bg-primary-soft"
             >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#C8102E]/10 group-hover:bg-[#C8102E] transition-colors">
-                <Icon className="h-6 w-6 text-[#C8102E] group-hover:text-white transition-colors" />
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+                <Icon className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-base font-bold text-slate-800 group-hover:text-[#C8102E] transition-colors">{label}</p>
-                <p className="text-sm text-slate-400 mt-0.5">{sub}</p>
+                <p className="text-base font-bold text-foreground transition-colors group-hover:text-primary">{label}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{sub}</p>
               </div>
-              <div className="ml-auto text-slate-300 group-hover:text-[#C8102E] transition-colors">→</div>
+              <div className="ml-auto text-muted-foreground/50 transition-colors group-hover:text-primary">→</div>
             </button>
           ))}
         </div>
@@ -199,21 +199,21 @@ export default function AddCustomerPage() {
       {/* Header */}
       <div className="flex items-center gap-3">
         <button onClick={() => setRegType(null)}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground hover:bg-muted/60 transition-colors">
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#C8102E]">
-            <Icon className="h-4 w-4 text-white" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+            <Icon className="h-4 w-4 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 leading-none">{chosen.label}</h1>
-            <p className="text-xs text-slate-500 mt-0.5">{chosen.sub}</p>
+            <h1 className="text-xl font-bold text-foreground leading-none">{chosen.label}</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">{chosen.sub}</p>
           </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
+      <form onSubmit={handleSubmit} className="surface p-6 space-y-5">
 
         {/* 1. Name */}
         <Field num={1} label={isSchool ? "School's Name" : isShop ? "Shop's Name" : "Name"} required>
@@ -255,14 +255,14 @@ export default function AddCustomerPage() {
 
             <div className="grid grid-cols-2 gap-4 pl-10">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                  8 · Review Month <span className="text-slate-400 font-normal normal-case text-[10px]">Calendar</span>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">
+                  8 · Review Month <span className="text-muted-foreground/70 font-normal normal-case text-[10px]">Calendar</span>
                 </label>
                 <input type="month" value={reviewMonth} onChange={e => setReviewMonth(e.target.value)} className={INPUT} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                  9 · Session Starts <span className="text-slate-400 font-normal normal-case text-[10px]">Calendar</span>
+                <label className="block text-xs font-semibold text-muted-foreground mb-1.5 uppercase tracking-wide">
+                  9 · Session Starts <span className="text-muted-foreground/70 font-normal normal-case text-[10px]">Calendar</span>
                 </label>
                 <input type="month" value={sessionStarts} onChange={e => setSessionStarts(e.target.value)} className={INPUT} />
               </div>
@@ -281,7 +281,7 @@ export default function AddCustomerPage() {
               <option value="">Select city…</option>
               {cities.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           </div>
         </Field>
 
@@ -313,16 +313,16 @@ export default function AddCustomerPage() {
         )}
 
         {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+          <div className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
         )}
 
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={() => setRegType(null)}
-            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            className="flex-1 rounded-xl border border-border py-3 text-sm font-medium text-muted-foreground hover:bg-muted/60 transition-colors">
             Back
           </button>
           <button type="submit" disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] py-3 text-sm font-bold text-white hover:bg-red-700 transition-colors disabled:opacity-60">
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground shadow-brand hover:opacity-90 transition-colors disabled:opacity-60">
             {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Adding…</> : "Add Customer"}
           </button>
         </div>

@@ -3,121 +3,58 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  Plus, Search, Download, Eye, Pencil, RefreshCw,
-  Filter, ChevronDown, X, MapPin, Phone, Mail, Globe,
-  Building2, User, Tag, Calendar,
+  Plus, Search, Download, Eye, Pencil, RefreshCw, ChevronDown,
 } from "lucide-react";
+import { SectionCard, EmptyState, TableSkeleton } from "@/components/shared/ui-bits";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 function stripHtml(s: string | null | undefined) {
   if (!s) return "";
   return s.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ").replace(/\s+/g, " ").trim();
 }
 
+const APPROVAL_TONE: Record<string, string> = {
+  APPROVED:     "bg-success/15 text-success border-success/25",
+  PENDING:      "bg-warning/20 text-warning-foreground border-warning/30",
+  NOT_APPROVED: "bg-destructive/15 text-destructive border-destructive/25",
+};
+const APPROVAL_LABEL: Record<string, string> = {
+  APPROVED: "Approved", PENDING: "Pending", NOT_APPROVED: "Not Approved",
+};
+
 function ApprovalBadge({ status }: { status: string }) {
   const s = (status ?? "").toUpperCase();
-  if (s === "APPROVED")
-    return <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 border-emerald-200">Approved</span>;
-  if (s === "PENDING")
-    return <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 border-amber-200">Pending</span>;
-  return <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 border-red-200">Not Approved</span>;
-}
-
-function CategoryBadge({ cat }: { cat: string | null | undefined }) {
-  if (!cat) return null;
-  const colors: Record<string, string> = {
-    "A+": "bg-purple-100 text-purple-700 border-purple-200",
-    "A":  "bg-blue-100 text-blue-700 border-blue-200",
-    "B":  "bg-teal-100 text-teal-700 border-teal-200",
-    "BOOKSHOPS": "bg-amber-100 text-amber-700 border-amber-200",
-  };
   return (
-    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${colors[cat] ?? "bg-slate-100 text-slate-600 border-slate-200"}`}>
-      {cat}
-    </span>
+    <Badge variant="outline" className={cn("rounded-full font-medium", APPROVAL_TONE[s] ?? "bg-muted text-muted-foreground")}>
+      {APPROVAL_LABEL[s] ?? "—"}
+    </Badge>
   );
 }
 
-// ─── Detail Modal ─────────────────────────────────────────────────────────────
+const CATEGORY_TONE: Record<string, string> = {
+  "A+": "bg-info/15 text-info-foreground border-info/25",
+  "A":  "bg-info/10 text-info-foreground border-info/20",
+  "B":  "bg-success/10 text-success border-success/20",
+  "BOOKSHOPS": "bg-warning/15 text-warning-foreground border-warning/25",
+};
 
-function CustomerDetailModal({ customer, onClose }: { customer: any; onClose: () => void }) {
-  const row = [
-    { icon: Building2, label: "City",    value: customer.city?.name },
-    { icon: Tag,       label: "Type",    value: customer.customerType },
-    { icon: Tag,       label: "Category",value: customer.category },
-    { icon: Phone,     label: "Phone",   value: customer.ownerPhone },
-    { icon: Mail,      label: "Email",   value: customer.email },
-    { icon: Globe,     label: "Website", value: customer.website },
-    { icon: MapPin,    label: "Address", value: customer.address },
-    { icon: User,      label: "Contact", value: customer.ownerName },
-    { icon: Tag,       label: "Zone",    value: customer.zone },
-    { icon: Building2, label: "Exam Board",      value: customer.examinationBoard },
-    { icon: Building2, label: "Programme",        value: customer.offeredProgramme },
-    { icon: Building2, label: "Total Students",   value: customer.totalStudents },
-  ].filter(f => f.value);
-
+function CategoryBadge({ cat }: { cat: string | null | undefined }) {
+  if (!cat) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-[#C8102E] to-[#9B0B22]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white font-bold text-lg">
-              {(customer.name ?? "C")[0].toUpperCase()}
-            </div>
-            <div>
-              <p className="font-bold text-white text-sm leading-tight">{customer.name}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <span className="text-[10px] text-white/70">{customer.customerType}</span>
-                {customer.category && <CategoryBadge cat={customer.category} />}
-              </div>
-            </div>
-          </div>
-          <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-        {/* Status & Joined */}
-        <div className="flex items-center gap-4 px-6 py-3 border-b border-slate-100 bg-slate-50/50">
-          <ApprovalBadge status={customer.approvalStatus ?? ""} />
-          {customer.createdAt && (
-            <span className="flex items-center gap-1 text-xs text-slate-400">
-              <Calendar className="h-3 w-3" />
-              Joined {new Date(customer.createdAt).toLocaleDateString("en-PK", { day:"numeric", month:"short", year:"numeric" })}
-            </span>
-          )}
-        </div>
-
-        {/* Fields */}
-        <div className="px-6 py-4 grid grid-cols-2 gap-3 max-h-80 overflow-y-auto">
-          {row.map(({ icon: Icon, label, value }) => (
-            <div key={label} className="min-w-0">
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
-              <div className="flex items-start gap-1.5 mt-0.5">
-                <Icon className="h-3.5 w-3.5 text-slate-400 mt-0.5 shrink-0" />
-                <p className="text-xs text-slate-700 font-medium break-words">{String(value)}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3 px-6 py-4 border-t border-slate-100">
-          <Link
-            href={`/customers/${customer.id}/edit`}
-            className="flex-1 text-center rounded-xl bg-[#C8102E] py-2.5 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
-          >
-            Edit Customer
-          </Link>
-          <button
-            onClick={onClose}
-            className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+    <Badge variant="outline" className={cn("rounded-full text-[10px] font-semibold", CATEGORY_TONE[cat] ?? "bg-muted text-muted-foreground")}>
+      {cat}
+    </Badge>
   );
 }
 
@@ -161,13 +98,13 @@ function ExportMenu({ rows }: { rows: any[] }) {
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
-        <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" />
-      </button>
+      <Button variant="outline" className="rounded-xl" onClick={() => setOpen(!open)}>
+        <Download className="mr-2 h-4 w-4" /> Export <ChevronDown className="ml-1 h-3.5 w-3.5" />
+      </Button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-36 rounded-xl border border-slate-200 bg-white shadow-lg z-10">
-          <button onClick={exportCSV} className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 rounded-t-xl">Export CSV</button>
-          <button onClick={exportPDF} className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 rounded-b-xl">Export PDF</button>
+        <div className="absolute right-0 top-full z-10 mt-1 w-40 overflow-hidden rounded-xl border border-border bg-card shadow-elevated">
+          <button onClick={exportCSV} className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted/60">Export CSV</button>
+          <button onClick={exportPDF} className="w-full px-3 py-2 text-left text-sm text-foreground hover:bg-muted/60">Export PDF</button>
         </div>
       )}
     </div>
@@ -184,7 +121,6 @@ export default function CustomersClient() {
   const [typeFilter, setTypeFilter]   = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage]               = useState(0);
-  const [detail, setDetail]           = useState<any | null>(null);
   const PER_PAGE = 50;
 
   async function load(p = 0) {
@@ -215,147 +151,146 @@ export default function CustomersClient() {
     return matchSearch && matchType && matchStatus;
   });
 
-  const totalPages = Math.ceil(total / PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(0); }}
-            placeholder="Search by name, city, or category…"
-            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition"
-          />
+    <div className="space-y-6">
+      <SectionCard
+        title="Customer Directory"
+        description={`${total.toLocaleString()} records`}
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="icon" className="rounded-xl" onClick={() => load(page)} disabled={loading}>
+              <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            </Button>
+            <ExportMenu rows={filtered} />
+            <Button className="rounded-xl" asChild>
+              <Link href="/customers/add">
+                <Plus className="mr-2 h-4 w-4" /> Add Customer
+              </Link>
+            </Button>
+          </div>
+        }
+      >
+        <div className="mb-5 flex flex-wrap gap-3">
+          <div className="relative min-w-64 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(0); }}
+              placeholder="Search by name, city, or category…"
+              className="h-11 rounded-xl pl-9"
+            />
+          </div>
+          <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setPage(0); }}>
+            <SelectTrigger className="h-11 w-44 rounded-xl">
+              <SelectValue placeholder="Type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="SCHOOL">School</SelectItem>
+              <SelectItem value="COLLEGE">College</SelectItem>
+              <SelectItem value="RETAILER">Book Shop</SelectItem>
+              <SelectItem value="SELF">Individual</SelectItem>
+              <SelectItem value="OTHER">Other</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(0); }}>
+            <SelectTrigger className="h-11 w-40 rounded-xl">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="not_approved">Not Approved</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <select
-            value={typeFilter}
-            onChange={e => { setTypeFilter(e.target.value); setPage(0); }}
-            className="pl-9 pr-7 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none appearance-none cursor-pointer"
-          >
-            <option value="all">All Types</option>
-            <option value="SCHOOL">School</option>
-            <option value="COLLEGE">College</option>
-            <option value="RETAILER">Book Shop</option>
-            <option value="SELF">Individual</option>
-            <option value="OTHER">Other</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-        </div>
-        <div className="relative">
-          <select
-            value={statusFilter}
-            onChange={e => { setStatusFilter(e.target.value); setPage(0); }}
-            className="px-3 pr-7 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none appearance-none cursor-pointer"
-          >
-            <option value="all">All Status</option>
-            <option value="approved">Approved</option>
-            <option value="pending">Pending</option>
-            <option value="not_approved">Not Approved</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-        </div>
-        <div className="flex gap-2">
-          <button onClick={() => load(page)} disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <ExportMenu rows={filtered} />
-          <Link href="/customers/add"
-            className="flex items-center gap-2 rounded-lg bg-[#C8102E] px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors">
-            <Plus className="h-4 w-4" /> Add Customer
-          </Link>
-        </div>
-      </div>
 
-      {/* Table */}
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-xs overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/50">
-              {["#", "Customer", "Category", "City", "Status", "Joined", "Actions"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {loading && [...Array(8)].map((_, i) => (
-              <tr key={i}>
-                {[...Array(7)].map((_, j) => (
-                  <td key={j} className="px-4 py-3">
-                    <div className="h-4 rounded bg-slate-100 animate-pulse" style={{ width: j === 1 ? "180px" : "80px" }} />
-                  </td>
+        {loading ? (
+          <TableSkeleton />
+        ) : filtered.length === 0 ? (
+          <EmptyState title="No customers found" description="Adjust the search or clear the filters." />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>City</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Joined</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((r: any) => (
+                  <TableRow key={r.id} className="transition-colors hover:bg-muted/50">
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-bold text-primary">
+                          {(r.name ?? "C")[0].toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <Link href={`/customers/${r.id}`} className="truncate font-medium hover:text-primary hover:underline">
+                            {stripHtml(r.name)}
+                          </Link>
+                          <p className="text-xs text-muted-foreground">{r.customerType ?? "Other"}</p>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell><CategoryBadge cat={r.category} /></TableCell>
+                    <TableCell>{stripHtml(r.city?.name) || "—"}</TableCell>
+                    <TableCell><ApprovalBadge status={r.approvalStatus ?? ""} /></TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-PK") : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
+                            <ChevronDown className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="rounded-xl">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/customers/${r.id}`}>
+                              <Eye className="mr-2 h-4 w-4" /> View
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/customers/${r.id}/edit`}>
+                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tr>
-            ))}
-            {!loading && filtered.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">No customers found</td>
-              </tr>
-            )}
-            {!loading && filtered.map((r: any, i: number) => (
-              <tr key={r.id ?? i} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-4 py-3 text-slate-400 text-xs">{page * PER_PAGE + i + 1}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#C8102E]/10 text-xs font-bold text-[#C8102E]">
-                      {(r.name ?? "C")[0].toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-800 leading-tight">{stripHtml(r.name)}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{r.customerType ?? "Other"}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3"><CategoryBadge cat={r.category} /></td>
-                <td className="px-4 py-3 text-slate-600 text-xs">{stripHtml(r.city?.name) || "—"}</td>
-                <td className="px-4 py-3"><ApprovalBadge status={r.approvalStatus ?? ""} /></td>
-                <td className="px-4 py-3 text-slate-500 text-xs">{r.createdAt ? new Date(r.createdAt).toLocaleDateString("en-PK") : "—"}</td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setDetail(r)}
-                      title="View details"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-[#C8102E] hover:bg-red-50 transition-colors"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <Link
-                      href={`/customers/${r.id}/edit`}
-                      title="Edit customer"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Link>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
-        {/* Pagination */}
-        <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3">
-          <p className="text-xs text-slate-500">
+        <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
+          <p className="text-xs text-muted-foreground">
             Showing {page * PER_PAGE + 1}–{Math.min((page + 1) * PER_PAGE, total)} of {total.toLocaleString()} customers
           </p>
-          <div className="flex items-center gap-1 text-xs text-slate-500">
-            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-              className="rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-40">← Prev</button>
-            <span className="rounded bg-[#C8102E] px-2 py-1 text-white font-medium">{page + 1}</span>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Button variant="ghost" size="sm" className="rounded-lg" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>
+              ← Prev
+            </Button>
+            <span className="rounded-lg bg-primary px-2.5 py-1 font-medium text-primary-foreground">{page + 1}</span>
             <span className="px-1">of {totalPages}</span>
-            <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
-              className="rounded px-2 py-1 hover:bg-slate-100 disabled:opacity-40">Next →</button>
+            <Button variant="ghost" size="sm" className="rounded-lg" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>
+              Next →
+            </Button>
           </div>
         </div>
-      </div>
-
-      {/* Detail Modal */}
-      {detail && <CustomerDetailModal customer={detail} onClose={() => setDetail(null)} />}
+      </SectionCard>
     </div>
   );
 }
