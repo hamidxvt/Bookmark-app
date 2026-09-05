@@ -21,6 +21,10 @@ interface Booker {
   profilePhoto?: string | null;
   createdAt: string;
   city: { id: number; name: string } | null;
+  lastLatitude?: number | string | null;
+  lastLongitude?: number | string | null;
+  lastSeenAt?: string | null;
+  gpsStatus?: string;
 }
 
 interface Visit {
@@ -31,6 +35,11 @@ interface Visit {
 
 interface AttendanceRow {
   id: number; date: string; startAt: string | null; endAt: string | null; status: string;
+}
+
+interface AssignedCustomer {
+  id: number; name: string; customerType: string;
+  city: { id: number; name: string } | null;
 }
 
 function initials(name: string) {
@@ -47,6 +56,9 @@ function hoursBetween(start: string | null, end: string | null) {
 export default function BookerDetailClient({ bookerId }: { bookerId: string }) {
   const [booker, setBooker] = useState<Booker | null>(null);
   const [visits, setVisits] = useState<Visit[]>([]);
+  const [visitsTotal, setVisitsTotal] = useState(0);
+  const [completedTotal, setCompletedTotal] = useState(0);
+  const [assignedCustomers, setAssignedCustomers] = useState<AssignedCustomer[]>([]);
   const [attendance, setAttendance] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -58,15 +70,21 @@ export default function BookerDetailClient({ bookerId }: { bookerId: string }) {
         const dateFrom = new Date();
         dateFrom.setDate(dateFrom.getDate() - 13);
 
-        const [bRes, vRes, aRes] = await Promise.all([
+        const [bRes, vRes, vTotalRes, vCompletedRes, cRes, aRes] = await Promise.all([
           fetch(`/api/v1/bookers/${bookerId}`).then(r => r.json()),
-          fetch(`/api/v1/visits?bookerId=${bookerId}&length=25`).then(r => r.json()),
+          fetch(`/api/v1/visits?bookerId=${bookerId}&length=100`).then(r => r.json()),
+          fetch(`/api/v1/visits?bookerId=${bookerId}&length=1`).then(r => r.json()),
+          fetch(`/api/v1/visits?bookerId=${bookerId}&status=COMPLETED&length=1`).then(r => r.json()),
+          fetch(`/api/v1/customers?assignedBookerId=${bookerId}&length=200`).then(r => r.json()),
           fetch(`/api/v1/attendance?bookerId=${bookerId}&dateFrom=${dateFrom.toISOString()}&dateTo=${dateTo.toISOString()}`).then(r => r.json()),
         ]);
 
         if (!bRes.success) { setNotFound(true); return; }
         setBooker(bRes.data);
         setVisits(vRes.data?.data ?? []);
+        setVisitsTotal(vTotalRes.data?.recordsTotal ?? 0);
+        setCompletedTotal(vCompletedRes.data?.recordsTotal ?? 0);
+        setAssignedCustomers(cRes.data?.data ?? []);
         setAttendance(aRes.data ?? []);
       } catch (e) {
         console.error(e);
@@ -99,8 +117,6 @@ export default function BookerDetailClient({ bookerId }: { bookerId: string }) {
     );
   }
 
-  const completedVisits = visits.filter(v => v.status === "COMPLETED").length;
-  const uniqueCustomers = new Set(visits.map(v => v.customer?.id).filter(Boolean)).size;
   const presentDays = attendance.filter(a => a.status === "present").length;
   const attendanceRate = attendance.length > 0 ? Math.round((presentDays / attendance.length) * 100) : 0;
   const todayVisits = visits.filter(v => new Date(v.visitDate).toDateString() === new Date().toDateString());
@@ -137,9 +153,9 @@ export default function BookerDetailClient({ bookerId }: { bookerId: string }) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Total Visits" value={visits.length} icon={<RouteIcon className="h-5 w-5" />} />
-        <StatCard label="Completed Visits" value={completedVisits} icon={<CheckCircle2 className="h-5 w-5" />} />
-        <StatCard label="Customers" value={uniqueCustomers} icon={<Users className="h-5 w-5" />} />
+        <StatCard label="Total Visits" value={visitsTotal} icon={<RouteIcon className="h-5 w-5" />} />
+        <StatCard label="Completed Visits" value={completedTotal} icon={<CheckCircle2 className="h-5 w-5" />} />
+        <StatCard label="Customers" value={assignedCustomers.length} icon={<Users className="h-5 w-5" />} />
         <StatCard label="Attendance (14d)" value={`${attendanceRate}%`} icon={<CalendarCheck className="h-5 w-5" />} />
       </div>
 
@@ -148,6 +164,7 @@ export default function BookerDetailClient({ bookerId }: { bookerId: string }) {
           <TabsTrigger value="overview" className="rounded-lg">Overview</TabsTrigger>
           <TabsTrigger value="visits" className="rounded-lg">Visits</TabsTrigger>
           <TabsTrigger value="attendance" className="rounded-lg">Attendance</TabsTrigger>
+          <TabsTrigger value="location" className="rounded-lg">Location History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="mt-5 grid gap-6 xl:grid-cols-2">
@@ -171,19 +188,17 @@ export default function BookerDetailClient({ bookerId }: { bookerId: string }) {
             </dl>
           </SectionCard>
 
-          <SectionCard title="Recent Customers" description={`${uniqueCustomers} accounts visited`}>
-            {visits.length === 0 ? (
-              <EmptyState title="No visits recorded yet" />
+          <SectionCard title="Assigned Customers" description={`${assignedCustomers.length} account(s) in portfolio`}>
+            {assignedCustomers.length === 0 ? (
+              <EmptyState title="No customers assigned yet" />
             ) : (
               <ul className="space-y-3">
-                {Array.from(new Map(visits.filter(v => v.customer).map(v => [v.customer!.id, v.customer!])).values())
-                  .slice(0, 6)
-                  .map((c) => (
-                    <li key={c.id} className="flex items-center justify-between rounded-xl border border-border/70 p-3">
-                      <span className="text-sm font-medium text-foreground">{c.name}</span>
-                      <span className="text-xs text-muted-foreground">{c.customerType}</span>
-                    </li>
-                  ))}
+                {assignedCustomers.slice(0, 6).map((c) => (
+                  <li key={c.id} className="flex items-center justify-between rounded-xl border border-border/70 p-3">
+                    <span className="text-sm font-medium text-foreground">{c.name}</span>
+                    <span className="text-xs text-muted-foreground">{c.customerType} · {c.city?.name ?? "—"}</span>
+                  </li>
+                ))}
               </ul>
             )}
           </SectionCard>
@@ -249,6 +264,25 @@ export default function BookerDetailClient({ bookerId }: { bookerId: string }) {
                   </TableBody>
                 </Table>
               </div>
+            )}
+          </SectionCard>
+        </TabsContent>
+
+        <TabsContent value="location" className="mt-5">
+          <SectionCard
+            title="Last Known Location"
+            description={booker.lastSeenAt ? `Last seen ${formatDateTime(booker.lastSeenAt)}` : "No GPS data yet"}
+          >
+            {booker.lastLatitude && booker.lastLongitude ? (
+              <div className="overflow-hidden rounded-xl border border-border/70">
+                <iframe
+                  title="Officer location"
+                  className="h-96 w-full"
+                  src={`https://www.openstreetmap.org/export/embed.html?bbox=${Number(booker.lastLongitude) - 0.01},${Number(booker.lastLatitude) - 0.01},${Number(booker.lastLongitude) + 0.01},${Number(booker.lastLatitude) + 0.01}&layer=mapnik&marker=${booker.lastLatitude},${booker.lastLongitude}`}
+                />
+              </div>
+            ) : (
+              <EmptyState title="No location data" description="This officer hasn't reported a GPS position yet." />
             )}
           </SectionCard>
         </TabsContent>

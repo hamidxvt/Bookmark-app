@@ -8,10 +8,12 @@ export async function GET(req: Request) {
     const take = Number(searchParams.get("length") ?? 50);
     const cityId = searchParams.get("cityId");
     const type = searchParams.get("type");
+    const assignedBookerId = searchParams.get("assignedBookerId");
 
     const where: Record<string, unknown> = { deletedAt: null };
     if (cityId) where.cityId = parseInt(cityId);
     if (type) where.customerType = type.toUpperCase();
+    if (assignedBookerId) where.assignedBookerId = parseInt(assignedBookerId);
 
     const [records, total] = await Promise.all([
       prisma.customer.findMany({

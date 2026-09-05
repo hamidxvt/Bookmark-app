@@ -20,6 +20,7 @@ export async function GET(
         basicSalary: true, securityDepositPct: true,
         sampleBudget: true, rewardPoints: true,
         profilePhoto: true,
+        lastLatitude: true, lastLongitude: true, lastSeenAt: true, gpsStatus: true,
         city: { select: { id: true, name: true } },
         createdAt: true,
       },
