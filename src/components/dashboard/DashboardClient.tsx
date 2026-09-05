@@ -92,17 +92,21 @@ export default function DashboardClient() {
         axios.get("/api/v1/live-activity"),
       ]);
       setSummary(sRes.data?.data ?? sRes.data);
-      const raw: Record<string, unknown>[] = aRes.data?.data ?? aRes.data ?? [];
+      const activities: unknown = aRes.data?.data?.activities ?? aRes.data?.data ?? aRes.data ?? [];
+      const raw: Record<string, unknown>[] = Array.isArray(activities) ? activities : [];
       setOfficers(
-        raw.map((o) => ({
-          id:          String(o.id),
-          name:        String(o.name),
-          city:        o.city ? String(o.city) : undefined,
-          isOffline:   Boolean(o.isOffline),
-          isIdle:      Boolean(o.isIdle),
-          visitsDone:  Number(o.visitsDone  ?? 0),
-          visitsTotal: Number(o.visitsTotal ?? 0),
-        })),
+        raw.map((o) => {
+          const stats = (o.stats ?? {}) as Record<string, unknown>;
+          return {
+            id:          String(o.id),
+            name:        String(o.name),
+            city:        o.city ? String(o.city) : undefined,
+            isOffline:   Boolean(o.isOffline),
+            isIdle:      Boolean(o.isIdle),
+            visitsDone:  Number(stats.completedToday ?? 0),
+            visitsTotal: Number(stats.totalToday ?? 0),
+          };
+        }),
       );
     } catch (e) {
       console.error(e);
