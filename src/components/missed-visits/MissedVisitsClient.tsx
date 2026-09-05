@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle, XCircle, RefreshCw, MapPin, Calendar } from "lucide-react";
+import { CheckCircle, XCircle, RefreshCw, MapPin, Calendar, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
+import { EmptyState, SectionCard, StatCard } from "@/components/shared/ui-bits";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 interface MissedVisit {
   id: number;
@@ -19,9 +26,9 @@ interface MissedVisit {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-700 border-amber-200",
-  approved: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  rejected: "bg-red-100 text-red-700 border-red-200",
+  pending: "bg-warning/15 text-warning-foreground border-warning/30",
+  approved: "bg-success/15 text-success border-success/25",
+  rejected: "bg-destructive/10 text-destructive border-destructive/25",
 };
 
 const CUSTOMER_TYPE_ICON: Record<string, string> = {
@@ -43,7 +50,7 @@ export default function MissedVisitsClient() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/missed-visits?status=${filter}`).then(r => r.json());
+      const res = await fetch(`/api/v1/missed-visits?status=${filter}`).then((r) => r.json());
       if (res.success) setItems(res.data);
     } finally {
       setLoading(false);
@@ -59,7 +66,7 @@ export default function MissedVisitsClient() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, status, adminNote: note }),
-      }).then(r => r.json());
+      }).then((r) => r.json());
       if (res.success) {
         setNoteModal(null);
         setNote("");
@@ -70,97 +77,99 @@ export default function MissedVisitsClient() {
     }
   }
 
-  const pending = items.filter(m => m.status === "pending").length;
+  const pending = items.filter((m) => m.status === "pending").length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 px-6 py-6 lg:px-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900">Missed Visits</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Review booker excuses for missed field visits</p>
+          <h1 className="text-xl font-bold text-foreground">Missed Visits</h1>
+          <p className="mt-0.5 text-sm text-muted-foreground">Review officer excuses for missed field visits</p>
         </div>
-        <div className="flex items-center gap-2">
-          {pending > 0 && (
-            <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-              {pending}
-            </span>
-          )}
-          <button onClick={load} disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-        </div>
+        <Button variant="outline" className="rounded-xl" onClick={load} disabled={loading}>
+          <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} /> Refresh
+        </Button>
       </div>
 
-      <div className="flex gap-1 rounded-xl bg-slate-100 p-1 w-fit">
-        {["pending", "approved", "rejected"].map(s => (
-          <button key={s} onClick={() => setFilter(s)}
-            className={`rounded-lg px-4 py-1.5 text-xs font-medium capitalize transition-all ${
-              filter === s ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
-            }`}>
-            {s}
-          </button>
-        ))}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Pending Review" value={pending} icon={<AlertTriangle className="h-5 w-5" />} />
+        <StatCard label="Showing" value={items.length} icon={<Calendar className="h-5 w-5" />} />
+        <StatCard label="Filter" value={filter.charAt(0).toUpperCase() + filter.slice(1)} icon={<CheckCircle className="h-5 w-5" />} />
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+      <SectionCard title="Excuse Reports" description={`${items.length} ${filter} reports`}>
+        <div className="mb-5 flex w-fit gap-1 rounded-xl bg-muted p-1">
+          {["pending", "approved", "rejected"].map((s) => (
+            <button
+              key={s}
+              onClick={() => setFilter(s)}
+              className={cn(
+                "rounded-lg px-4 py-1.5 text-xs font-medium capitalize transition-all",
+                filter === s ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+
         {loading ? (
-          <div className="divide-y divide-slate-50">
+          <div className="space-y-3">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-6 py-4">
-                <div className="h-10 w-10 rounded-xl bg-slate-100 animate-pulse" />
+              <div key={i} className="flex items-center gap-4 px-2 py-3">
+                <div className="h-10 w-10 animate-pulse rounded-xl bg-muted" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-3 w-52 rounded bg-slate-100 animate-pulse" />
-                  <div className="h-2.5 w-36 rounded bg-slate-100 animate-pulse" />
+                  <div className="h-3 w-52 animate-pulse rounded bg-muted" />
+                  <div className="h-2.5 w-36 animate-pulse rounded bg-muted" />
                 </div>
               </div>
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="py-16 text-center">
-            <CheckCircle className="mx-auto h-10 w-10 text-slate-200" />
-            <p className="mt-3 text-sm text-slate-400">No {filter} missed visit reports</p>
-          </div>
+          <EmptyState title={`No ${filter} missed visit reports`} />
         ) : (
-          <div className="divide-y divide-slate-50">
-            {items.map(item => (
-              <div key={item.id} className="flex items-start gap-4 px-6 py-4 hover:bg-slate-50/50 transition-colors">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-xl">
+          <div className="divide-y divide-border">
+            {items.map((item) => (
+              <div key={item.id} className="flex items-start gap-4 py-4 transition-colors hover:bg-muted/40">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted text-xl">
                   {CUSTOMER_TYPE_ICON[item.visit.customer.customerType] ?? "📍"}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-slate-800">{item.visit.customer.name}</p>
-                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[item.status]}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">{item.visit.customer.name}</p>
+                    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize", STATUS_COLORS[item.status])}>
                       {item.status}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-500">
+                  <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
                     <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{item.booker.name}</span>
                     <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{format(new Date(item.visit.visitDate), "MMM d, yyyy")}</span>
                   </div>
-                  <p className="text-xs text-slate-600 mt-1.5 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                  <p className="mt-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-foreground">
                     {item.reason}
                   </p>
                   {item.adminNote && (
-                    <p className="text-xs text-slate-400 mt-1 italic">Admin note: {item.adminNote}</p>
+                    <p className="mt-1 text-xs italic text-muted-foreground">Admin note: {item.adminNote}</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <p className="text-xs text-slate-400 hidden sm:block">{format(new Date(item.createdAt), "MMM d")}</p>
+                <div className="flex shrink-0 items-center gap-2">
+                  <p className="hidden text-xs text-muted-foreground sm:block">{format(new Date(item.createdAt), "MMM d")}</p>
                   {item.status === "pending" && (
                     <>
-                      <button onClick={() => setNoteModal({ id: item.id, action: "approved" })} disabled={actionId === item.id}
-                        className="flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50">
-                        <CheckCircle className="h-3.5 w-3.5" />
-                        Approve
-                      </button>
-                      <button onClick={() => setNoteModal({ id: item.id, action: "rejected" })} disabled={actionId === item.id}
-                        className="flex items-center gap-1 rounded-lg bg-red-50 border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50">
-                        <XCircle className="h-3.5 w-3.5" />
-                        Reject
-                      </button>
+                      <Button
+                        size="sm" variant="outline" disabled={actionId === item.id}
+                        className="rounded-lg border-success/30 bg-success/10 text-success hover:bg-success/20"
+                        onClick={() => setNoteModal({ id: item.id, action: "approved" })}
+                      >
+                        <CheckCircle className="mr-1 h-3.5 w-3.5" /> Approve
+                      </Button>
+                      <Button
+                        size="sm" variant="outline" disabled={actionId === item.id}
+                        className="rounded-lg border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive/20"
+                        onClick={() => setNoteModal({ id: item.id, action: "rejected" })}
+                      >
+                        <XCircle className="mr-1 h-3.5 w-3.5" /> Reject
+                      </Button>
                     </>
                   )}
                 </div>
@@ -168,35 +177,42 @@ export default function MissedVisitsClient() {
             ))}
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      {noteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-slate-900 mb-1">
-              {noteModal.action === "approved" ? "Approve Excuse" : "Reject Excuse"}
-            </h3>
-            <p className="text-sm text-slate-500 mb-4">
-              {noteModal.action === "rejected" ? "Rejecting will deduct the daily performance allowance." : "Approving excuses the missed visit with no penalty."}
-            </p>
-            <textarea value={note} onChange={e => setNote(e.target.value)}
-              placeholder="Optional note for the booker..." rows={3}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none" />
-            <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => { setNoteModal(null); setNote(""); }}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">
-                Cancel
-              </button>
-              <button onClick={() => handleAction(noteModal.id, noteModal.action)} disabled={actionId !== null}
-                className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${
-                  noteModal.action === "approved" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"
-                }`}>
-                Confirm
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={!!noteModal} onOpenChange={(o) => { if (!o) { setNoteModal(null); setNote(""); } }}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{noteModal?.action === "approved" ? "Approve Excuse" : "Reject Excuse"}</DialogTitle>
+            <DialogDescription>
+              {noteModal?.action === "rejected"
+                ? "Rejecting will deduct the daily performance allowance."
+                : "Approving excuses the missed visit with no penalty."}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional note for the officer…"
+            rows={3}
+            className="resize-none rounded-xl"
+          />
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => { setNoteModal(null); setNote(""); }}>
+              Cancel
+            </Button>
+            <Button
+              disabled={actionId !== null}
+              className={cn(
+                "rounded-xl",
+                noteModal?.action === "approved" ? "bg-success text-success-foreground hover:bg-success/90" : "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+              )}
+              onClick={() => noteModal && handleAction(noteModal.id, noteModal.action)}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

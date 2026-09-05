@@ -1,29 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarPlus, Loader2 } from "lucide-react";
+import { SectionCard } from "@/components/shared/ui-bits";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const inputCls = "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition";
-const labelCls = "block text-xs font-semibold text-slate-700 mb-1.5";
-
-const BOOKERS = [
-  { id: 1, name: "Ahmed Raza" },
-  { id: 2, name: "Sara Malik" },
-  { id: 3, name: "Ali Hassan" },
-  { id: 4, name: "Usman Khan" },
-];
-
-const CUSTOMERS = [
-  { id: 1, name: "City School DHA" },
-  { id: 2, name: "Karachi Grammar School" },
-  { id: 3, name: "Al Barkat Books" },
-  { id: 4, name: "LGS Gulberg" },
-  { id: 5, name: "DPS Karachi" },
-];
+interface Booker { id: number; name: string }
+interface Customer { id: number; name: string }
 
 export default function ScheduleVisitPage() {
+  const [bookers, setBookers] = useState<Booker[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [bookerId, setBookerId] = useState("");
+  const [customerId, setCustomerId] = useState("");
+  const [priority, setPriority] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/v1/bookers?length=500").then((r) => r.json()).then((res) => {
+      if (res.success) setBookers(res.data?.data ?? []);
+    }).catch(() => {});
+    fetch("/api/v1/customers?length=500").then((r) => r.json()).then((res) => {
+      if (res.success) setCustomers(res.data?.data ?? []);
+    }).catch(() => {});
+  }, []);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -32,65 +37,71 @@ export default function ScheduleVisitPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="max-w-2xl space-y-6 px-6 py-6 lg:px-8">
       <div className="flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-100">
-          <CalendarPlus className="h-4 w-4 text-sky-600" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-soft">
+          <CalendarPlus className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Schedule Visit</h1>
-          <p className="text-xs text-slate-500">Assign a booker to visit a customer</p>
+          <h1 className="text-xl font-bold text-foreground">Schedule Visit</h1>
+          <p className="text-xs text-muted-foreground">Assign an officer to visit a customer</p>
         </div>
       </div>
 
       {success && (
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5 text-sm text-emerald-700 font-medium">
+        <div className="rounded-xl border border-success/25 bg-success/10 px-4 py-3.5 text-sm font-medium text-success">
           Visit scheduled successfully!
         </div>
       )}
 
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-xs p-6">
+      <SectionCard title="Visit Details" description="Fill in the visit information">
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label className={labelCls}>Booker</label>
-              <select name="booker_id" required className={inputCls}>
-                <option value="">Select booker</option>
-                {BOOKERS.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Officer</Label>
+              <Select value={bookerId} onValueChange={setBookerId} required>
+                <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select officer" /></SelectTrigger>
+                <SelectContent>
+                  {bookers.map((b) => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <label className={labelCls}>Customer</label>
-              <select name="customer_id" required className={inputCls}>
-                <option value="">Select customer</option>
-                {CUSTOMERS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label className={labelCls}>Visit Date</label>
-              <input type="date" name="date" required className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Priority</label>
-              <select name="priority" required className={inputCls}>
-                <option value="">Select priority</option>
-                <option value="High">High</option>
-                <option value="Medium">Medium</option>
-                <option value="Low">Low</option>
-              </select>
+            <div className="space-y-2">
+              <Label>Customer</Label>
+              <Select value={customerId} onValueChange={setCustomerId} required>
+                <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select customer" /></SelectTrigger>
+                <SelectContent>
+                  {customers.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          <div>
-            <label className={labelCls}>Special Instructions</label>
-            <textarea name="special_instruction" rows={4} placeholder="Any notes or instructions for this visit…" className={`${inputCls} resize-none`} />
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Visit Date</Label>
+              <Input type="date" name="date" required className="h-11 rounded-xl" />
+            </div>
+            <div className="space-y-2">
+              <Label>Priority</Label>
+              <Select value={priority} onValueChange={setPriority} required>
+                <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select priority" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="Low">Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <button type="submit" disabled={loading} className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#0a1628] py-3 text-sm font-semibold text-white hover:bg-slate-800 transition disabled:opacity-60 cursor-pointer">
-            {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Scheduling…</> : "Schedule Visit"}
-          </button>
+          <div className="space-y-2">
+            <Label>Special Instructions</Label>
+            <Textarea name="special_instruction" rows={4} placeholder="Any notes or instructions for this visit…" className="rounded-xl resize-none" />
+          </div>
+          <Button type="submit" disabled={loading} className="w-full rounded-xl py-6 text-sm font-semibold">
+            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scheduling…</> : "Schedule Visit"}
+          </Button>
         </form>
-      </div>
+      </SectionCard>
     </div>
   );
 }
