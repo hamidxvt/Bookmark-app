@@ -3,8 +3,21 @@
 import { useEffect, useState } from "react";
 import {
   Search, RefreshCw, CheckCircle, XCircle, Clock, Package,
-  Filter, User, ChevronDown, Eye, X, FileText,
+  Eye, X, FileText, Boxes, Truck,
 } from "lucide-react";
+
+import { EmptyState, SectionCard, StatCard, TableSkeleton } from "@/components/shared/ui-bits";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { cn, formatPKR } from "@/lib/utils";
 
 interface SampleRequest {
   id: number;
@@ -23,27 +36,27 @@ interface SampleRequest {
   customer: { id: number; name: string } | null;
 }
 
+const STATUS_TONE: Record<string, string> = {
+  approved: "bg-success/15 text-success",
+  rejected: "bg-destructive/15 text-destructive",
+  delivered: "bg-info/15 text-info-foreground",
+  pending: "bg-warning/20 text-warning-foreground",
+};
+
+const STATUS_ICON: Record<string, typeof CheckCircle> = {
+  approved: CheckCircle,
+  rejected: XCircle,
+  delivered: Package,
+  pending: Clock,
+};
+
 function StatusBadge({ status }: { status: string }) {
   const s = status.toLowerCase();
-  if (s === "approved") return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700">
-      <CheckCircle className="h-3 w-3" />Approved
-    </span>
-  );
-  if (s === "rejected") return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700">
-      <XCircle className="h-3 w-3" />Rejected
-    </span>
-  );
-  if (s === "delivered") return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-blue-100 text-blue-700">
-      <Package className="h-3 w-3" />Delivered
-    </span>
-  );
+  const Icon = STATUS_ICON[s] ?? Clock;
   return (
-    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold bg-amber-100 text-amber-700">
-      <Clock className="h-3 w-3" />Pending
-    </span>
+    <Badge className={cn("gap-1 font-semibold capitalize", STATUS_TONE[s] ?? "bg-muted text-muted-foreground")}>
+      <Icon className="h-3 w-3" /> {s}
+    </Badge>
   );
 }
 
@@ -74,120 +87,117 @@ function ReviewModal({ sample, onClose, onDone }: {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="text-lg font-bold text-gray-900">Review Sample Request</h2>
-          <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-100 transition">
-            <X className="h-5 w-5 text-gray-500" />
-          </button>
-        </div>
-        <div className="p-6 space-y-4">
-          <div className="rounded-xl bg-gray-50 p-4 space-y-2">
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="rounded-2xl sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Review Sample Request</DialogTitle>
+          <DialogDescription>Approve or reject this sample request from the field.</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-2 rounded-xl bg-muted/50 p-4">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Officer</span>
-              <span className="font-medium text-gray-900">{sample.booker.name}</span>
+              <span className="text-muted-foreground">Officer</span>
+              <span className="font-medium text-foreground">{sample.booker.name}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Product</span>
-              <span className="font-medium text-gray-900">{sample.productName}</span>
+              <span className="text-muted-foreground">Product</span>
+              <span className="font-medium text-foreground">{sample.productName}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500">Quantity</span>
-              <span className="font-medium text-gray-900">{sample.quantity}</span>
+              <span className="text-muted-foreground">Quantity</span>
+              <span className="font-medium text-foreground">{sample.quantity}</span>
             </div>
             {sample.notes && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Notes</span>
-                <span className="font-medium text-gray-900 text-right max-w-[60%]">{sample.notes}</span>
+                <span className="text-muted-foreground">Notes</span>
+                <span className="max-w-[60%] text-right font-medium text-foreground">{sample.notes}</span>
               </div>
             )}
           </div>
 
           <div>
-            <label className="text-sm font-semibold text-gray-700 block mb-2">Decision</label>
+            <Label className="mb-2 block">Decision</Label>
             <div className="grid grid-cols-2 gap-3">
               <button
+                type="button"
                 onClick={() => setAction("approved")}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-xl border-2 py-2.5 text-sm font-semibold transition-all",
                   action === "approved"
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                    : "border-gray-200 text-gray-500 hover:border-emerald-300"
-                }`}
+                    ? "border-success bg-success/10 text-success"
+                    : "border-border text-muted-foreground hover:border-success/40",
+                )}
               >
                 <CheckCircle className="h-4 w-4" /> Approve
               </button>
               <button
+                type="button"
                 onClick={() => setAction("rejected")}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                className={cn(
+                  "flex items-center justify-center gap-2 rounded-xl border-2 py-2.5 text-sm font-semibold transition-all",
                   action === "rejected"
-                    ? "border-red-500 bg-red-50 text-red-700"
-                    : "border-gray-200 text-gray-500 hover:border-red-300"
-                }`}
+                    ? "border-destructive bg-destructive/10 text-destructive"
+                    : "border-border text-muted-foreground hover:border-destructive/40",
+                )}
               >
                 <XCircle className="h-4 w-4" /> Reject
               </button>
             </div>
           </div>
 
-          <div>
-            <label className="text-sm font-semibold text-gray-700 block mb-1.5">Admin Notes (optional)</label>
-            <textarea
+          <div className="space-y-1.5">
+            <Label>Admin Notes (optional)</Label>
+            <Textarea
               value={notes}
-              onChange={e => setNotes(e.target.value)}
+              onChange={(e) => setNotes(e.target.value)}
               rows={3}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
-              placeholder="Reason for decision..."
+              className="rounded-xl"
+              placeholder="Reason for decision…"
             />
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
         </div>
-        <div className="flex gap-3 px-6 pb-6">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 transition"
-          >
+
+        <DialogFooter className="gap-3 sm:gap-3">
+          <Button variant="outline" className="flex-1 rounded-xl" onClick={onClose}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            className={cn(
+              "flex-1 rounded-xl",
+              action === "rejected" && "bg-destructive text-destructive-foreground hover:bg-destructive/80",
+            )}
             onClick={submit}
             disabled={saving}
-            className={`flex-1 py-2.5 rounded-xl text-sm font-semibold text-white transition ${
-              action === "approved"
-                ? "bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300"
-                : "bg-[#C8102E] hover:bg-[#a00e25] disabled:bg-red-300"
-            }`}
           >
             {saving ? "Saving…" : action === "approved" ? "Approve" : "Reject"}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
 function SignatureModal({ sample, onClose }: { sample: SampleRequest; onClose: () => void }) {
   if (!sample.signatureBase64) return null;
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="text-base font-bold">Customer Signature</h2>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="p-5">
-          <p className="text-sm text-gray-500 mb-3">Signed by: <span className="font-medium text-gray-800">{sample.customerName ?? "Unknown"}</span></p>
-          <img
-            src={`data:image/png;base64,${sample.signatureBase64}`}
-            alt="Customer signature"
-            className="w-full border rounded-xl bg-gray-50"
-          />
-        </div>
-      </div>
-    </div>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="rounded-2xl sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Customer Signature</DialogTitle>
+          <DialogDescription>
+            Signed by <span className="font-medium text-foreground">{sample.customerName ?? "Unknown"}</span>
+          </DialogDescription>
+        </DialogHeader>
+        <img
+          src={`data:image/png;base64,${sample.signatureBase64}`}
+          alt="Customer signature"
+          className="w-full rounded-xl border border-border bg-muted/40"
+        />
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -232,133 +242,108 @@ export default function SamplesClient() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Sample Management</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Review and approve sample requests from field officers</p>
-        </div>
-        <button onClick={() => load(statusFilter)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-100 text-gray-700 text-sm font-medium hover:bg-gray-200 transition">
-          <RefreshCw className="h-4 w-4" /> Refresh
-        </button>
+    <div className="space-y-6 px-6 py-6 lg:px-8">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard label="Total Requests" value={stats.total} icon={<Boxes className="h-5 w-5" />} />
+        <StatCard label="Pending" value={stats.pending} icon={<Clock className="h-5 w-5" />} />
+        <StatCard label="Approved" value={stats.approved} icon={<CheckCircle className="h-5 w-5" />} />
+        <StatCard label="Delivered" value={stats.delivered} icon={<Truck className="h-5 w-5" />} />
       </div>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-5 gap-4">
-        {[
-          { label: "Total", value: stats.total, color: "bg-gray-50 text-gray-700" },
-          { label: "Pending", value: stats.pending, color: "bg-amber-50 text-amber-700" },
-          { label: "Approved", value: stats.approved, color: "bg-emerald-50 text-emerald-700" },
-          { label: "Rejected", value: stats.rejected, color: "bg-red-50 text-red-700" },
-          { label: "Delivered", value: stats.delivered, color: "bg-blue-50 text-blue-700" },
-        ].map(stat => (
-          <div key={stat.label} className={`rounded-2xl p-4 ${stat.color}`}>
-            <p className="text-2xl font-bold">{stat.value}</p>
-            <p className="text-xs font-medium mt-0.5 opacity-80">{stat.label}</p>
+      <SectionCard
+        title="Sample Requests"
+        description={`${filtered.length} of ${samples.length} records`}
+        action={
+          <Button variant="outline" className="rounded-xl" onClick={() => load(statusFilter)} disabled={loading}>
+            <RefreshCw className={cn("mr-2 h-4 w-4", loading && "animate-spin")} /> Refresh
+          </Button>
+        }
+      >
+        <div className="mb-5 grid gap-3 md:grid-cols-[1fr_220px]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by officer, product, or customer…"
+              className="h-11 rounded-xl pl-9"
+            />
           </div>
-        ))}
-      </div>
-
-      {/* Filters Bar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex-1 min-w-64 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]"
-            placeholder="Search by officer, product, or customer…"
-          />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="approved">Approved</SelectItem>
+              <SelectItem value="rejected">Rejected</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="pl-9 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#C8102E] appearance-none cursor-pointer"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="delivered">Delivered</option>
-          </select>
-          <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-        </div>
-      </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="h-8 w-8 rounded-full border-2 border-[#C8102E] border-t-transparent animate-spin" />
-          </div>
+          <TableSkeleton />
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-gray-400">
-            <Package className="h-12 w-12 mb-3 opacity-30" />
-            <p className="text-sm font-medium">No sample requests found</p>
-          </div>
+          <EmptyState title="No sample requests found" description="Adjust the filters to see more records." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  {["#", "Officer", "Product", "Qty", "Price", "Customer", "Status", "Submitted", "Actions"].map(h => (
-                    <th key={h} className="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">{h}</th>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {["#", "Officer", "Product", "Qty", "Price", "Customer", "Status", "Submitted", "Actions"].map((h) => (
+                    <TableHead key={h}>{h}</TableHead>
                   ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {filtered.map(s => (
-                  <tr key={s.id} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="px-4 py-3 font-mono text-gray-400">#{s.id}</td>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-gray-900">{s.booker.name}</div>
-                      <div className="text-xs text-gray-400">{s.booker.email}</div>
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-800">{s.productName}</td>
-                    <td className="px-4 py-3 text-gray-600">{s.quantity}</td>
-                    <td className="px-4 py-3 text-gray-600 font-medium">
-                      {s.price ? `Rs. ${(parseFloat(s.price.toString()) * s.quantity).toLocaleString()}` : '—'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {s.customer?.name ?? s.customerName ?? <span className="text-gray-300">—</span>}
-                    </td>
-                    <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
-                    <td className="px-4 py-3 text-gray-500">
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((s) => (
+                  <TableRow key={s.id} className="transition-colors hover:bg-muted/50">
+                    <TableCell className="font-mono text-xs text-muted-foreground">#{s.id}</TableCell>
+                    <TableCell>
+                      <div className="font-semibold text-foreground">{s.booker.name}</div>
+                      <div className="text-xs text-muted-foreground">{s.booker.email}</div>
+                    </TableCell>
+                    <TableCell className="font-medium">{s.productName}</TableCell>
+                    <TableCell>{s.quantity}</TableCell>
+                    <TableCell className="font-medium">
+                      {s.price ? formatPKR(parseFloat(s.price.toString()) * s.quantity) : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {s.customer?.name ?? s.customerName ?? <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+                    <TableCell><StatusBadge status={s.status} /></TableCell>
+                    <TableCell className="text-muted-foreground">
                       {new Date(s.createdAt).toLocaleDateString("en-PK", { day: "2-digit", month: "short", year: "numeric" })}
-                    </td>
-                    <td className="px-4 py-3">
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-1.5">
                         {s.status === "pending" && (
-                          <button
-                            onClick={() => setReviewing(s)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#C8102E] text-white text-xs font-semibold hover:bg-[#a00e25] transition"
-                          >
-                            <Eye className="h-3 w-3" /> Review
-                          </button>
+                          <Button size="sm" className="rounded-lg text-xs" onClick={() => setReviewing(s)}>
+                            <Eye className="mr-1 h-3 w-3" /> Review
+                          </Button>
                         )}
                         {s.signatureBase64 && (
-                          <button
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-lg text-xs"
                             onClick={() => setViewingSig(s)}
-                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50 text-blue-700 text-xs font-semibold hover:bg-blue-100 transition"
                           >
-                            <FileText className="h-3 w-3" /> Sig
-                          </button>
+                            <FileText className="mr-1 h-3 w-3" /> Sig
+                          </Button>
                         )}
                         {!s.signatureBase64 && s.adminNotes && (
-                          <span className="text-xs text-gray-400 italic">"{s.adminNotes}"</span>
+                          <span className="text-xs italic text-muted-foreground">"{s.adminNotes}"</span>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
         )}
-      </div>
+      </SectionCard>
 
       {reviewing && (
         <ReviewModal

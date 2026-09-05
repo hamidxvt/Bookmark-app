@@ -4,22 +4,26 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Package, Upload, X, Loader2 } from "lucide-react";
 
+import { SectionCard } from "@/components/shared/ui-bits";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+
 const SEGMENTS = ["Early Years", "Primary", "Lower Secondary", "O Level", "A Level", "Higher Secondary", "University"];
 const GRADES   = Array.from({ length: 14 }, (_, i) => String(i + 1));
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-        {label} {required && <span className="text-[#C8102E]">*</span>}
-      </label>
+    <div className="space-y-1.5">
+      <Label>
+        {label} {required && <span className="text-destructive">*</span>}
+      </Label>
       {children}
     </div>
   );
 }
-
-const INPUT = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition-all";
-const SELECT = INPUT + " appearance-none cursor-pointer";
 
 export default function AddProductPage() {
   const router = useRouter();
@@ -110,129 +114,157 @@ export default function AddProductPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      {/* Header */}
+    <div className="mx-auto max-w-2xl space-y-6 px-6 py-6 lg:px-8">
       <div className="flex items-center gap-3">
-        <button onClick={() => router.back()}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors">
+        <button
+          onClick={() => router.back()}
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted"
+        >
           <ArrowLeft className="h-4 w-4" />
         </button>
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#C8102E]">
-            <Package className="h-4 w-4 text-white" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+            <Package className="h-4 w-4 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-900 leading-none">Product Profile</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Add a new product to the catalogue</p>
+            <h1 className="text-xl font-bold leading-none text-foreground">Product Profile</h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">Add a new product to the catalogue</p>
           </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6 space-y-5">
-        {/* 1. Brand — dropdown */}
-        <Field label="Brand" required>
-          <select value={form.brandId} onChange={e => set("brandId", e.target.value)} className={SELECT} required>
-            <option value="">Select brand…</option>
-            {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-        </Field>
-
-        {/* 2. Subject — dropdown */}
-        <Field label="Subject">
-          <select value={form.subjectId} onChange={e => set("subjectId", e.target.value)} className={SELECT}>
-            <option value="">Select subject…</option>
-            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </Field>
-
-        {/* 3. Series — dropdown */}
-        <Field label="Series">
-          <select value={form.seriesId} onChange={e => set("seriesId", e.target.value)} className={SELECT}>
-            <option value="">Select series…</option>
-            {series.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
-        </Field>
-
-        {/* 4. Product Name */}
-        <Field label="Product Name" required>
-          <input value={form.name} onChange={e => set("name", e.target.value)}
-            placeholder="e.g. ASTA - THE WEAVER'S DAUGHTER" className={INPUT} required />
-        </Field>
-
-        {/* 5. ISBN Number */}
-        <Field label="ISBN Number">
-          <input value={form.isbn} onChange={e => set("isbn", e.target.value)}
-            placeholder="e.g. 978-969-123-456-7" className={INPUT} maxLength={20} />
-        </Field>
-
-        {/* 6 & 7. Segment + Grade — side by side */}
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Segment">
-            <select value={form.segment} onChange={e => set("segment", e.target.value)} className={SELECT}>
-              <option value="">Select segment…</option>
-              {SEGMENTS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+      <SectionCard title="Product Details" className="p-0">
+        <form onSubmit={handleSubmit} className="space-y-5 p-1">
+          <Field label="Brand" required>
+            <Select value={form.brandId} onValueChange={(v) => set("brandId", v)}>
+              <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select brand…" /></SelectTrigger>
+              <SelectContent>
+                {brands.map(b => <SelectItem key={b.id} value={String(b.id)}>{b.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Field>
-          <Field label="Grade">
-            <select value={form.grade} onChange={e => set("grade", e.target.value)} className={SELECT}>
-              <option value="">Select grade…</option>
-              {GRADES.map(g => <option key={g} value={g}>Grade {g}</option>)}
-            </select>
+
+          <Field label="Subject">
+            <Select value={form.subjectId} onValueChange={(v) => set("subjectId", v)}>
+              <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select subject…" /></SelectTrigger>
+              <SelectContent>
+                {subjects.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </Field>
-        </div>
 
-        {/* 8. Description */}
-        <Field label="Description">
-          <textarea value={form.description} onChange={e => set("description", e.target.value)}
-            rows={3} placeholder="Brief description of the product…"
-            className={INPUT + " resize-none"} />
-        </Field>
+          <Field label="Series">
+            <Select value={form.seriesId} onValueChange={(v) => set("seriesId", v)}>
+              <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select series…" /></SelectTrigger>
+              <SelectContent>
+                {series.map(s => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </Field>
 
-        {/* 9. Retail Price */}
-        <Field label="Retail Price (PKR)" required>
-          <input type="number" min="0" step="0.01" value={form.retailPrice}
-            onChange={e => set("retailPrice", e.target.value)}
-            placeholder="e.g. 650" className={INPUT} required />
-        </Field>
+          <Field label="Product Name" required>
+            <Input
+              value={form.name}
+              onChange={e => set("name", e.target.value)}
+              placeholder="e.g. ASTA - THE WEAVER'S DAUGHTER"
+              className="h-11 rounded-xl"
+              required
+            />
+          </Field>
 
-        {/* 10. Upload Picture */}
-        <Field label="Upload Picture">
-          <div className="relative">
-            {imgPreview ? (
-              <div className="relative w-full h-44 rounded-xl overflow-hidden border border-slate-200">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={imgPreview} alt="preview" className="w-full h-full object-cover" />
-                <button type="button" onClick={() => { setImgPreview(null); set("image", ""); }}
-                  className="absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors">
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center w-full h-32 rounded-xl border-2 border-dashed border-slate-200 cursor-pointer hover:border-[#C8102E] hover:bg-red-50/30 transition-colors">
-                <Upload className="h-6 w-6 text-slate-300 mb-2" />
-                <span className="text-xs text-slate-400">Click to upload product image</span>
-                <span className="text-[10px] text-slate-300 mt-1">PNG, JPG up to 5MB</span>
-                <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
-              </label>
-            )}
+          <Field label="ISBN Number">
+            <Input
+              value={form.isbn}
+              onChange={e => set("isbn", e.target.value)}
+              placeholder="e.g. 978-969-123-456-7"
+              className="h-11 rounded-xl"
+              maxLength={20}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="Segment">
+              <Select value={form.segment} onValueChange={(v) => set("segment", v)}>
+                <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select segment…" /></SelectTrigger>
+                <SelectContent>
+                  {SEGMENTS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="Grade">
+              <Select value={form.grade} onValueChange={(v) => set("grade", v)}>
+                <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="Select grade…" /></SelectTrigger>
+                <SelectContent>
+                  {GRADES.map(g => <SelectItem key={g} value={g}>Grade {g}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
           </div>
-        </Field>
 
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-        )}
+          <Field label="Description">
+            <Textarea
+              value={form.description}
+              onChange={e => set("description", e.target.value)}
+              rows={3}
+              placeholder="Brief description of the product…"
+              className="rounded-xl"
+            />
+          </Field>
 
-        <div className="flex gap-3 pt-2">
-          <button type="button" onClick={() => router.back()}
-            className="flex-1 rounded-xl border border-slate-200 py-3 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors">
-            Cancel
-          </button>
-          <button type="submit" disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-[#C8102E] py-3 text-sm font-bold text-white hover:bg-red-700 transition-colors disabled:opacity-60">
-            {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Adding…</> : "Add Product"}
-          </button>
-        </div>
-      </form>
+          <Field label="Retail Price (PKR)" required>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.retailPrice}
+              onChange={e => set("retailPrice", e.target.value)}
+              placeholder="e.g. 650"
+              className="h-11 rounded-xl"
+              required
+            />
+          </Field>
+
+          <Field label="Upload Picture">
+            <div className="relative">
+              {imgPreview ? (
+                <div className="relative h-44 w-full overflow-hidden rounded-xl border border-border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imgPreview} alt="preview" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => { setImgPreview(null); set("image", ""); }}
+                    className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/50 text-white transition-colors hover:bg-black/70"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className="flex h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border transition-colors hover:border-primary hover:bg-primary-soft/40">
+                  <Upload className="mb-2 h-6 w-6 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">Click to upload product image</span>
+                  <span className="mt-1 text-[10px] text-muted-foreground/70">PNG, JPG up to 5MB</span>
+                  <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
+                </label>
+              )}
+            </div>
+          </Field>
+
+          {error && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <Button type="button" variant="outline" className="flex-1 rounded-xl py-3" onClick={() => router.back()}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={saving} className="flex-1 rounded-xl py-3">
+              {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Adding…</> : "Add Product"}
+            </Button>
+          </div>
+        </form>
+      </SectionCard>
     </div>
   );
 }
