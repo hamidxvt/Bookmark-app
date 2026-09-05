@@ -1,99 +1,143 @@
 "use client";
 
-const inputClass =
-  "w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 shadow-xs outline-none focus:border-[#C8102E] focus:ring-2 focus:ring-[#C8102E]/20 transition";
-const labelClass = "block text-sm font-medium text-slate-700 mb-1.5";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { SectionCard } from "@/components/shared/ui-bits";
 
 export default function AddBookerPage() {
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  const router = useRouter();
+  const [cities, setCities] = useState<Array<{ id: number; name: string }>>([]);
+  const [form, setForm] = useState({
+    name: "", email: "", phone: "", designation: "",
+    password: "", visitTargets: "", ratesPerVisit: "", cityId: "",
+    adminApproved: false,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/v1/cities").then(r => r.json()).then(d => {
+      if (d.success && d.data) setCities(d.data);
+    }).catch(() => {});
+  }, []);
+
+  const set = (k: string, v: string | boolean) => setForm(p => ({ ...p, [k]: v }));
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setSaving(true); setError("");
+    try {
+      const res = await fetch("/api/v1/bookers/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name, email: form.email, phone: form.phone,
+          password: form.password,
+          designation: form.designation || null,
+          visitTargets: form.visitTargets || null,
+          ratesPerVisit: form.ratesPerVisit || null,
+          cityId: form.cityId ? parseInt(form.cityId) : null,
+          adminApproved: form.adminApproved ? "APPROVED" : "PENDING",
+          jobStatus: form.adminApproved ? "ACTIVE" : "NOT_ACTIVE",
+        }),
+      }).then(r => r.json());
+      if (res.success) {
+        toast.success("Officer added", { description: `${form.name} was created successfully.` });
+        router.push("/bookers");
+      } else {
+        setError(res.error ?? "Failed to add officer");
+      }
+    } catch {
+      setError("Failed to add officer");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
-    <div className="max-w-2xl">
-          <div className="rounded-2xl bg-white border border-slate-200 shadow-xs p-6 space-y-5">
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div>
-                <label className={labelClass}>Full Name</label>
-                <input type="text" name="name" required placeholder="Enter full name" className={inputClass} />
+    <div className="space-y-6 px-6 py-6 lg:px-8">
+      <div className="max-w-2xl">
+        <SectionCard title="Add Field Officer" description="New officers can be marked approved immediately or left pending review.">
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <p className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {error}
+              </p>
+            )}
+
+            <div className="space-y-2">
+              <Label>Full Name</Label>
+              <Input required placeholder="Enter full name" value={form.name} onChange={e => set("name", e.target.value)} className="rounded-xl" />
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input required type="email" placeholder="email@example.com" value={form.email} onChange={e => set("email", e.target.value)} className="rounded-xl" />
               </div>
-              <div>
-                <label className={labelClass}>Father Name</label>
-                <input type="text" name="father_name" placeholder="Enter father name" className={inputClass} />
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input required type="tel" placeholder="03XX XXXXXXX" value={form.phone} onChange={e => set("phone", e.target.value)} className="rounded-xl" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className={labelClass}>Email</label>
-                  <input type="email" name="email" required placeholder="email@example.com" className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Phone</label>
-                  <input type="tel" name="phone" placeholder="03XX XXXXXXX" className={inputClass} />
-                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Designation</Label>
+                <Input placeholder="e.g. Sales Officer" value={form.designation} onChange={e => set("designation", e.target.value)} className="rounded-xl" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className={labelClass}>CNIC</label>
-                  <input type="text" name="cnic" placeholder="XXXXX-XXXXXXX-X" className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Gender</label>
-                  <select name="gender" className={inputClass}>
-                    <option value="">Select gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
+              <div className="space-y-2">
+                <Label>City</Label>
+                <Select value={form.cityId} onValueChange={v => set("cityId", v)}>
+                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select city" /></SelectTrigger>
+                  <SelectContent>
+                    {cities.map(c => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className={labelClass}>Date of Birth</label>
-                  <input type="date" name="dob" className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>City</label>
-                  <select name="city" className={inputClass}>
-                    <option value="">Select city</option>
-                    <option value="Karachi">Karachi</option>
-                    <option value="Lahore">Lahore</option>
-                    <option value="Multan">Multan</option>
-                  </select>
-                </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input required type="password" placeholder="Set login password" value={form.password} onChange={e => set("password", e.target.value)} className="rounded-xl" />
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Visit Targets (daily)</Label>
+                <Input type="number" min={0} placeholder="e.g. 7" value={form.visitTargets} onChange={e => set("visitTargets", e.target.value)} className="rounded-xl" />
               </div>
-              <div>
-                <label className={labelClass}>Password</label>
-                <input type="password" name="password" required placeholder="Set login password" className={inputClass} />
+              <div className="space-y-2">
+                <Label>Rates per Visit (PKR)</Label>
+                <Input type="number" min={0} step="0.01" placeholder="e.g. 500" value={form.ratesPerVisit} onChange={e => set("ratesPerVisit", e.target.value)} className="rounded-xl" />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className={labelClass}>Visit Targets (monthly)</label>
-                  <input type="number" name="visit_targets" min={0} placeholder="e.g. 120" className={inputClass} />
-                </div>
-                <div>
-                  <label className={labelClass}>Rates per Visit (PKR)</label>
-                  <input type="number" name="rates_per_visit" min={0} step="0.01" placeholder="e.g. 500" className={inputClass} />
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  name="admin_approved"
-                  id="admin_approved"
-                  className="h-4 w-4 rounded border-slate-300 text-[#C8102E] focus:ring-[#C8102E]/20"
-                />
-                <label htmlFor="admin_approved" className="text-sm font-medium text-slate-700">
-                  Admin Approved
-                </label>
-              </div>
-              <button
-                type="submit"
-                className="w-full rounded-lg bg-[#0f1e3c] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1a3060] transition"
-              >
-                Add Member
-              </button>
-            </form>
-          </div>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+              <input
+                type="checkbox"
+                checked={form.adminApproved}
+                onChange={e => set("adminApproved", e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary/20"
+              />
+              Admin Approved
+            </label>
+
+            <Button type="submit" disabled={saving} className="w-full rounded-xl">
+              {saving ? "Adding…" : "Add Member"}
+            </Button>
+          </form>
+        </SectionCard>
+      </div>
     </div>
   );
 }

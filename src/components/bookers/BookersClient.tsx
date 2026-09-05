@@ -1,10 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
-  Search, Eye, EyeOff, MapPin, RefreshCw, CheckCircle, Clock, XCircle,
-  Plus, Trash2, X, Navigation, KeyRound, Pencil, Filter, ChevronDown, Camera,
+  Search, Eye, EyeOff, MapPin, RefreshCw, Plus, Trash2, X,
+  Navigation, KeyRound, Pencil, Camera, MoreHorizontal, Users, Satellite, UserCheck,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EmptyState, SectionCard, StatCard, StatusPill, TableSkeleton } from "@/components/shared/ui-bits";
 
 interface Booker {
   id: number; name: string; email: string; phone: string; gender: string;
@@ -24,18 +39,13 @@ function stripHtml(s: string | null | undefined): string {
   return stripped.length > 0 ? stripped : "—";
 }
 
-function GpsBadge({ status }: { status: string }) {
-  const s = status?.toUpperCase();
-  if (s === "ACTIVE") return <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600"><span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />Active</span>;
-  if (s === "IDLE")   return <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600"><span className="h-2 w-2 rounded-full bg-amber-500" />Idle</span>;
-  return <span className="flex items-center gap-1.5 text-xs font-medium text-slate-400"><span className="h-2 w-2 rounded-full bg-slate-300" />Offline</span>;
-}
-
-function ApprovalBadge({ status }: { status: string }) {
-  const s = status?.toUpperCase();
-  if (s === "APPROVED") return <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 border-emerald-200 items-center gap-1"><CheckCircle className="h-3 w-3" />Approved</span>;
-  if (s === "PENDING")  return <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 border-amber-200 items-center gap-1"><Clock className="h-3 w-3" />Pending</span>;
-  return <span className="inline-flex rounded-full border px-2 py-0.5 text-xs font-medium bg-red-100 text-red-800 border-red-200 items-center gap-1"><XCircle className="h-3 w-3" />Not Approved</span>;
+function initials(name: string) {
+  return (name || "B")
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 // ── Create / Edit Officer Modal ────────────────────────────────────────────────
@@ -52,7 +62,7 @@ function OfficerModal({
     visitTargets: booker?.visitTargets ?? "", sampleBudget: booker?.sampleBudget ?? 300000,
     adminApproved: booker?.adminApproved ?? "PENDING",
     jobStatus: booker?.jobStatus ?? "NOT_ACTIVE",
-    cityId: booker?.city?.id ?? "",
+    cityId: booker?.city?.id ? String(booker.city.id) : "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -109,30 +119,34 @@ function OfficerModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white flex items-center justify-between border-b border-slate-100 px-6 py-4 z-10">
-          <h2 className="text-base font-semibold text-slate-800">{isEdit ? `Edit: ${booker!.name}` : "Add New Officer"}</h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-slate-100"><X className="h-4 w-4 text-slate-500" /></button>
-        </div>
-        <form onSubmit={submit} className="p-6 space-y-4">
-          {error && <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">{error}</p>}
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-2xl sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{isEdit ? `Edit: ${booker!.name}` : "Add New Officer"}</DialogTitle>
+          <DialogDescription>New officers start as pending until approved.</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          {error && (
+            <p className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+              {error}
+            </p>
+          )}
 
           {/* Photo Upload */}
           <div className="flex items-center gap-4">
             <div
-              className="relative h-16 w-16 rounded-full border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden cursor-pointer hover:border-[#C8102E] transition-colors bg-slate-50"
+              className="relative flex h-16 w-16 cursor-pointer items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-border bg-muted transition-colors hover:border-primary"
               onClick={() => photoInputRef.current?.click()}
             >
               {photoPreview
                 ? <img src={photoPreview} alt="preview" className="h-full w-full object-cover" />
-                : <Camera className="h-5 w-5 text-slate-300" />}
+                : <Camera className="h-5 w-5 text-muted-foreground" />}
             </div>
             <div>
-              <p className="text-xs font-medium text-slate-700">Officer Photo</p>
-              <p className="text-xs text-slate-400 mt-0.5">Click to upload (JPG, PNG)</p>
+              <p className="text-xs font-medium text-foreground">Officer Photo</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Click to upload (JPG, PNG)</p>
               <button type="button" onClick={() => photoInputRef.current?.click()}
-                className="mt-1 text-xs text-[#C8102E] font-medium hover:underline">
+                className="mt-1 text-xs font-medium text-primary hover:underline">
                 {photoPreview ? "Change Photo" : "Upload Photo"}
               </button>
             </div>
@@ -140,37 +154,38 @@ function OfficerModal({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            {[
-              { label: "Full Name", key: "name", type: "text", full: true },
-              { label: "Email", key: "email", type: "email" },
-              { label: "Phone", key: "phone", type: "text" },
-              { label: "Designation", key: "designation", type: "text", placeholder: "e.g. Sales Officer" },
-            ].map(f => (
-              <div key={f.key} className={(f as any).full ? "col-span-2" : ""}>
-                <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>
-                <input type={f.type} value={(form as any)[f.key]}
-                  required={f.key !== "designation"}
-                  placeholder={(f as any).placeholder}
-                  onChange={e => set(f.key, e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500" />
-              </div>
-            ))}
+            <div className="col-span-2 space-y-2">
+              <Label>Full Name</Label>
+              <Input required value={form.name} onChange={e => set("name", e.target.value)} className="rounded-xl" />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input required type="email" value={form.email} onChange={e => set("email", e.target.value)} className="rounded-xl" />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone</Label>
+              <Input required value={form.phone} onChange={e => set("phone", e.target.value)} className="rounded-xl" />
+            </div>
+            <div className="col-span-2 space-y-2">
+              <Label>Designation</Label>
+              <Input placeholder="e.g. Sales Officer" value={form.designation} onChange={e => set("designation", e.target.value)} className="rounded-xl" />
+            </div>
 
             {!isEdit && (
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-slate-600 mb-1">Password</label>
+              <div className="col-span-2 space-y-2">
+                <Label>Password</Label>
                 <div className="relative">
-                  <input
+                  <Input
                     type={showPassword ? "text" : "password"}
                     value={form.password} required={!isEdit}
                     onChange={e => set("password", e.target.value)}
                     placeholder="Min 6 characters"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]"
+                    className="rounded-xl pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(v => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -179,8 +194,8 @@ function OfficerModal({
             )}
           </div>
 
-          <div className="border-t border-slate-100 pt-4">
-            <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wide">Salary & Targets</p>
+          <div className="border-t border-border pt-4">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Salary &amp; Targets</p>
             <div className="grid grid-cols-2 gap-4">
               {[
                 { label: "Basic Salary (PKR/mo)", key: "basicSalary" },
@@ -188,56 +203,61 @@ function OfficerModal({
                 { label: "Daily Visit Target", key: "visitTargets" },
                 { label: "Sample Budget (PKR/yr)", key: "sampleBudget" },
               ].map(f => (
-                <div key={f.key}>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">{f.label}</label>
-                  <input type="number" value={(form as any)[f.key]}
+                <div key={f.key} className="space-y-2">
+                  <Label>{f.label}</Label>
+                  <Input type="number" value={(form as any)[f.key]}
                     onChange={e => set(f.key, e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]" />
+                    className="rounded-xl" />
                 </div>
               ))}
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Approval Status</label>
-              <select value={form.adminApproved} onChange={e => set("adminApproved", e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none">
-                <option value="PENDING">Pending</option>
-                <option value="APPROVED">Approved</option>
-                <option value="NOT_APPROVED">Not Approved</option>
-              </select>
+            <div className="space-y-2">
+              <Label>Approval Status</Label>
+              <Select value={form.adminApproved} onValueChange={(v) => set("adminApproved", v)}>
+                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PENDING">Pending</SelectItem>
+                  <SelectItem value="APPROVED">Approved</SelectItem>
+                  <SelectItem value="NOT_APPROVED">Not Approved</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Job Status</label>
-              <select value={form.jobStatus} onChange={e => set("jobStatus", e.target.value)}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none">
-                <option value="ACTIVE">Active</option>
-                <option value="NOT_ACTIVE">Not Active</option>
-              </select>
+            <div className="space-y-2">
+              <Label>Job Status</Label>
+              <Select value={form.jobStatus} onValueChange={(v) => set("jobStatus", v)}>
+                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="NOT_ACTIVE">Not Active</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Assigned City</label>
-            <select value={form.cityId} onChange={e => set("cityId", e.target.value)}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none">
-              <option value="">— Select City —</option>
-              {cities.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            <Label>Assigned City</Label>
+            <Select value={form.cityId} onValueChange={(v) => set("cityId", v)}>
+              <SelectTrigger className="rounded-xl"><SelectValue placeholder="— Select City —" /></SelectTrigger>
+              <SelectContent>
+                {cities.map(c => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          <div className="flex gap-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-            <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-[#C8102E] py-2.5 text-sm font-medium text-white hover:bg-[#9B0B22] disabled:opacity-50 transition-colors">
+          <DialogFooter>
+            <Button type="button" variant="outline" className="rounded-xl" onClick={onClose}>Cancel</Button>
+            <Button type="submit" disabled={saving} className="rounded-xl">
               {saving ? "Saving…" : isEdit ? "Save Changes" : "Create Officer"}
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -265,51 +285,48 @@ function ResetPasswordModal({ booker, onClose }: { booker: Booker; onClose: () =
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <div>
-            <h2 className="text-base font-semibold text-slate-800">Reset Password</h2>
-            <p className="text-xs text-slate-400 mt-0.5">{booker.name} · {booker.email}</p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-slate-100"><X className="h-4 w-4 text-slate-500" /></button>
-        </div>
-        <div className="p-6">
-          {success ? (
-            <div className="text-center space-y-3">
-              <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-full bg-emerald-100">
-                <CheckCircle className="h-6 w-6 text-emerald-600" />
-              </div>
-              <p className="font-semibold text-slate-800">Password Updated!</p>
-              <p className="text-xs text-slate-500">The officer can now log in with the new password.</p>
-              <button onClick={onClose} className="w-full rounded-lg bg-[#0f1e3c] py-2.5 text-sm font-medium text-white">Done</button>
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="rounded-2xl sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Reset Password</DialogTitle>
+          <DialogDescription>{booker.name} · {booker.email}</DialogDescription>
+        </DialogHeader>
+        {success ? (
+          <div className="space-y-3 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success/15">
+              <KeyRound className="h-6 w-6 text-success" />
             </div>
-          ) : (
-            <form onSubmit={submit} className="space-y-4">
-              {error && <p className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-600">{error}</p>}
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">New Password</label>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} required
-                  placeholder="Min 6 characters"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Confirm Password</label>
-                <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required
-                  placeholder="Repeat password"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E]" />
-              </div>
-              <div className="flex gap-3 pt-1">
-                <button type="button" onClick={onClose} className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-medium text-white hover:bg-amber-600 disabled:opacity-50">
-                  {saving ? "Saving…" : "Reset Password"}
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
+            <p className="font-semibold text-foreground">Password Updated!</p>
+            <p className="text-xs text-muted-foreground">The officer can now log in with the new password.</p>
+            <Button className="w-full rounded-xl" onClick={onClose}>Done</Button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
+            {error && (
+              <p className="rounded-xl border border-destructive/25 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                {error}
+              </p>
+            )}
+            <div className="space-y-2">
+              <Label>New Password</Label>
+              <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required
+                placeholder="Min 6 characters" className="rounded-xl" />
+            </div>
+            <div className="space-y-2">
+              <Label>Confirm Password</Label>
+              <Input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required
+                placeholder="Repeat password" className="rounded-xl" />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" className="rounded-xl" onClick={onClose}>Cancel</Button>
+              <Button type="submit" disabled={saving} className="rounded-xl">
+                {saving ? "Saving…" : "Reset Password"}
+              </Button>
+            </DialogFooter>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -321,35 +338,43 @@ function TrackModal({ booker, onClose }: { booker: Booker; onClose: () => void }
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
-          <div>
-            <h2 className="text-base font-semibold text-slate-800">Tracking: {booker.name}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">{booker.email}</p>
-          </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 hover:bg-slate-100"><X className="h-4 w-4 text-slate-500" /></button>
-        </div>
-        <div className="p-6 space-y-4">
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="rounded-2xl sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Tracking: {booker.name}</DialogTitle>
+          <DialogDescription>{booker.email}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 text-xs">
-            <div className="rounded-xl bg-slate-50 p-3"><p className="text-slate-400 mb-1">GPS Status</p><GpsBadge status={booker.gpsStatus} /></div>
-            <div className="rounded-xl bg-slate-50 p-3"><p className="text-slate-400 mb-1">Last Seen</p><p className="font-medium text-slate-700">{booker.lastSeenAt ? new Date(booker.lastSeenAt).toLocaleTimeString() : "Never"}</p></div>
-            <div className="rounded-xl bg-slate-50 p-3 col-span-2"><p className="text-slate-400 mb-1">Coordinates</p><p className="font-mono font-medium text-slate-700">{hasCoords ? `${booker.lastLatitude}, ${booker.lastLongitude}` : "No location data"}</p></div>
+            <div className="rounded-xl bg-muted p-3">
+              <p className="mb-1 text-muted-foreground">GPS Status</p>
+              <StatusPill value={booker.gpsStatus} />
+            </div>
+            <div className="rounded-xl bg-muted p-3">
+              <p className="mb-1 text-muted-foreground">Last Seen</p>
+              <p className="font-medium text-foreground">{booker.lastSeenAt ? new Date(booker.lastSeenAt).toLocaleTimeString() : "Never"}</p>
+            </div>
+            <div className="col-span-2 rounded-xl bg-muted p-3">
+              <p className="mb-1 text-muted-foreground">Coordinates</p>
+              <p className="font-mono font-medium text-foreground">{hasCoords ? `${booker.lastLatitude}, ${booker.lastLongitude}` : "No location data"}</p>
+            </div>
           </div>
           {mapUrl ? (
-            <iframe src={mapUrl} className="w-full h-56 rounded-xl border border-slate-200" title="Officer location" />
+            <iframe src={mapUrl} className="h-56 w-full rounded-xl border border-border" title="Officer location" />
           ) : (
-            <div className="h-40 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 text-sm">No GPS data — officer needs to start day</div>
+            <div className="flex h-40 items-center justify-center rounded-xl bg-muted text-sm text-muted-foreground">
+              No GPS data — officer needs to start day
+            </div>
           )}
           {hasCoords && (
             <a href={`https://www.openstreetmap.org/?mlat=${booker.lastLatitude}&mlon=${booker.lastLongitude}`} target="_blank" rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full rounded-lg bg-[#C8102E] py-2 text-sm font-medium text-white hover:bg-[#C8102E]">
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary py-2 text-sm font-semibold text-primary-foreground shadow-brand transition hover:opacity-90">
               <Navigation className="h-4 w-4" /> Open in Maps
             </a>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -410,137 +435,148 @@ export default function BookersClient() {
   const pending = rows.filter(r => r.adminApproved === "PENDING").length;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6 px-6 py-6 lg:px-8">
       {showCreate && <OfficerModal onClose={() => setShowCreate(false)} onSaved={load} />}
       {editing    && <OfficerModal booker={editing} onClose={() => setEditing(null)} onSaved={load} />}
       {resetting  && <ResetPasswordModal booker={resetting} onClose={() => setResetting(null)} />}
       {tracking   && <TrackModal booker={tracking} onClose={() => setTracking(null)} />}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between flex-wrap">
-        <div className="relative flex-1 min-w-56">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, email, phone, city…"
-            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#C8102E]/20 focus:border-[#C8102E] transition" />
-        </div>
-        <div className="relative">
-          <Filter className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <select value={gpsFilter} onChange={e => setGpsFilter(e.target.value)}
-            className="pl-9 pr-7 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none appearance-none cursor-pointer">
-            <option value="all">All GPS</option>
-            <option value="ACTIVE">Active</option>
-            <option value="IDLE">Idle</option>
-            <option value="OFFLINE">Offline</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-        </div>
-        <div className="relative">
-          <select value={approvalFilter} onChange={e => setApprovalFilter(e.target.value)}
-            className="px-3 pr-7 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:outline-none appearance-none cursor-pointer">
-            <option value="all">All Status</option>
-            <option value="APPROVED">Approved</option>
-            <option value="PENDING">Pending</option>
-            <option value="NOT_APPROVED">Not Approved</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-        </div>
-        <div className="flex gap-2">
-          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </button>
-          <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 rounded-lg bg-[#0f1e3c] px-3 py-2 text-xs font-medium text-white hover:bg-[#1a3060]">
-            <Plus className="h-3.5 w-3.5" /> Add Officer
-          </button>
-        </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Total Officers" value={total} icon={<Users className="h-5 w-5" />} />
+        <StatCard label="Active Now" value={active} icon={<Satellite className="h-5 w-5" />} href="/live-activity" />
+        <StatCard label="Need Approval" value={pending} icon={<UserCheck className="h-5 w-5" />} />
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: "Total Officers", value: total,   color: "text-blue-700"    },
-          { label: "Active Now",     value: active,  color: "text-emerald-700" },
-          { label: "Need Approval",  value: pending, color: "text-amber-700"   },
-        ].map(s => (
-          <div key={s.label} className="rounded-xl bg-white border border-slate-200 p-4 shadow-xs">
-            <p className={`text-2xl font-bold ${s.color} tabular-nums`}>{s.value.toLocaleString()}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+      <SectionCard
+        title="All Officers"
+        description={`${filtered.length} of ${total} officers`}
+        action={
+          <div className="flex gap-2">
+            <Button variant="outline" className="rounded-xl" onClick={load} disabled={loading}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Button className="rounded-xl" onClick={() => setShowCreate(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Officer
+            </Button>
           </div>
-        ))}
-      </div>
-
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-xs overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/50">
-              {["#", "Officer", "City", "Phone", "GPS", "Status", "Actions"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {loading && [...Array(5)].map((_, i) => (
-              <tr key={i}>{[...Array(7)].map((_, j) => (
-                <td key={j} className="px-4 py-3"><div className="h-4 rounded bg-slate-100 animate-pulse" style={{ width: j === 1 ? "160px" : "80px" }} /></td>
-              ))}</tr>
-            ))}
-            {!loading && filtered.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-400">
-                No officers found · <button onClick={() => setShowCreate(true)} className="text-[#C8102E] underline">Add one</button>
-              </td></tr>
-            )}
-            {!loading && filtered.map((r, i) => (
-              <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-4 py-3 text-slate-400 text-xs">{i + 1}</td>
-                <td className="px-4 py-3">
-                    <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 shrink-0 rounded-full overflow-hidden border border-slate-200">
-                      {r.profilePhoto
-                        ? <img src={r.profilePhoto} alt={r.name} className="h-full w-full object-cover" />
-                        : <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-[#0f1e3c] to-[#1a5276] text-xs font-bold text-white">{r.name?.[0]?.toUpperCase() ?? "B"}</div>}
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-slate-800">{r.name}</p>
-                      <p className="text-xs text-slate-400">{r.email}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-xs text-slate-500">{stripHtml(r.city?.name)}</td>
-                <td className="px-4 py-3 text-xs text-slate-500">{r.phone}</td>
-                <td className="px-4 py-3"><GpsBadge status={r.gpsStatus} /></td>
-                <td className="px-4 py-3"><ApprovalBadge status={r.adminApproved} /></td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => setTracking(r)} title="Track GPS"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-[#C8102E] hover:bg-[#C8102E] transition-colors">
-                      <MapPin className="h-3.5 w-3.5" />
-                    </button>
-                    <button onClick={() => setEditing(r)} title="Edit Officer"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
-                      <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                    <button onClick={() => setResetting(r)} title="Reset Password"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors">
-                      <KeyRound className="h-3.5 w-3.5" />
-                    </button>
-                    {r.adminApproved === "PENDING" && (
-                      <button onClick={() => approveBooker(r.id)} disabled={approving === r.id}
-                        className="rounded-lg bg-emerald-600 px-2 py-1 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50">
-                        {approving === r.id ? "…" : "Approve"}
-                      </button>
-                    )}
-                    <button onClick={() => deleteBooker(r.id, r.name)} disabled={deleting === r.id} title="Remove officer"
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                      {deleting === r.id ? <span className="text-xs">…</span> : <Trash2 className="h-3.5 w-3.5" />}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="border-t border-slate-100 px-4 py-3 flex items-center justify-between">
-          <p className="text-xs text-slate-500">Showing {filtered.length} of {total} officers</p>
-          <button onClick={() => setShowCreate(true)} className="text-xs font-medium text-[#C8102E] hover:text-[#C8102E]">+ Add New Officer</button>
+        }
+      >
+        <div className="mb-5 flex flex-wrap gap-3">
+          <div className="relative min-w-64 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search by name, email, phone, city…"
+              className="h-11 rounded-xl pl-9"
+            />
+          </div>
+          <Select value={gpsFilter} onValueChange={setGpsFilter}>
+            <SelectTrigger className="h-11 w-40 rounded-xl"><SelectValue placeholder="GPS status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All GPS</SelectItem>
+              <SelectItem value="ACTIVE">Active</SelectItem>
+              <SelectItem value="IDLE">Idle</SelectItem>
+              <SelectItem value="OFFLINE">Offline</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={approvalFilter} onValueChange={setApprovalFilter}>
+            <SelectTrigger className="h-11 w-44 rounded-xl"><SelectValue placeholder="Approval status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="APPROVED">Approved</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="NOT_APPROVED">Not Approved</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      </div>
+
+        {loading ? (
+          <TableSkeleton />
+        ) : filtered.length === 0 ? (
+          <EmptyState title="No officers found" description="Try a different search term or reset the filters." />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Officer</TableHead>
+                  <TableHead>City</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>GPS</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((r) => (
+                  <TableRow key={r.id} className="transition-colors hover:bg-muted/50">
+                    <TableCell>
+                      <Link href={`/bookers/${r.id}`} className="flex items-center gap-3 hover:text-primary">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-navy text-xs font-bold text-navy-foreground">
+                          {r.profilePhoto
+                            ? <img src={r.profilePhoto} alt={r.name} className="h-full w-full object-cover" />
+                            : initials(r.name)}
+                        </span>
+                        <div>
+                          <p className="font-medium">{r.name}</p>
+                          <p className="text-xs text-muted-foreground">{r.email}</p>
+                        </div>
+                      </Link>
+                    </TableCell>
+                    <TableCell>{stripHtml(r.city?.name)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{r.phone}</TableCell>
+                    <TableCell><StatusPill value={r.gpsStatus} /></TableCell>
+                    <TableCell><StatusPill value={r.adminApproved} /></TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {r.adminApproved === "PENDING" && (
+                          <Button
+                            size="sm"
+                            className="h-8 rounded-lg bg-success text-success-foreground hover:bg-success/90"
+                            disabled={approving === r.id}
+                            onClick={() => approveBooker(r.id)}
+                          >
+                            {approving === r.id ? "…" : "Approve"}
+                          </Button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-lg">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="rounded-xl">
+                            <DropdownMenuItem asChild>
+                              <Link href={`/bookers/${r.id}`}><Eye className="mr-2 h-4 w-4" /> View</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditing(r)}>
+                              <Pencil className="mr-2 h-4 w-4" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setTracking(r)}>
+                              <MapPin className="mr-2 h-4 w-4" /> Track Location
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setResetting(r)}>
+                              <KeyRound className="mr-2 h-4 w-4" /> Reset Password
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              disabled={deleting === r.id}
+                              onClick={() => deleteBooker(r.id, r.name)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> {deleting === r.id ? "Removing…" : "Delete"}
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </SectionCard>
     </div>
   );
 }
