@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { Download, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { SectionCard } from "@/components/shared/ui-bits";
 
 const REPORT_TYPES = [
   { type: "visits", label: "Visits Report", description: "All visit records with officer, customer, status, notes" },
@@ -36,50 +38,54 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-1">Export Data</h1>
-      <p className="text-gray-500 text-sm mb-6">Download CSV files for any report below. Use the date range to filter.</p>
-
-      {/* Date range */}
-      <div className="flex gap-4 mb-8 p-4 bg-gray-50 rounded-xl border border-gray-200">
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">From</label>
-          <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">To</label>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+    <div className="max-w-3xl space-y-6 px-6 py-6 lg:px-8">
+      <div>
+        <h1 className="text-xl font-bold text-foreground">Export Data</h1>
+        <p className="text-sm text-muted-foreground">Download CSV files for any report below. Use the date range to filter.</p>
       </div>
+
+      <SectionCard title="Date Range" description="Applies to every report below">
+        <div className="flex gap-4">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground block mb-1">From</label>
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground block mb-1">To</label>
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            />
+          </div>
+        </div>
+      </SectionCard>
 
       <div className="space-y-3">
         {REPORT_TYPES.map(({ type, label, description }) => (
           <div
             key={type}
-            className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-blue-300 transition"
+            className="surface flex items-center justify-between p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-elevated"
           >
-            <div>
-              <p className="font-semibold text-gray-800">{label}</p>
-              <p className="text-sm text-gray-500">{description}</p>
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
+                <FileText className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="font-semibold text-foreground text-sm">{label}</p>
+                <p className="text-sm text-muted-foreground">{description}</p>
+              </div>
             </div>
-            <button
-              onClick={() => download(type)}
-              disabled={loading === type}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition"
-            >
-              <Download size={15} />
-              {loading === type ? "Downloading..." : "Download CSV"}
-            </button>
+            <Button onClick={() => download(type)} disabled={loading === type} className="rounded-xl">
+              <Download className="h-3.5 w-3.5" />
+              {loading === type ? "Downloading…" : "Download CSV"}
+            </Button>
           </div>
         ))}
       </div>
