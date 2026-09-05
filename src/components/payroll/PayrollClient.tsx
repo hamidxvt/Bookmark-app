@@ -1,7 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { DollarSign, RefreshCw, Download, ChevronDown } from "lucide-react";
+import { useEffect, useState } from "react";
+import { DollarSign, RefreshCw, Download, TrendingUp, Wallet } from "lucide-react";
+import { SectionCard, StatCard, EmptyState, TableSkeleton } from "@/components/shared/ui-bits";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 interface PayrollRecord {
   bookerId: number;
@@ -19,12 +30,6 @@ function pkr(n: number) {
 }
 
 function ExportMenu({ rows, month, year }: { rows: PayrollRecord[]; month: number; year: number }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
-  }, []);
   function exportCSV() {
     const headers = ["Officer", "Present Days", "Basic Salary", "Rate/Visit", "Completed Visits", "Performance", "Total Pay"];
     const csv = [headers.join(","), ...rows.map(r => [
@@ -33,7 +38,7 @@ function ExportMenu({ rows, month, year }: { rows: PayrollRecord[]; month: numbe
     ].join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = `payroll_${year}_${month}.csv`; a.click(); setOpen(false);
+    a.download = `payroll_${year}_${month}.csv`; a.click();
   }
   function exportPDF() {
     const win = window.open("", "_blank"); if (!win) return;
@@ -45,20 +50,20 @@ function ExportMenu({ rows, month, year }: { rows: PayrollRecord[]; month: numbe
       <table><thead><tr><th>Officer</th><th>Days</th><th>Basic</th><th>Visits</th><th>Performance</th><th>Total</th></tr></thead>
       <tbody>${rows.map(r => `<tr><td>${r.bookerName}</td><td>${r.presentDays}</td><td>Rs.${r.basicSalary.toLocaleString()}</td><td>${r.completedVisits}</td><td>Rs.${r.performanceEarned.toLocaleString()}</td><td>Rs.${r.totalPay.toLocaleString()}</td></tr>`).join("")}</tbody>
       </table></body></html>`);
-    win.document.close(); win.focus(); win.print(); setOpen(false);
+    win.document.close(); win.focus(); win.print();
   }
   return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
-        <Download className="h-3.5 w-3.5" /> Export <ChevronDown className="h-3 w-3" />
-      </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 w-36 rounded-xl border border-slate-200 bg-white shadow-lg z-10">
-          <button onClick={exportCSV} className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 rounded-t-xl">Export CSV</button>
-          <button onClick={exportPDF} className="w-full px-3 py-2 text-left text-xs text-slate-700 hover:bg-slate-50 rounded-b-xl">Export PDF</button>
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" className="rounded-xl">
+          <Download className="mr-2 h-4 w-4" /> Export
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="rounded-xl">
+        <DropdownMenuItem onClick={exportCSV}>Export CSV</DropdownMenuItem>
+        <DropdownMenuItem onClick={exportPDF}>Export PDF</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -83,101 +88,87 @@ export default function PayrollClient() {
 
   useEffect(() => { load(); }, [month, year]);
 
-  const totalPayroll   = records.reduce((s, r) => s + r.totalPay, 0);
-  const totalBasic     = records.reduce((s, r) => s + r.basicSalary, 0);
-  const totalPerf      = records.reduce((s, r) => s + r.performanceEarned, 0);
+  const totalPayroll = records.reduce((s, r) => s + r.totalPay, 0);
+  const totalBasic   = records.reduce((s, r) => s + r.basicSalary, 0);
+  const totalPerf    = records.reduce((s, r) => s + r.performanceEarned, 0);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Payroll</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Basic salary + performance-based earnings per officer</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative">
-            <select value={month} onChange={e => setMonth(Number(e.target.value))}
-              className="rounded-xl border border-slate-200 bg-white px-3 pr-8 py-2 text-sm appearance-none cursor-pointer focus:outline-none">
-              {MONTHS.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          </div>
-          <div className="relative">
-            <select value={year} onChange={e => setYear(Number(e.target.value))}
-              className="rounded-xl border border-slate-200 bg-white px-3 pr-8 py-2 text-sm appearance-none cursor-pointer focus:outline-none">
-              {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          </div>
-          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Recalculate
-          </button>
-          <ExportMenu rows={records} month={month} year={year} />
-        </div>
+    <div className="space-y-6 px-6 py-6 lg:px-8">
+      {/* KPI row */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Total Payroll" value={pkr(totalPayroll)} icon={<Wallet className="h-5 w-5" />} />
+        <StatCard label="Base Salaries" value={pkr(totalBasic)} icon={<DollarSign className="h-5 w-5" />} />
+        <StatCard label="Performance Bonus" value={pkr(totalPerf)} icon={<TrendingUp className="h-5 w-5" />} />
       </div>
 
-      {/* Summary KPIs */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Total Payroll",     value: pkr(totalPayroll), color: "text-[#C8102E]" },
-          { label: "Base Salaries",     value: pkr(totalBasic),   color: "text-slate-700" },
-          { label: "Performance Bonus", value: pkr(totalPerf),    color: "text-emerald-700" },
-        ].map(s => (
-          <div key={s.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-            <DollarSign className="h-4 w-4 text-slate-300 mb-2" />
-            <p className={`text-xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-slate-500 mt-0.5">{s.label}</p>
+      <SectionCard
+        title={`${meta?.monthName ?? MONTHS[month - 1]} ${year} — Officer Breakdown`}
+        description={`${records.length} officers`}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={String(month)} onValueChange={v => setMonth(Number(v))}>
+              <SelectTrigger className="h-10 w-36 rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((m, i) => <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={String(year)} onValueChange={v => setYear(Number(v))}>
+              <SelectTrigger className="h-10 w-24 rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[2024, 2025, 2026].map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <button
+              onClick={load}
+              disabled={loading}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card shadow-card transition hover:shadow-elevated"
+              aria-label="Recalculate"
+            >
+              <RefreshCw className={cn("h-4 w-4 text-muted-foreground", loading && "animate-spin")} />
+            </button>
+            <ExportMenu rows={records} month={month} year={year} />
           </div>
-        ))}
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100">
-          <p className="text-sm font-semibold text-slate-800">
-            {meta?.monthName ?? MONTHS[month - 1]} {year} — Officer Breakdown
-          </p>
-        </div>
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-100 bg-slate-50/50">
-              {["#", "Officer", "Present Days", "Basic Salary", "Visits Done", "Performance", "Total Pay"].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-50">
-            {loading && [...Array(5)].map((_, i) => (
-              <tr key={i}>{[...Array(7)].map((_, j) => (
-                <td key={j} className="px-4 py-3"><div className="h-4 rounded bg-slate-100 animate-pulse" style={{ width: j === 1 ? "140px" : "80px" }} /></td>
-              ))}</tr>
-            ))}
-            {!loading && records.length === 0 && (
-              <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">No active officers with salary data</td></tr>
-            )}
-            {!loading && records.map((r, i) => (
-              <tr key={r.bookerId} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-4 py-3 text-xs text-slate-400">{i + 1}</td>
-                <td className="px-4 py-3 text-xs font-semibold text-slate-800">{r.bookerName}</td>
-                <td className="px-4 py-3 text-xs text-slate-600">{r.presentDays} days</td>
-                <td className="px-4 py-3 text-xs text-slate-600">{pkr(r.basicSalary)}</td>
-                <td className="px-4 py-3 text-xs text-slate-600">{r.completedVisits}</td>
-                <td className="px-4 py-3 text-xs text-emerald-700 font-medium">{pkr(r.performanceEarned)}</td>
-                <td className="px-4 py-3 text-xs font-bold text-[#C8102E]">{pkr(r.totalPay)}</td>
-              </tr>
-            ))}
-            {!loading && records.length > 0 && (
-              <tr className="bg-slate-50 border-t-2 border-slate-200">
-                <td colSpan={2} className="px-4 py-3 text-xs font-bold text-slate-700">TOTAL</td>
-                <td className="px-4 py-3" />
-                <td className="px-4 py-3 text-xs font-bold text-slate-700">{pkr(totalBasic)}</td>
-                <td className="px-4 py-3" />
-                <td className="px-4 py-3 text-xs font-bold text-emerald-700">{pkr(totalPerf)}</td>
-                <td className="px-4 py-3 text-xs font-bold text-[#C8102E]">{pkr(totalPayroll)}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+        }
+      >
+        {loading ? (
+          <TableSkeleton />
+        ) : records.length === 0 ? (
+          <EmptyState title="No active officers with salary data" />
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {["#", "Officer", "Present Days", "Basic Salary", "Visits Done", "Performance", "Total Pay"].map(h => (
+                    <TableHead key={h}>{h}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {records.map((r, i) => (
+                  <TableRow key={r.bookerId} className="transition-colors hover:bg-muted/50">
+                    <TableCell className="text-muted-foreground">{i + 1}</TableCell>
+                    <TableCell className="font-medium">{r.bookerName}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.presentDays} days</TableCell>
+                    <TableCell className="text-muted-foreground">{pkr(r.basicSalary)}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.completedVisits}</TableCell>
+                    <TableCell className="font-medium text-success">{pkr(r.performanceEarned)}</TableCell>
+                    <TableCell className="font-bold text-primary">{pkr(r.totalPay)}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-muted/40">
+                  <TableCell colSpan={2} className="font-bold text-foreground">TOTAL</TableCell>
+                  <TableCell />
+                  <TableCell className="font-bold text-foreground">{pkr(totalBasic)}</TableCell>
+                  <TableCell />
+                  <TableCell className="font-bold text-success">{pkr(totalPerf)}</TableCell>
+                  <TableCell className="font-bold text-primary">{pkr(totalPayroll)}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </SectionCard>
     </div>
   );
 }

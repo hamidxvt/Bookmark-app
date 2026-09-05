@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle, XCircle, Clock, RefreshCw, Filter } from "lucide-react";
+import { CheckCircle2, XCircle, RefreshCw, Filter, PlaneTakeoff } from "lucide-react";
 import { format } from "date-fns";
+import { SectionCard, EmptyState, TableSkeleton } from "@/components/shared/ui-bits";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
 interface Leave {
   id: number;
@@ -17,10 +22,12 @@ interface Leave {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-700 border-amber-200",
-  approved: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  rejected: "bg-red-100 text-red-700 border-red-200",
+  pending:  "bg-warning/20 text-warning-foreground",
+  approved: "bg-success/15 text-success",
+  rejected: "bg-destructive/15 text-destructive",
 };
+
+const FILTERS = ["pending", "approved", "rejected"] as const;
 
 function days(from: string, to: string) {
   const d = Math.ceil((new Date(to).getTime() - new Date(from).getTime()) / 86400000) + 1;
@@ -68,123 +75,98 @@ export default function LeavesClient() {
   const pending = leaves.filter(l => l.status === "pending").length;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Leave Requests</h2>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Review and approve leave applications from bookers
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {pending > 0 && (
-            <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs font-bold text-white">
-              {pending}
-            </span>
-          )}
-          <button
-            onClick={load}
-            disabled={loading}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-          >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </button>
-        </div>
-      </div>
-
-      {/* Filter tabs */}
-      <div className="flex gap-1 rounded-xl bg-slate-100 p-1 w-fit">
-        {["pending", "approved", "rejected"].map(s => (
-          <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`rounded-lg px-4 py-1.5 text-xs font-medium capitalize transition-all ${
-              filter === s ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-        <button
-          onClick={() => setFilter("")}
-          className={`flex items-center gap-1 rounded-lg px-4 py-1.5 text-xs font-medium transition-all ${
-            filter === "" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-700"
-          }`}
-        >
-          <Filter className="h-3 w-3" />
-          All
-        </button>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+    <div className="space-y-6 px-6 py-6 lg:px-8">
+      <SectionCard
+        title="Leave Requests"
+        description={pending > 0 ? `${pending} pending review` : "Review and approve leave applications from bookers"}
+        action={
+          <div className="flex items-center gap-2">
+            <div className="flex rounded-xl bg-muted p-1">
+              {FILTERS.map(s => (
+                <button
+                  key={s}
+                  onClick={() => setFilter(s)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-semibold capitalize transition-all duration-200",
+                    filter === s ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {s}
+                </button>
+              ))}
+              <button
+                onClick={() => setFilter("")}
+                className={cn(
+                  "flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-all duration-200",
+                  filter === "" ? "bg-card text-foreground shadow-card" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Filter className="h-3 w-3" /> All
+              </button>
+            </div>
+            <button
+              onClick={load}
+              disabled={loading}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card shadow-card transition hover:shadow-elevated"
+              aria-label="Refresh"
+            >
+              <RefreshCw className={cn("h-4 w-4 text-muted-foreground", loading && "animate-spin")} />
+            </button>
+          </div>
+        }
+      >
         {loading ? (
-          <div className="divide-y divide-slate-50">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center gap-4 px-6 py-4">
-                <div className="h-10 w-10 rounded-full bg-slate-100 animate-pulse" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 w-48 rounded bg-slate-100 animate-pulse" />
-                  <div className="h-2.5 w-32 rounded bg-slate-100 animate-pulse" />
-                </div>
-                <div className="h-6 w-20 rounded-full bg-slate-100 animate-pulse" />
-              </div>
-            ))}
-          </div>
+          <TableSkeleton />
         ) : leaves.length === 0 ? (
-          <div className="py-16 text-center">
-            <CheckCircle className="mx-auto h-10 w-10 text-slate-200" />
-            <p className="mt-3 text-sm text-slate-400">No {filter || ""} leave requests</p>
-          </div>
+          <EmptyState title={`No ${filter || ""} leave requests`.trim()} description="Nothing to review right now." />
         ) : (
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-border">
             {leaves.map(leave => (
-              <div key={leave.id} className="flex items-start gap-4 px-6 py-4 hover:bg-slate-50/50 transition-colors">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm font-bold text-violet-700">
+              <div key={leave.id} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy text-sm font-bold text-navy-foreground">
                   {leave.booker.name[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-slate-800">{leave.booker.name}</p>
-                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[leave.status]}`}>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-foreground">{leave.booker.name}</p>
+                    <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize", STATUS_COLORS[leave.status])}>
                       {leave.status}
                     </span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 capitalize">
-                      {leave.leaveType} leave
+                    <span className="inline-flex items-center gap-1 rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium capitalize text-primary">
+                      <PlaneTakeoff className="h-3 w-3" /> {leave.leaveType} leave
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {format(new Date(leave.fromDate), "MMM d")} — {format(new Date(leave.toDate), "MMM d, yyyy")}
                     {" · "}{days(leave.fromDate, leave.toDate)}
                   </p>
-                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">{leave.reason}</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{leave.reason}</p>
                   {leave.adminNotes && (
-                    <p className="text-xs text-slate-400 mt-1 italic">Admin note: {leave.adminNotes}</p>
+                    <p className="mt-1 text-xs italic text-muted-foreground/80">Admin note: {leave.adminNotes}</p>
                   )}
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <p className="text-xs text-slate-400 hidden sm:block">
+                <div className="flex shrink-0 items-center gap-2">
+                  <p className="hidden text-xs text-muted-foreground sm:block">
                     {format(new Date(leave.createdAt), "MMM d")}
                   </p>
                   {leave.status === "pending" && (
                     <>
-                      <button
+                      <Button
+                        variant="outline"
+                        className="h-8 rounded-lg border-success/30 bg-success/10 px-3 text-xs font-medium text-success hover:bg-success/15"
+                        disabled={actionId === leave.id}
                         onClick={() => setNoteModal({ id: leave.id, action: "approved" })}
-                        disabled={actionId === leave.id}
-                        className="flex items-center gap-1 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
                       >
-                        <CheckCircle className="h-3.5 w-3.5" />
-                        Approve
-                      </button>
-                      <button
+                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Approve
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="h-8 rounded-lg border-destructive/30 bg-destructive/10 px-3 text-xs font-medium text-destructive hover:bg-destructive/15"
+                        disabled={actionId === leave.id}
                         onClick={() => setNoteModal({ id: leave.id, action: "rejected" })}
-                        disabled={actionId === leave.id}
-                        className="flex items-center gap-1 rounded-lg bg-red-50 border border-red-200 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
                       >
-                        <XCircle className="h-3.5 w-3.5" />
-                        Reject
-                      </button>
+                        <XCircle className="mr-1 h-3.5 w-3.5" /> Reject
+                      </Button>
                     </>
                   )}
                 </div>
@@ -192,45 +174,38 @@ export default function LeavesClient() {
             ))}
           </div>
         )}
-      </div>
+      </SectionCard>
 
-      {/* Note modal */}
-      {noteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-            <h3 className="text-base font-semibold text-slate-900 mb-1">
-              {noteModal.action === "approved" ? "Approve Leave" : "Reject Leave"}
-            </h3>
-            <p className="text-sm text-slate-500 mb-4">Add an optional note for the booker.</p>
-            <textarea
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              placeholder="Optional admin note..."
-              rows={3}
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#C8102E] resize-none"
-            />
-            <div className="flex justify-end gap-2 mt-4">
-              <button
-                onClick={() => { setNoteModal(null); setNote(""); }}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleAction(noteModal.id, noteModal.action)}
-                disabled={actionId !== null}
-                className={`rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${
-                  noteModal.action === "approved"
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-red-600 hover:bg-red-700"
-                }`}
-              >
-                {noteModal.action === "approved" ? "Approve" : "Reject"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={!!noteModal} onOpenChange={(o: boolean) => { if (!o) { setNoteModal(null); setNote(""); } }}>
+        <DialogContent className="rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{noteModal?.action === "approved" ? "Approve Leave" : "Reject Leave"}</DialogTitle>
+            <DialogDescription>Add an optional note for the booker.</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="Optional admin note…"
+            rows={3}
+            className="rounded-xl"
+          />
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => { setNoteModal(null); setNote(""); }}>
+              Cancel
+            </Button>
+            <Button
+              className={cn(
+                "rounded-xl",
+                noteModal?.action === "rejected" && "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+              )}
+              disabled={actionId !== null}
+              onClick={() => noteModal && handleAction(noteModal.id, noteModal.action)}
+            >
+              {noteModal?.action === "approved" ? "Approve" : "Reject"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
