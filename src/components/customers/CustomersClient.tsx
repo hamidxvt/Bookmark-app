@@ -120,6 +120,7 @@ export default function CustomersClient() {
   const [search, setSearch]           = useState("");
   const [typeFilter, setTypeFilter]   = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedCity, setSelectedCity] = useState("all");
   const [page, setPage]               = useState(0);
   const PER_PAGE = 50;
 
@@ -137,18 +138,22 @@ export default function CustomersClient() {
 
   useEffect(() => { load(page); }, [page]);
 
+  const cities = Array.from(new Set(rows.map(r => r.city?.name).filter(Boolean))).sort();
+
   const filtered = rows.filter(r => {
     const name = (r.name ?? "").toLowerCase();
+    const cityName = r.city?.name ?? "";
     const matchSearch = !search ||
       name.includes(search.toLowerCase()) ||
-      (r.city?.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+      cityName.toLowerCase().includes(search.toLowerCase()) ||
       (r.category ?? "").toLowerCase().includes(search.toLowerCase());
+    const matchCity   = selectedCity === "all" || cityName === selectedCity;
     const matchType   = typeFilter === "all" || r.customerType === typeFilter;
     const matchStatus = statusFilter === "all" ||
       (statusFilter === "approved"     && r.approvalStatus === "APPROVED") ||
       (statusFilter === "pending"      && r.approvalStatus === "PENDING") ||
       (statusFilter === "not_approved" && r.approvalStatus === "NOT_APPROVED");
-    return matchSearch && matchType && matchStatus;
+    return matchSearch && matchCity && matchType && matchStatus;
   });
 
   const totalPages = Math.max(1, Math.ceil(total / PER_PAGE));
@@ -182,6 +187,17 @@ export default function CustomersClient() {
               className="h-11 rounded-xl pl-9"
             />
           </div>
+          <Select value={selectedCity} onValueChange={v => { setSelectedCity(v); setPage(0); }}>
+            <SelectTrigger className="h-11 w-44 rounded-xl">
+              <SelectValue placeholder="City" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cities</SelectItem>
+              {cities.map(city => (
+                <SelectItem key={city} value={city}>{city}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Select value={typeFilter} onValueChange={v => { setTypeFilter(v); setPage(0); }}>
             <SelectTrigger className="h-11 w-44 rounded-xl">
               <SelectValue placeholder="Type" />

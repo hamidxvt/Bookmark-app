@@ -8,6 +8,7 @@ import { EmptyState, SectionCard, StatCard, TableSkeleton } from "@/components/s
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn, formatPKR } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ export default function ProductsClient() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("all");
 
   async function load() {
     setLoading(true);
@@ -62,11 +64,19 @@ export default function ProductsClient() {
     load();
   }, []);
 
+  const brands = useMemo(
+    () => Array.from(new Set(rows.map(r => r.brand).filter(Boolean))).sort(),
+    [rows],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) => r.name.toLowerCase().includes(q));
-  }, [rows, search]);
+    return rows.filter((r) => {
+      const matchSearch = !q || r.name.toLowerCase().includes(q);
+      const matchBrand = selectedBrand === "all" || r.brand === selectedBrand;
+      return matchSearch && matchBrand;
+    });
+  }, [rows, search, selectedBrand]);
 
   const brandCount = useMemo(() => new Set(rows.map((r) => r.brand).filter(Boolean)).size, [rows]);
   const gradeCount = useMemo(() => new Set(rows.map((r) => r.grade).filter(Boolean)).size, [rows]);
@@ -95,14 +105,27 @@ export default function ProductsClient() {
           </div>
         }
       >
-        <div className="relative mb-5 max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products…"
-            className="h-11 rounded-xl pl-9"
-          />
+        <div className="mb-5 flex flex-wrap gap-3">
+          <div className="relative min-w-64 flex-1 max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search products…"
+              className="h-11 rounded-xl pl-9"
+            />
+          </div>
+          <Select value={selectedBrand} onValueChange={setSelectedBrand}>
+            <SelectTrigger className="h-11 w-44 rounded-xl">
+              <SelectValue placeholder="Brand" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Brands</SelectItem>
+              {brands.map(brand => (
+                <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {loading ? (

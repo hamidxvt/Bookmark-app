@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SectionCard, StatCard, EmptyState, TableSkeleton } from "@/components/shared/ui-bits";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface ActiveVisit { id: number; customerName: string; address: string | null; checkInAt: string | null; }
@@ -408,6 +409,7 @@ export default function LiveActivityClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "active" | "idle" | "offline" | "alerts">("all");
+  const [selectedCity, setSelectedCity] = useState("all");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
@@ -426,7 +428,10 @@ export default function LiveActivityClient() {
     return () => clearInterval(interval);
   }, [load]);
 
+  const cities = Array.from(new Set(data?.activities.map(a => a.city).filter(Boolean) ?? [])).sort();
+
   const filtered = data?.activities.filter(a => {
+    if (selectedCity !== "all" && a.city !== selectedCity) return false;
     if (filter === "active")  return !a.isOffline && !a.isIdle;
     if (filter === "idle")    return a.isIdle && !a.isOffline;
     if (filter === "offline") return a.isOffline;
@@ -458,6 +463,20 @@ export default function LiveActivityClient() {
           </button>
         }
       >
+        <div className="mb-5 flex flex-wrap items-center gap-3">
+          <Select value={selectedCity} onValueChange={setSelectedCity}>
+            <SelectTrigger className="h-10 w-44 rounded-xl">
+              <SelectValue placeholder="City" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cities</SelectItem>
+              {cities.map(city => (
+                <SelectItem key={city} value={city}>{city}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="mb-5 flex gap-2 flex-wrap">
           {(["all", "active", "idle", "offline", "alerts"] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
