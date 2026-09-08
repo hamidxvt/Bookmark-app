@@ -13,7 +13,8 @@ class ApiConstants {
 
   // ── Auth ────────────────────────────────────────────────────────────────
   static const String login = '/auth';
-  static const String changePassword = '/auth/change-password';
+  static const String forgotPassword = '/forgot-password';
+  static const String resetPassword = '/reset-password';
   static const String me = '/me';
 
   // ── Workday ─────────────────────────────────────────────────────────────
@@ -29,11 +30,24 @@ class ApiConstants {
   static String visitStart(int id) => '/visits/$id/start';
   static String visitComplete(int id) => '/visits/$id/complete';
   static String visitMiss(int id) => '/visits/$id/miss';
-  static String visitEdit(int id) => '/visits/$id/edit';
+  static String visitEta(int id) => '/visits/$id/eta';
+
+  // ── Customers ───────────────────────────────────────────────────────────
+  static String customerDetail(int id) => '/customers/$id';
+  static String customerUpdateRequest(int id) => '/customers/$id/update-request';
+
+  // ── Samples ─────────────────────────────────────────────────────────────
+  static const String samples = '/samples';
+  static String sampleUpdate(int id) => '/samples/$id';
+
+  // ── Leaves ──────────────────────────────────────────────────────────────
+  static const String leaves = '/leaves';
+
+  // ── Products ────────────────────────────────────────────────────────────
+  static const String products = '/products';
 
   // ── GPS Tracking ─────────────────────────────────────────────────────────
   static const String gpsPing = '/gps';
-  static const String livePositions = '/gps/live';
 
   // ── Route Optimization ────────────────────────────────────────────────────
   static const String routeOptimized = '/route';
