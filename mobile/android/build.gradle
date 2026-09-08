@@ -1,0 +1,45 @@
+buildscript {
+    ext.kotlin_version = '2.0.0'  // Updated for compatibility with newer plugins
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.3.2'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        // Firebase — must match google-services.json version
+        classpath 'com.google.gms:google-services:4.4.2'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.buildDir = '../build'
+subprojects {
+    project.buildDir = "${rootProject.buildDir}/${project.name}"
+}
+subprojects {
+    project.evaluationDependsOn(':app')
+}
+
+// ────────────────────────────────────────────────────────────────
+// Disable Gradle 8 lint model tasks globally
+// (Fixes flutter_background_service compatibility issues)
+// ────────────────────────────────────────────────────────────────
+subprojects {
+    tasks.all { task ->
+        if (task.name.contains('LintModel') || task.name.contains('generateLint')) {
+            task.enabled = false
+        }
+    }
+}
+
+tasks.register("clean", Delete) {
+    delete rootProject.buildDir
+}
