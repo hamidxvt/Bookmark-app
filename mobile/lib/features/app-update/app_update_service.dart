@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/constants/api_constants.dart';
 
@@ -71,7 +72,7 @@ class AppUpdateService {
       
       final res = await _dio.get(
         ApiConstants.appVersion,
-        queryParameters: {
+        params: {
           'current_version_code': currentVersionCode,
           'platform': 'android',
         },
@@ -143,6 +144,13 @@ class AppUpdateService {
         debugPrint('[AppUpdate] Local file, skipping download: $downloadUrl');
         return downloadUrl;
       }
+
+      // Get temp directory for download
+      final tempDir = await getTemporaryDirectory();
+      final fileName = 'bookmark_update.apk';
+      final savePath = '${tempDir.path}/$fileName';
+
+      debugPrint('[AppUpdate] Saving to: $savePath');
 
       // For remote URLs, use DioClient to download
       final response = await _dio.download(

@@ -239,10 +239,7 @@ class _DetailView extends StatelessWidget {
                 child: OutlinedButton.icon(
                   icon: const Icon(Icons.directions_rounded, size: 16),
                   label: const Text('Navigate'),
-                  onPressed: () => launchUrl(
-                    Uri.parse('google.navigation:q=$lat,$lng&mode=d'),
-                    mode: LaunchMode.externalApplication,
-                  ),
+                  onPressed: () => context.push('/map'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.info,
                     side: BorderSide(color: AppColors.info.withOpacity(0.5)),

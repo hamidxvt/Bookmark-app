@@ -1,0 +1,11 @@
+dev.fluttercommunity.plus.packageinfo.package_info_plus-core-1.6.0-0 /Users/apple/.gradle/caches/transforms-3/2a4d8dd76489f12413f10e166397bdcc/transformed/core-1.6.0/res
+dev.fluttercommunity.plus.packageinfo.package_info_plus-jetified-annotation-experimental-1.1.0-1 /Users/apple/.gradle/caches/transforms-3/5e77ed07ef515a543dd319a0c69c13f1/transformed/jetified-annotation-experimental-1.1.0/res
+dev.fluttercommunity.plus.packageinfo.package_info_plus-jetified-window-java-1.0.0-beta04-2 /Users/apple/.gradle/caches/transforms-3/bb807f154fcda6ebad3a321cd2ea004a/transformed/jetified-window-java-1.0.0-beta04/res
+dev.fluttercommunity.plus.packageinfo.package_info_plus-jetified-window-1.0.0-beta04-3 /Users/apple/.gradle/caches/transforms-3/d37df22a90d8041d85814b4a101a52bf/transformed/jetified-window-1.0.0-beta04/res
+dev.fluttercommunity.plus.packageinfo.package_info_plus-main-4 /Users/apple/.pub-cache/hosted/pub.dev/package_info_plus-8.0.0/android/src/main/res
+dev.fluttercommunity.plus.packageinfo.package_info_plus-release-5 /Users/apple/.pub-cache/hosted/pub.dev/package_info_plus-8.0.0/android/src/release/res
+dev.fluttercommunity.plus.packageinfo.package_info_plus-pngs-6 /Users/apple/Documents/bookmark_field_force_manager/mobile/build/package_info_plus/generated/res/pngs/release
+dev.fluttercommunity.plus.packageinfo.package_info_plus-resValues-7 /Users/apple/Documents/bookmark_field_force_manager/mobile/build/package_info_plus/generated/res/resValues/release
+dev.fluttercommunity.plus.packageinfo.package_info_plus-mergeReleaseResources-8 /Users/apple/Documents/bookmark_field_force_manager/mobile/build/package_info_plus/intermediates/incremental/release/mergeReleaseResources/merged.dir
+dev.fluttercommunity.plus.packageinfo.package_info_plus-mergeReleaseResources-9 /Users/apple/Documents/bookmark_field_force_manager/mobile/build/package_info_plus/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+dev.fluttercommunity.plus.packageinfo.package_info_plus-release-10 /Users/apple/Documents/bookmark_field_force_manager/mobile/build/package_info_plus/intermediates/merged_res/release/mergeReleaseResources

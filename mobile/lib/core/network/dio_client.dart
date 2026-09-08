@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pretty_dio_logger/pretty_dio_logger.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../constants/api_constants.dart';
 import '../storage/secure_storage.dart';
@@ -62,6 +63,27 @@ class DioClient {
 
   Future<Response> delete(String path, {dynamic data}) =>
       _dio.delete(path, data: data);
+
+  Future<String?> download(
+    String urlPath, {
+    required Function(int received, int total) onReceiveProgress,
+  }) async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final fileName = urlPath.split('/').last;
+      final savePath = '${tempDir.path}/$fileName';
+
+      await _dio.download(
+        urlPath,
+        savePath,
+        onReceiveProgress: onReceiveProgress,
+      );
+
+      return savePath;
+    } catch (e) {
+      return null;
+    }
+  }
 }
 
 class ApiException implements Exception {

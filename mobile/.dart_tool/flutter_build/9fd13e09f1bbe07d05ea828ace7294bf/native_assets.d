@@ -1,0 +1,1 @@
+ /Users/apple/Documents/bookmark_field_force_manager/mobile/.dart_tool/flutter_build/9fd13e09f1bbe07d05ea828ace7294bf/native_assets.yaml: 

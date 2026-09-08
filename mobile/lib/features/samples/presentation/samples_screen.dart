@@ -37,6 +37,7 @@ class SampleRequest {
   final String? notes, customerName, adminNotes;
   final DateTime createdAt;
   final Map<String, dynamic>? customer;
+  final String? pdfUrl;
 
   const SampleRequest({
     required this.id,
@@ -50,6 +51,7 @@ class SampleRequest {
     this.adminNotes,
     required this.createdAt,
     this.customer,
+    this.pdfUrl,
   });
 
   factory SampleRequest.fromJson(Map<String, dynamic> j) => SampleRequest(
@@ -66,6 +68,7 @@ class SampleRequest {
             ? DateTime.tryParse(j['createdAt']) ?? DateTime.now()
             : DateTime.now(),
         customer: j['customer'] as Map<String, dynamic>?,
+        pdfUrl: j['pdfUrl'] as String?,
       );
 }
 
@@ -105,6 +108,23 @@ final sampleDataProvider = FutureProvider.autoDispose<_SampleData>((ref) async {
     samples: list.cast<Map<String, dynamic>>().map(SampleRequest.fromJson).toList(),
   );
 });
+
+// Products search provider
+final productsSearchProvider = FutureProvider.family.autoDispose<List<Map<String, dynamic>>, String>(
+  (ref, query) async {
+    final dio = ref.watch(dioClientProvider);
+    try {
+      final res = await dio.get('/products', params: {'q': query, 'limit': '30'});
+      final raw = res.data;
+      if (raw is Map && raw['success'] == true && raw['data'] is List) {
+        return (raw['data'] as List).cast<Map<String, dynamic>>();
+      }
+      return [];
+    } catch (_) {
+      return [];
+    }
+  },
+);
 
 final customersSearchProvider = FutureProvider.family.autoDispose<List<Map<String, dynamic>>, String>(
   (ref, query) async {
@@ -152,30 +172,51 @@ class _SamplesScreenState extends ConsumerState<SamplesScreen> {
     final async = ref.watch(sampleDataProvider);
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Sample Management'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.pop(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── Header ─────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text('Samples',
+                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
+                  ),
+                  GestureDetector(
+                    onTap: () => ref.invalidate(sampleDataProvider),
+                    child: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.card,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.outline),
+                      ),
+                      child: const Icon(Icons.refresh_rounded, size: 18, color: AppColors.primary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: async.when(
+                loading: () => const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+                error: (e, _) => _ErrorView(message: e.toString(), onRetry: () => ref.invalidate(sampleDataProvider)),
+                data: (data) => _buildBody(data),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => ref.invalidate(sampleDataProvider),
-          ),
-        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showNewRequestSheet(context),
         icon: const Icon(Icons.add_rounded),
-        label: const Text('Request Sample'),
+        label: const Text('Request Sample', style: TextStyle(fontWeight: FontWeight.w800)),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
-      ),
-      body: async.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => _ErrorView(message: e.toString(), onRetry: () => ref.invalidate(sampleDataProvider)),
-        data: (data) => _buildBody(data),
+        elevation: 4,
       ),
     );
   }
@@ -192,6 +233,22 @@ class _SamplesScreenState extends ConsumerState<SamplesScreen> {
         // ── Budget Dashboard ────────────────────────────────────────────────
         _BudgetCard(budget: data.budget, fmt: _fmt)
             .animate().fadeIn().slideY(begin: -0.04),
+        const SizedBox(height: 14),
+
+        // ── Status Stats Grid ────────────────────────────────────────────────
+        Row(children: [
+          _StatPill(icon: Icons.check_rounded, label: 'Approved',
+              value: approved.length, color: AppColors.primary),
+          const SizedBox(width: 8),
+          _StatPill(icon: Icons.hourglass_top_rounded, label: 'Pending',
+              value: pending.length, color: AppColors.warning),
+          const SizedBox(width: 8),
+          _StatPill(icon: Icons.local_shipping_outlined, label: 'Delivered',
+              value: delivered.length, color: AppColors.success),
+          const SizedBox(width: 8),
+          _StatPill(icon: Icons.close_rounded, label: 'Rejected',
+              value: rejected.length, color: AppColors.textMuted),
+        ]).animate().fadeIn(delay: 100.ms),
         const SizedBox(height: 20),
 
         if (data.samples.isEmpty)
@@ -274,49 +331,75 @@ class _BudgetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pctUsed = budget.total > 0 ? (budget.used / budget.total).clamp(0.0, 1.0) : 0.0;
-    final barColor = pctUsed > 0.8 ? Colors.red.shade600 : pctUsed > 0.5 ? Colors.amber.shade700 : Colors.green.shade600;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFC8102E), Color(0xFF8B0000)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.25), blurRadius: 16, offset: const Offset(0, 6))],
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.xxl),
+        border: Border.all(color: AppColors.outline),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 3))],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Title row
         Row(children: [
-          const Icon(Icons.account_balance_wallet_outlined, color: Colors.white70, size: 18),
-          const SizedBox(width: 8),
-          const Text('Sample Budget', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
-          const Spacer(),
-          Text('PKR ${fmt.format(budget.total.toInt())}',
-              style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700)),
-        ]),
-        const SizedBox(height: 16),
-        Row(children: [
-          _BudgetStat('Used', fmt.format(budget.used.toInt()), Colors.white),
-          const SizedBox(width: 24),
-          _BudgetStat('Remaining', fmt.format(budget.remaining.toInt()), Colors.greenAccent.shade100),
-        ]),
-        const SizedBox(height: 16),
-        // Progress bar
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: pctUsed,
-              backgroundColor: Colors.white24,
-              valueColor: AlwaysStoppedAnimation<Color>(barColor),
-              minHeight: 8,
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
+            child: const Icon(Icons.account_balance_wallet_outlined, color: AppColors.primary, size: 18),
           ),
-          const SizedBox(height: 6),
-          Text('${(pctUsed * 100).toStringAsFixed(1)}% of budget used',
-              style: const TextStyle(color: Colors.white60, fontSize: 11)),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Sample Budget',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
+              Text('Financial year 2026',
+                  style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+            ]),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.background,
+              borderRadius: BorderRadius.circular(AppRadius.full),
+            ),
+            child: Text('${(pctUsed * 100).toStringAsFixed(1)}% Used',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.onSurface)),
+          ),
+        ]),
+
+        const SizedBox(height: 16),
+
+        // Remaining amount
+        Text('PKR ${fmt.format(budget.remaining.toInt())}',
+            style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: AppColors.onSurface, letterSpacing: -0.5)),
+        Text('Remaining of PKR ${fmt.format(budget.total.toInt())} total',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary)),
+
+        const SizedBox(height: 14),
+
+        // Progress bar
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          child: LinearProgressIndicator(
+            value: pctUsed,
+            backgroundColor: AppColors.outline,
+            valueColor: AlwaysStoppedAnimation<Color>(
+                pctUsed > 0.8 ? AppColors.missed : AppColors.primary),
+            minHeight: 10,
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // Used / Available
+        Row(children: [
+          Expanded(child: _BudgetStat('Used', fmt.format(budget.used.toInt()), false)),
+          const SizedBox(width: 10),
+          Expanded(child: _BudgetStat('Available', fmt.format(budget.remaining.toInt()), true)),
         ]),
       ]),
     );
@@ -325,15 +408,57 @@ class _BudgetCard extends StatelessWidget {
 
 class _BudgetStat extends StatelessWidget {
   final String label, value;
-  final Color valueColor;
-  const _BudgetStat(this.label, this.value, this.valueColor);
+  final bool highlight;
+  const _BudgetStat(this.label, this.value, this.highlight);
 
   @override
-  Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    Text(label, style: const TextStyle(color: Colors.white54, fontSize: 11)),
-    const SizedBox(height: 2),
-    Text('PKR $value', style: TextStyle(color: valueColor, fontSize: 16, fontWeight: FontWeight.w800)),
-  ]);
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    decoration: BoxDecoration(
+      color: highlight ? AppColors.successLight : AppColors.background,
+      borderRadius: BorderRadius.circular(AppRadius.lg),
+    ),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label,
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, letterSpacing: 0.5,
+              color: highlight ? AppColors.success : AppColors.textMuted)),
+      const SizedBox(height: 3),
+      Text('PKR $value',
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.onSurface)),
+    ]),
+  );
+}
+
+class _StatPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int value;
+  final Color color;
+  const _StatPill({required this.icon, required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.outline),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6)],
+      ),
+      child: Column(children: [
+        Container(
+          width: 32, height: 32,
+          decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(11)),
+          child: Icon(icon, size: 15, color: color),
+        ),
+        const SizedBox(height: 6),
+        Text('$value', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.onSurface, letterSpacing: -0.3)),
+        const SizedBox(height: 2),
+        Text(label, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textSecondary)),
+      ]),
+    ),
+  );
 }
 
 // ── UI Helpers ────────────────────────────────────────────────────────────────
@@ -376,6 +501,17 @@ class _ErrorView extends StatelessWidget {
   );
 }
 
+Future<void> _viewPdf(String pdfBase64) async {
+  try {
+    final bytes = base64Decode(pdfBase64.contains(',')
+        ? pdfBase64.split(',').last
+        : pdfBase64);
+    await Printing.layoutPdf(onLayout: (_) async => bytes);
+  } catch (e) {
+    debugPrint('[PDF view error] $e');
+  }
+}
+
 class _SampleCard extends StatelessWidget {
   final SampleRequest sample;
   final NumberFormat fmt;
@@ -394,11 +530,11 @@ class _SampleCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
           border: isApproved
-              ? Border.all(color: Colors.green.shade300, width: 1.5)
-              : Border.all(color: Colors.grey.shade100),
+              ? Border.all(color: AppColors.success.withOpacity(0.4), width: 1.5)
+              : Border.all(color: AppColors.outline),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -444,6 +580,21 @@ class _SampleCard extends StatelessWidget {
                 child: const Text('Deliver', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w700)),
               ),
             ],
+            if (sample.status == 'delivered' && sample.pdfUrl != null) ...[
+              const SizedBox(height: 6),
+              GestureDetector(
+                onTap: () => _viewPdf(sample.pdfUrl!),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.blue.shade200),
+                  ),
+                  child: const Text('PDF', style: TextStyle(fontSize: 10, color: Colors.blue, fontWeight: FontWeight.w700)),
+                ),
+              ),
+            ],
           ]),
         ]),
       ),
@@ -458,7 +609,15 @@ class _SampleCard extends StatelessWidget {
   };
 }
 
-// ── New Request Sheet ─────────────────────────────────────────────────────────
+// ── New Request Sheet (multi-product) ─────────────────────────────────────────
+class _SelectedProduct {
+  final int id;
+  final String name;
+  final double price;
+  int qty;
+  _SelectedProduct({required this.id, required this.name, required this.price, this.qty = 1});
+}
+
 class _NewRequestSheet extends ConsumerStatefulWidget {
   final VoidCallback onSubmitted;
   const _NewRequestSheet({required this.onSubmitted});
@@ -467,44 +626,64 @@ class _NewRequestSheet extends ConsumerStatefulWidget {
 }
 
 class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
-  final _productCtrl = TextEditingController();
-  final _notesCtrl   = TextEditingController();
-  final _priceCtrl   = TextEditingController();
-  int  _qty    = 1;
+  final _searchCtrl = TextEditingController();
+  final _notesCtrl  = TextEditingController();
+  final List<_SelectedProduct> _selected = [];
   bool _saving = false;
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _searchCtrl.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
-    _productCtrl.dispose();
+    _searchCtrl.dispose();
     _notesCtrl.dispose();
-    _priceCtrl.dispose();
     super.dispose();
   }
 
-  double? get _parsedPrice {
-    final t = _priceCtrl.text.trim();
-    return t.isEmpty ? null : double.tryParse(t);
+  void _toggleProduct(Map<String, dynamic> product) {
+    final id = product['id'] as int;
+    final existing = _selected.indexWhere((p) => p.id == id);
+    if (existing >= 0) {
+      setState(() => _selected.removeAt(existing));
+    } else {
+      setState(() => _selected.add(_SelectedProduct(
+        id: id,
+        name: product['name'] as String? ?? 'Product',
+        price: (product['price'] as num?)?.toDouble() ?? 0,
+      )));
+    }
   }
 
-  double get _estimatedCost {
-    final p = _parsedPrice;
-    return p != null ? p * _qty : 0;
-  }
+  double get _totalCost => _selected.fold(0, (sum, p) => sum + p.price * p.qty);
 
   Future<void> _submit() async {
-    if (_productCtrl.text.trim().isEmpty) {
-      setState(() => _error = 'Product name is required');
+    if (_selected.isEmpty) {
+      setState(() => _error = 'Select at least one product');
       return;
     }
     setState(() { _saving = true; _error = null; });
     try {
       final dio = ref.read(dioClientProvider);
+      final notes = _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim();
+
+      // Build a combined product name and itemsJson for one request
+      final productNames = _selected.map((p) => '${p.name} (×${p.qty})').join(', ');
+      final itemsJson = _selected.map((p) => {'name': p.name, 'qty': p.qty, 'price': p.price}).toList();
+
       await dio.post('/samples', data: {
-        'productName': _productCtrl.text.trim(),
-        'quantity': _qty,
-        'notes': _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
-        'price': _parsedPrice,
+        'productName': productNames,
+        'quantity': _selected.fold<int>(0, (sum, p) => sum + p.qty),
+        'notes': notes,
+        'items': itemsJson,
+        'price': _selected.isNotEmpty && _selected.first.price > 0
+            ? _selected.fold<double>(0, (sum, p) => sum + p.price * p.qty) /
+              _selected.fold<int>(0, (sum, p) => sum + p.qty)
+            : null,
       });
       if (mounted) {
         widget.onSubmitted();
@@ -520,95 +699,209 @@ class _NewRequestSheetState extends ConsumerState<_NewRequestSheet> {
   @override
   Widget build(BuildContext context) {
     final fmt = NumberFormat('#,##0', 'en_US');
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-      child: Container(
+    final productsAsync = ref.watch(productsSearchProvider(_searchCtrl.text.trim()));
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.9,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scrollCtrl) => Container(
         decoration: const BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: const EdgeInsets.all(24),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Text('New Sample Request', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-            const Spacer(),
-            IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
-          ]),
-          const SizedBox(height: 20),
+        child: Column(children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 12),
+            width: 40, height: 4,
+            decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Row(children: [
+              const Text('Request Samples', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const Spacer(),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+            ]),
+          ),
 
-          _Field(label: 'Product / Sample Name', child: TextField(
-            controller: _productCtrl,
-            decoration: _inputDecor('e.g. Science Textbook Grade 8'),
-          )),
-          const SizedBox(height: 16),
-
-          Row(children: [
-            const Text('Quantity', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-            const Spacer(),
-            IconButton(
-              onPressed: () { if (_qty > 1) setState(() => _qty--); },
-              icon: const Icon(Icons.remove_circle_outline), color: AppColors.primary,
-            ),
-            Text('$_qty', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-            IconButton(
-              onPressed: () => setState(() => _qty++),
-              icon: const Icon(Icons.add_circle_outline), color: AppColors.primary,
-            ),
-          ]),
-          const SizedBox(height: 12),
-
-          _Field(label: 'Price per unit (PKR)', child: TextField(
-            controller: _priceCtrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            onChanged: (_) => setState(() {}),
-            decoration: _inputDecor('e.g. 500'),
-          )),
-
-          if (_parsedPrice != null && _estimatedCost > 0) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(10),
+          // Search bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+            child: TextField(
+              controller: _searchCtrl,
+              decoration: _inputDecor('Search products…').copyWith(
+                prefixIcon: const Icon(Icons.search_rounded),
               ),
-              child: Row(children: [
-                const Icon(Icons.calculate_outlined, size: 16, color: AppColors.primary),
-                const SizedBox(width: 8),
-                Text('Estimated cost: PKR ${fmt.format(_estimatedCost.toInt())}',
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
-              ]),
-            ),
-          ],
-
-          const SizedBox(height: 12),
-          _Field(label: 'Notes (optional)', child: TextField(
-            controller: _notesCtrl,
-            maxLines: 2,
-            decoration: _inputDecor('Any additional details…'),
-          )),
-
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
-          ],
-
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity, height: 52,
-            child: ElevatedButton(
-              onPressed: _saving ? null : _submit,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
-              child: _saving
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Submit Request', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             ),
           ),
-          const SizedBox(height: 8),
+
+          // Selected summary chip row
+          if (_selected.isNotEmpty)
+            Container(
+              height: 38,
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                scrollDirection: Axis.horizontal,
+                itemCount: _selected.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (_, i) {
+                  final p = _selected[i];
+                  return Chip(
+                    label: Text('${p.name} ×${p.qty}', style: const TextStyle(fontSize: 11)),
+                    backgroundColor: AppColors.primary.withOpacity(0.1),
+                    side: BorderSide(color: AppColors.primary.withOpacity(0.3)),
+                    deleteIcon: const Icon(Icons.close, size: 14),
+                    onDeleted: () => setState(() => _selected.removeAt(i)),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity: VisualDensity.compact,
+                  );
+                },
+              ),
+            ),
+
+          // Product list
+          Expanded(
+            child: productsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text(e.toString())),
+              data: (products) {
+                if (products.isEmpty && _searchCtrl.text.isEmpty) {
+                  return Center(child: Text('Type to search products', style: TextStyle(color: Colors.grey.shade500)));
+                }
+                if (products.isEmpty) {
+                  return Center(child: Text('No products found', style: TextStyle(color: Colors.grey.shade500)));
+                }
+                return ListView.separated(
+                  controller: scrollCtrl,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: products.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (_, i) {
+                    final p = products[i];
+                    final pid = p['id'] as int;
+                    final selectedIdx = _selected.indexWhere((s) => s.id == pid);
+                    final isSelected = selectedIdx >= 0;
+
+                    return GestureDetector(
+                      onTap: () => _toggleProduct(p),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.primary.withOpacity(0.08) : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.shade100),
+                        ),
+                        child: Row(children: [
+                          Container(
+                            width: 36, height: 36,
+                            decoration: BoxDecoration(
+                              color: isSelected ? AppColors.primary : Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isSelected ? Icons.check_rounded : Icons.inventory_2_outlined,
+                              color: isSelected ? Colors.white : Colors.grey.shade500,
+                              size: 18,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(p['name'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                              Text(
+                                '${p['grade'] != null && (p['grade'] as String).isNotEmpty ? 'Grade ${p['grade']} · ' : ''}${p['brand'] ?? ''}',
+                                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                              ),
+                            ]),
+                          ),
+                          if ((p['price'] as num?)?.toDouble() != null && (p['price'] as num) > 0)
+                            Text(
+                              'PKR ${fmt.format((p['price'] as num).toInt())}',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+                            ),
+                          // Quantity adjuster when selected
+                          if (isSelected) ...[
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () { if (_selected[selectedIdx].qty > 1) setState(() => _selected[selectedIdx].qty--); },
+                              child: const Icon(Icons.remove_circle_outline, size: 20, color: AppColors.primary),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 4),
+                              child: Text('${_selected[selectedIdx].qty}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                            ),
+                            GestureDetector(
+                              onTap: () => setState(() => _selected[selectedIdx].qty++),
+                              child: const Icon(Icons.add_circle_outline, size: 20, color: AppColors.primary),
+                            ),
+                          ],
+                        ]),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+
+          // Footer
+          Padding(
+            padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+              _Field(label: 'Notes (optional)', child: TextField(
+                controller: _notesCtrl,
+                maxLines: 2,
+                decoration: _inputDecor('Any additional details…'),
+              )),
+
+              if (_selected.isNotEmpty && _totalCost > 0) ...[
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(children: [
+                    const Icon(Icons.calculate_outlined, size: 16, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_selected.length} product${_selected.length > 1 ? 's' : ''} · Est. PKR ${fmt.format(_totalCost.toInt())}',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary),
+                    ),
+                  ]),
+                ),
+              ],
+
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              ],
+
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity, height: 52,
+                child: ElevatedButton(
+                  onPressed: _saving ? null : _submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                  child: _saving
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Text(
+                          _selected.isEmpty ? 'Select Products to Submit' : 'Submit ${_selected.length} Request${_selected.length > 1 ? 's' : ''}',
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                        ),
+                ),
+              ),
+            ]),
+          ),
         ]),
       ),
     );
@@ -667,11 +960,14 @@ class _DeliverSampleScreenState extends ConsumerState<DeliverSampleScreen> {
       final pdfFile = File('${tmp.path}/sample_delivery_${widget.sample.id}.pdf');
       await pdfFile.writeAsBytes(pdfBytes);
 
+      final pdfBase64Str = 'data:application/pdf;base64,${base64Encode(pdfBytes)}';
+
       final dio = ref.read(dioClientProvider);
       await dio.patch('/samples/${widget.sample.id}', data: {
         'customerName': _selectedCustomer?['name'],
         'customerId': _selectedCustomer?['id'],
         'signatureBase64': sigBase64,
+        'pdfBase64': pdfBase64Str,
         'notes': _notesCtrl.text.trim().isEmpty ? null : _notesCtrl.text.trim(),
         'quantity': _qty,
       });
