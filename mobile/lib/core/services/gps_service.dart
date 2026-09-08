@@ -25,23 +25,47 @@ class GpsService {
       await prefs.setString('auth_token', jwtToken);
     }
 
-    if (!kIsWeb) await startBackgroundGps();
-
-    // Position stream — fires on movement (works when outdoors/high accuracy)
-    final perm = await Geolocator.checkPermission();
-    if (!kIsWeb &&
-        (perm == LocationPermission.always ||
-            perm == LocationPermission.whileInUse)) {
-      _posStream = Geolocator.getPositionStream(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          distanceFilter: 3,
-        ),
-      ).listen((pos) {
-        _lastPosition = pos;
-        _sendPingAsync(pos);
-      }, onError: (_) {});
+    if (kIsWeb) {
+      _timer = Timer.periodic(const Duration(seconds: 5), (_) => _timerTick());
+      return;
     }
+
+    // Ensure location services are on and permission is granted BEFORE
+    // starting the foreground service — Android 14+ throws SecurityException
+    // when starting a `location`-typed FGS without location permission.
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      debugPrint('[GpsService] Location services disabled — tracking will not start');
+      return;
+    }
+
+    var perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) {
+      perm = await Geolocator.requestPermission();
+    }
+    if (perm == LocationPermission.denied ||
+        perm == LocationPermission.deniedForever) {
+      debugPrint('[GpsService] Location permission denied — tracking will not start');
+      return;
+    }
+
+    try {
+      await startBackgroundGps();
+    } catch (e) {
+      debugPrint('[GpsService] startBackgroundGps failed: $e');
+    }
+
+    _posStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 3,
+      ),
+    ).listen((pos) {
+      _lastPosition = pos;
+      _sendPingAsync(pos);
+    }, onError: (e) {
+      debugPrint('[GpsService] position stream error: $e');
+    });
 
     // 5-second timer — reliable fallback for indoors / low-signal
     _timer = Timer.periodic(const Duration(seconds: 5), (_) => _timerTick());

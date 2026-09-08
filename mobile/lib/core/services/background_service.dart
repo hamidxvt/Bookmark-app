@@ -44,10 +44,18 @@ Future<void> initBackgroundService() async {
 
 /// Start background GPS service (call after day start / login)
 Future<void> startBackgroundGps() async {
-  final service = FlutterBackgroundService();
-  final running = await service.isRunning();
-  if (!running) {
-    await service.startService();
+  try {
+    final service = FlutterBackgroundService();
+    final running = await service.isRunning();
+    if (!running) {
+      await service.startService();
+    }
+  } catch (e) {
+    // Android 14+ throws SecurityException if location permission missing
+    // or if invoked while app is in background. Caller has already ensured
+    // permission; log so failures are diagnosable.
+    debugPrint('[BackgroundService] startService failed: $e');
+    rethrow;
   }
 }
 
