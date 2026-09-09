@@ -30,13 +30,14 @@ class RouteStop {
 
   factory RouteStop.fromJson(Map<String, dynamic> j) {
     final c = j['customer'] as Map<String, dynamic>? ?? {};
+    double toDouble(dynamic v) => v is num ? v.toDouble() : double.tryParse('$v') ?? 0;
     return RouteStop(
       visitId: j['visitId'] ?? 0,
       sequence: j['sequence'] ?? 0,
       customerName: c['name'] ?? j['customerName'] ?? 'Unknown',
-      lat: (c['latitude'] ?? j['lat'] ?? 0).toDouble(),
-      lng: (c['longitude'] ?? j['lng'] ?? 0).toDouble(),
-      distanceKm: (j['distanceKm'] ?? 0).toDouble(),
+      lat: toDouble(c['latitude'] ?? j['lat']),
+      lng: toDouble(c['longitude'] ?? j['lng']),
+      distanceKm: toDouble(j['distanceKm']),
       status: j['status'] ?? 'PENDING',
     );
   }
@@ -119,8 +120,79 @@ class RouteMapScreen extends ConsumerStatefulWidget {
 class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
   GoogleMapController? _mapController;
   int _selectedStop = 0;
-  Set<Polyline> _polylines = {};
+  Set<Polyline> _navPolylines = {};
+  Set<Polyline> _overviewPolylines = {};
   bool _navigating = false;
+  bool _mapFitted = false;
+
+  Set<Polyline> get _allPolylines =>
+      _navPolylines.isNotEmpty ? _navPolylines : _overviewPolylines;
+
+  void _buildOverviewPolyline(List<RouteStop> stops, LatLng? myPos) {
+    final valid = stops.where((s) => s.lat != 0 && s.lng != 0).toList();
+    if (valid.length < 2 && myPos == null) {
+      _overviewPolylines = {};
+      return;
+    }
+    final points = <LatLng>[
+      if (myPos != null) myPos,
+      ...valid.map((s) => LatLng(s.lat, s.lng)),
+    ];
+    if (points.length < 2) {
+      _overviewPolylines = {};
+      return;
+    }
+    _overviewPolylines = {
+      Polyline(
+        polylineId: const PolylineId('route_overview'),
+        points: points,
+        color: AppColors.primary.withOpacity(0.85),
+        width: 4,
+        geodesic: true,
+        startCap: Cap.roundCap,
+        endCap: Cap.roundCap,
+        jointType: JointType.round,
+      ),
+    };
+  }
+
+  Future<void> _fitMapToStops(List<RouteStop> stops, LatLng? myPos) async {
+    if (_mapController == null) return;
+    final valid = stops.where((s) => s.lat != 0 && s.lng != 0).toList();
+    if (valid.isEmpty && myPos == null) return;
+
+    if (valid.length == 1 && myPos == null) {
+      await _mapController!.animateCamera(
+        CameraUpdate.newLatLngZoom(LatLng(valid[0].lat, valid[0].lng), 14),
+      );
+      return;
+    }
+
+    double minLat = myPos?.latitude ?? valid.first.lat;
+    double maxLat = minLat;
+    double minLng = myPos?.longitude ?? valid.first.lng;
+    double maxLng = minLng;
+
+    for (final p in [
+      if (myPos != null) myPos,
+      ...valid.map((s) => LatLng(s.lat, s.lng)),
+    ]) {
+      if (p.latitude < minLat) minLat = p.latitude;
+      if (p.latitude > maxLat) maxLat = p.latitude;
+      if (p.longitude < minLng) minLng = p.longitude;
+      if (p.longitude > maxLng) maxLng = p.longitude;
+    }
+
+    await _mapController!.animateCamera(
+      CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat, minLng),
+          northeast: LatLng(maxLat, maxLng),
+        ),
+        100,
+      ),
+    );
+  }
 
   Future<DirectionsResult?> _fetchDirections(LatLng origin, RouteStop dest) async {
     try {
@@ -167,12 +239,13 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
 
       if (directions != null && directions.polylinePoints.isNotEmpty) {
         setState(() {
-          _polylines = {
+          _navPolylines = {
             Polyline(
               polylineId: const PolylineId('route'),
               points: directions.polylinePoints,
               color: AppColors.primary,
               width: 5,
+              geodesic: true,
               startCap: Cap.roundCap,
               endCap: Cap.roundCap,
               jointType: JointType.round,
@@ -401,23 +474,36 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
           message: err.toString(),
           onRetry: () => ref.invalidate(routeProvider),
         ),
-        data: (stops) => _MapBody(
-          stops: stops,
-          selectedStop: _selectedStop,
-          polylines: _polylines,
-          navigating: _navigating,
-          onSelectStop: (i) {
-            setState(() => _selectedStop = i);
-            if (i < stops.length) {
-              _mapController?.animateCamera(
-                CameraUpdate.newLatLngZoom(LatLng(stops[i].lat, stops[i].lng), 15),
-              );
-            }
-          },
-          onMapCreated: (ctrl) => _mapController = ctrl,
-          buildMarkers: (stops, myPos, heading) => _buildMarkers(stops, _selectedStop, myPos, heading),
-          onNavigate: _navigate,
-        ),
+        data: (stops) {
+          final valid = stops.where((s) => s.lat != 0 && s.lng != 0).toList();
+          return _MapBody(
+            stops: valid,
+            selectedStop: _selectedStop,
+            polylines: _allPolylines,
+            navigating: _navigating,
+            onSelectStop: (i) {
+              setState(() => _selectedStop = i);
+              if (i < valid.length) {
+                _mapController?.animateCamera(
+                  CameraUpdate.newLatLngZoom(LatLng(valid[i].lat, valid[i].lng), 15),
+                );
+              }
+            },
+            onMapCreated: (ctrl) {
+              _mapController = ctrl;
+              _mapFitted = false;
+            },
+            onReady: (myPos) {
+              if (_mapFitted) return;
+              _buildOverviewPolyline(valid, myPos);
+              _mapFitted = true;
+              _fitMapToStops(valid, myPos);
+              if (mounted) setState(() {});
+            },
+            buildMarkers: (stops, myPos, heading) => _buildMarkers(stops, _selectedStop, myPos, heading),
+            onNavigate: _navigate,
+          );
+        },
       ),
     );
   }
@@ -431,6 +517,7 @@ class _MapBody extends ConsumerStatefulWidget {
   final bool navigating;
   final ValueChanged<int> onSelectStop;
   final void Function(GoogleMapController) onMapCreated;
+  final void Function(LatLng? myPos) onReady;
   final Set<Marker> Function(List<RouteStop>, LatLng?, double?) buildMarkers;
   final Future<void> Function(RouteStop) onNavigate;
 
@@ -441,6 +528,7 @@ class _MapBody extends ConsumerStatefulWidget {
     required this.navigating,
     required this.onSelectStop,
     required this.onMapCreated,
+    required this.onReady,
     required this.buildMarkers,
     required this.onNavigate,
   });
@@ -462,12 +550,12 @@ class _MapBodyState extends ConsumerState<_MapBody> {
   Future<void> _fetchPosition() async {
     final gps = ref.read(gpsServiceProvider);
     final pos = await gps.getCurrentPosition();
-    if (pos != null && mounted) {
-      setState(() {
-        _myPos = LatLng(pos.latitude, pos.longitude);
-        _myHeading = pos.heading >= 0 ? pos.heading : null;
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _myPos = pos != null ? LatLng(pos.latitude, pos.longitude) : null;
+      _myHeading = pos != null && pos.heading >= 0 ? pos.heading : null;
+    });
+    widget.onReady(_myPos);
   }
 
   @override
@@ -484,17 +572,22 @@ class _MapBodyState extends ConsumerState<_MapBody> {
     if (valid.isEmpty) return const _EmptyRoute();
 
     return Stack(children: [
-      GoogleMap(
-        onMapCreated: widget.onMapCreated,
-        initialCameraPosition: initialCamera,
-        markers: widget.buildMarkers(valid, _myPos, _myHeading),
-        polylines: widget.polylines,
-        myLocationEnabled: true,
-        myLocationButtonEnabled: false,
-        zoomControlsEnabled: false,
-        mapToolbarEnabled: false,
-        compassEnabled: true,
-        trafficEnabled: true,
+      Positioned.fill(
+        child: GoogleMap(
+          onMapCreated: (ctrl) {
+            widget.onMapCreated(ctrl);
+            widget.onReady(_myPos);
+          },
+          initialCameraPosition: initialCamera,
+          markers: widget.buildMarkers(valid, _myPos, _myHeading),
+          polylines: widget.polylines,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: false,
+          zoomControlsEnabled: false,
+          mapToolbarEnabled: false,
+          compassEnabled: true,
+          trafficEnabled: false,
+        ),
       ),
 
       // Top bar

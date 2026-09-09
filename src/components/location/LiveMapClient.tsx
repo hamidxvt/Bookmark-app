@@ -184,33 +184,52 @@ function LiveMap({
     return el;
   }, []);
 
+  const initMap = useCallback(() => {
+    if (!mapRef.current || gmap.current) return false;
+    const gmaps = (window as any).google;
+    if (!gmaps?.maps?.Map) return false;
+
+    const map = new gmaps.maps.Map(mapRef.current, {
+      center: { lat: 34.3512, lng: 72.0189 },
+      zoom: 13,
+      mapId: "bookmark_livemap",
+      zoomControl: true,
+      streetViewControl: false,
+      mapTypeControl: false,
+      fullscreenControl: true,
+    });
+    new gmaps.maps.TrafficLayer().setMap(map);
+    infoWindow.current = new gmaps.maps.InfoWindow();
+    gmap.current = map;
+    if (!document.querySelector("#gm-pulse-style")) {
+      const s = document.createElement("style");
+      s.id = "gm-pulse-style";
+      s.textContent = `@keyframes gm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.15)}}`;
+      document.head.appendChild(s);
+    }
+    setReady(true);
+    return true;
+  }, []);
+
   useEffect(() => {
     if (typeof window === "undefined" || !GMAP_API_KEY) return;
-    if ((window as any).google?.maps?.Map) { setReady(true); return; }
+
+    if (initMap()) return;
+
+    const existing = document.querySelector('script[src*="maps.googleapis.com/maps/api/js"]') as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", initMap);
+      if ((window as any).google?.maps?.Map) initMap();
+      return () => existing.removeEventListener("load", initMap);
+    }
+
     const script = document.createElement("script");
     script.src = `https://maps.googleapis.com/maps/api/js?key=${GMAP_API_KEY}&libraries=places,marker`;
-    script.async = true; script.defer = true;
-    script.onload = () => {
-      if (!mapRef.current) return;
-      const gmaps = (window as any).google;
-      const map = new gmaps.maps.Map(mapRef.current, {
-        center: { lat: 34.3512, lng: 72.0189 }, zoom: 13,
-        mapId: "bookmark_livemap",
-        zoomControl: true, streetViewControl: false, mapTypeControl: false, fullscreenControl: true,
-      });
-      new gmaps.maps.TrafficLayer().setMap(map);
-      infoWindow.current = new gmaps.maps.InfoWindow();
-      gmap.current = map;
-      if (!document.querySelector("#gm-pulse-style")) {
-        const s = document.createElement("style");
-        s.id = "gm-pulse-style";
-        s.textContent = `@keyframes gm-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.15)}}`;
-        document.head.appendChild(s);
-      }
-      setReady(true);
-    };
+    script.async = true;
+    script.defer = true;
+    script.onload = () => { initMap(); };
     document.head.appendChild(script);
-  }, []);
+  }, [initMap]);
 
   useEffect(() => {
     if (!ready || !gmap.current) return;
@@ -478,52 +497,98 @@ export default function LiveMapClient() {
     }, ...prev].slice(0, 20));
   }, []);
 
+  const mergeOfficers = useCallback((fresh: Officer[]) => {
+    setLastUpdate(new Date());
+    fresh.forEach(o => {
+      const prev = prevOfficers.current[o.id];
+      const name = stripHtml(o.name);
+      if (!prev) {
+        if (o.gpsStatus === "ACTIVE") addEvent({ iconType: "online", text: `${name} came online`, color: "text-emerald-700 bg-emerald-50" });
+      } else {
+        if (prev.gpsStatus !== "ACTIVE" && o.gpsStatus === "ACTIVE")
+          addEvent({ iconType: "online", text: `${name} is now active`, color: "text-emerald-700 bg-emerald-50" });
+        if (prev.gpsStatus === "ACTIVE" && o.gpsStatus !== "ACTIVE")
+          addEvent({ iconType: "offline", text: `${name} went ${o.gpsStatus?.toLowerCase()}`, color: "text-slate-600 bg-slate-50" });
+        const prevSpd = Number(prev.lastSpeedKmh ?? 0);
+        const curSpd  = Number(o.lastSpeedKmh ?? 0);
+        if (prevSpd < 2 && curSpd > 5)
+          addEvent({ iconType: "moving", text: `${name} started moving · ${curSpd.toFixed(0)} km/h`, color: "text-blue-700 bg-blue-50" });
+        if (prevSpd > 5 && curSpd < 1)
+          addEvent({ iconType: "stopped", text: `${name} stopped`, color: "text-amber-700 bg-amber-50" });
+      }
+      prevOfficers.current[o.id] = o;
+    });
+    setOfficers(fresh);
+    setSelected(prev => {
+      if (!prev) return prev;
+      const updated = fresh.find(o => o.id === prev.id);
+      if (!updated) return null;
+      return { ...prev, ...updated };
+    });
+  }, [addEvent]);
+
+  const applyPingUpdate = useCallback((officer: Officer, trailPoint?: TrailPoint | null) => {
+    setLastUpdate(new Date());
+    const prev = prevOfficers.current[officer.id];
+    const name = stripHtml(officer.name);
+    if (prev) {
+      const prevSpd = Number(prev.lastSpeedKmh ?? 0);
+      const curSpd  = Number(officer.lastSpeedKmh ?? 0);
+      if (prevSpd < 2 && curSpd > 5)
+        addEvent({ iconType: "moving", text: `${name} started moving · ${curSpd.toFixed(0)} km/h`, color: "text-blue-700 bg-blue-50" });
+      if (prevSpd > 5 && curSpd < 1)
+        addEvent({ iconType: "stopped", text: `${name} stopped`, color: "text-amber-700 bg-amber-50" });
+    }
+    prevOfficers.current[officer.id] = officer;
+    setOfficers(prevList => {
+      const idx = prevList.findIndex(o => o.id === officer.id);
+      if (idx === -1) return [...prevList, officer];
+      const next = [...prevList];
+      next[idx] = { ...next[idx], ...officer };
+      return next;
+    });
+    setSelected(prev => (prev?.id === officer.id ? { ...prev, ...officer } : prev));
+    if (trailPoint) {
+      setTrailPoints(prev => {
+        const last = prev[prev.length - 1];
+        if (last && last.lat === trailPoint.lat && last.lng === trailPoint.lng) return prev;
+        return [...prev.slice(-499), trailPoint];
+      });
+    }
+  }, [addEvent]);
+
   const load = useCallback(async () => {
     try {
       const params = selCity ? `?cityId=${selCity.id}` : "";
       const res = await fetch(`/api/v1/location${params}`).then(r => r.json());
-      if (res.success) {
-        const fresh: Officer[] = res.data?.bookers ?? [];
-        setLastUpdate(new Date());
-
-        // Detect state changes for activity feed
-        fresh.forEach(o => {
-          const prev = prevOfficers.current[o.id];
-          const name = stripHtml(o.name);
-          if (!prev) {
-            if (o.gpsStatus === "ACTIVE") addEvent({ iconType: "online", text: `${name} came online`, color: "text-emerald-700 bg-emerald-50" });
-          } else {
-            if (prev.gpsStatus !== "ACTIVE" && o.gpsStatus === "ACTIVE")
-              addEvent({ iconType: "online", text: `${name} is now active`, color: "text-emerald-700 bg-emerald-50" });
-            if (prev.gpsStatus === "ACTIVE" && o.gpsStatus !== "ACTIVE")
-              addEvent({ iconType: "offline", text: `${name} went ${o.gpsStatus?.toLowerCase()}`, color: "text-slate-600 bg-slate-50" });
-            const prevSpd = Number(prev.lastSpeedKmh ?? 0);
-            const curSpd  = Number(o.lastSpeedKmh ?? 0);
-            if (prevSpd < 2 && curSpd > 5)
-              addEvent({ iconType: "moving", text: `${name} started moving · ${curSpd.toFixed(0)} km/h`, color: "text-blue-700 bg-blue-50" });
-            if (prevSpd > 5 && curSpd < 1)
-              addEvent({ iconType: "stopped", text: `${name} stopped`, color: "text-amber-700 bg-amber-50" });
-          }
-          prevOfficers.current[o.id] = o;
-        });
-
-        setOfficers(fresh);
-        // Only update selected if it still exists in fresh data, don't reopen
-        if (selected && !fresh.find((o: Officer) => o.id === selected.id)) {
-          setSelected(null);
-        } else if (selected) {
-          const updated = fresh.find((o: Officer) => o.id === selected.id);
-          if (updated) {
-            // Only update selected if the core data changed to avoid re-renders
-            setSelected(prev => prev && updated ? { ...prev, ...updated } : updated);
-          }
-        }
-      }
+      if (res.success) mergeOfficers(res.data?.bookers ?? []);
     } catch { /* silent */ } finally { setLoading(false); }
-  }, [selCity, addEvent]);
+  }, [selCity, mergeOfficers]);
 
-  // Poll location data every 1.5s
-  useEffect(() => { load(); const t = setInterval(load, 1_500); return () => clearInterval(t); }, [load]);
+  // Initial snapshot + manual refresh
+  useEffect(() => { load(); }, [load]);
+
+  // Real-time GPS via SSE (replaces polling)
+  useEffect(() => {
+    const params = selCity ? `?cityId=${selCity.id}` : "";
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(`/api/v1/location/stream${params}`);
+      es.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.kind === "snapshot" && Array.isArray(msg.bookers)) {
+            mergeOfficers(msg.bookers as Officer[]);
+            setLoading(false);
+          } else if (msg.kind === "ping" && msg.officer) {
+            applyPingUpdate(msg.officer as Officer, msg.trailPoint as TrailPoint | null);
+          }
+        } catch { /* ignore malformed */ }
+      };
+      es.onerror = () => { es?.close(); };
+    } catch { /* SSE unsupported */ }
+    return () => { es?.close(); };
+  }, [selCity, mergeOfficers, applyPingUpdate]);
 
   // Poll smart officer activity every 5s for notifications
   useEffect(() => {
@@ -658,7 +723,7 @@ export default function LiveMapClient() {
             <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse inline-block" />
             Live GPS Tracking
           </h2>
-          <p className="text-sm text-slate-500 mt-0.5">Real-time officer positions · live marker animation</p>
+          <p className="text-sm text-slate-500 mt-0.5">Live SSE stream · markers update as officers move</p>
         </div>
         <div className="flex items-center gap-2">
           {/* City filter */}
