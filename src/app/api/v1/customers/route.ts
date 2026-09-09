@@ -67,15 +67,16 @@ export async function POST(req: Request) {
       reviewMonth, sessionStarts,
     } = body;
 
-    if (!name?.trim()) return NextResponse.json({ success: false, error: { message: "Name is required" } }, { status: 400 });
-    if (!ownerPhone?.trim()) return NextResponse.json({ success: false, error: { message: "Contact number is required" } }, { status: 400 });
-    if (!cityId) return NextResponse.json({ success: false, error: { message: "City is required" } }, { status: 400 });
+    if (!name?.trim()) return NextResponse.json({ success: false, error: { field: "name", message: "Name is required" } }, { status: 400 });
+    const phone = String(ownerPhone ?? body.phone ?? "").trim();
+    if (!phone) return NextResponse.json({ success: false, error: { field: "phone", message: "Phone number is required" } }, { status: 400 });
+    if (!cityId) return NextResponse.json({ success: false, error: { field: "city", message: "City is required" } }, { status: 400 });
 
     const customer = await (prisma as any).customer.create({
       data: {
         name: name.trim(),
         ownerName: ownerName?.trim() || null,
-        ownerPhone: ownerPhone.trim(),
+        ownerPhone: phone,
         email: email?.trim() || null,
         website: website?.trim() || null,
         address: address?.trim() || null,

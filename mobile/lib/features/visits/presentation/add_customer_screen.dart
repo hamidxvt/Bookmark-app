@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +8,7 @@ import 'dart:io';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/services/gps_service.dart';
 
 class AddCustomerScreen extends ConsumerStatefulWidget {
   final int visitId;
@@ -58,11 +60,36 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
     }
   }
 
+  String? _validateForm() {
+    final name = _nameCtrl.text.trim();
+    final phone = _phoneCtrl.text.trim();
+
+    if (name.isEmpty) return 'Name is required';
+    if (phone.isEmpty) return 'Phone number is required';
+    if (phone.replaceAll(RegExp(r'[\s\-()+]'), '').length < 7) {
+      return 'Enter a valid phone number';
+    }
+    return null;
+  }
+
+  String _extractErrorMessage(dynamic error) {
+    if (error is DioException) {
+      return ApiException.fromDio(error).message;
+    }
+    return error.toString();
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.error),
+    );
+  }
+
   Future<void> _submitCustomer() async {
-    if (_nameCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter customer name'), backgroundColor: AppColors.error),
-      );
+    final validationError = _validateForm();
+    if (validationError != null) {
+      _showError(validationError);
       return;
     }
 
@@ -70,8 +97,9 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
 
     try {
       final dio = ref.read(dioClientProvider);
-      
-      // Convert photo to base64 if present
+      final gps = ref.read(gpsServiceProvider);
+      final pos = await gps.getCurrentPosition();
+
       String? photoBase64;
       if (_photo != null) {
         final bytes = await _photo!.readAsBytes();
@@ -82,27 +110,24 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
         '/customers',
         data: {
           'name': _nameCtrl.text.trim(),
-          'ownerName': _ownerCtrl.text.trim(),
+          if (_ownerCtrl.text.trim().isNotEmpty) 'ownerName': _ownerCtrl.text.trim(),
           'ownerPhone': _phoneCtrl.text.trim(),
-          'email': _emailCtrl.text.trim(),
-          'address': _addressCtrl.text.trim(),
-          'category': _categoryCtrl.text.trim(),
-          'photo': photoBase64,
-          'latitude': 0.0,
-          'longitude': 0.0,
+          'phone': _phoneCtrl.text.trim(),
+          if (_emailCtrl.text.trim().isNotEmpty) 'email': _emailCtrl.text.trim(),
+          if (_addressCtrl.text.trim().isNotEmpty) 'address': _addressCtrl.text.trim(),
+          if (_categoryCtrl.text.trim().isNotEmpty) 'category': _categoryCtrl.text.trim(),
+          if (photoBase64 != null) 'photo': photoBase64,
+          if (pos != null) 'latitude': pos.latitude,
+          if (pos != null) 'longitude': pos.longitude,
         },
       );
 
       if (res.data['success'] == true) {
         final customerId = res.data['data']['id'];
 
-        // Link customer to visit (start visit with new customer)
         await dio.post(
           '/visits',
-          data: {
-            'customerId': customerId,
-            'visitDate': DateTime.now().toIso8601String(),
-          },
+          data: {'customerId': customerId},
         ).catchError((_) => null);
 
         if (mounted) {
@@ -119,13 +144,13 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
           );
           context.pop(customerId);
         }
+      } else {
+        final err = res.data['error'];
+        final msg = err is Map ? (err['message'] ?? 'Failed to add customer') : (err ?? 'Failed to add customer');
+        _showError(msg.toString());
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
-        );
-      }
+      _showError(_extractErrorMessage(e));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -147,7 +172,6 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Photo section
             GestureDetector(
               onTap: _loading ? null : _pickPhoto,
               child: Container(
@@ -175,17 +199,15 @@ class _AddCustomerScreenState extends ConsumerState<AddCustomerScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Form fields
-            _buildField('Shop/School Name', _nameCtrl, Icons.storefront_rounded),
+            _buildField('Shop/School Name *', _nameCtrl, Icons.storefront_rounded),
             _buildField('Owner Name', _ownerCtrl, Icons.person_outline_rounded),
-            _buildField('Phone', _phoneCtrl, Icons.phone_outlined, keyboardType: TextInputType.phone),
+            _buildField('Phone *', _phoneCtrl, Icons.phone_outlined, keyboardType: TextInputType.phone),
             _buildField('Email', _emailCtrl, Icons.email_outlined, keyboardType: TextInputType.emailAddress),
             _buildField('Address', _addressCtrl, Icons.location_on_outlined, maxLines: 2),
             _buildField('Category', _categoryCtrl, Icons.label_outline),
 
             const SizedBox(height: 24),
 
-            // Submit button
             SizedBox(
               width: double.infinity,
               height: 48,

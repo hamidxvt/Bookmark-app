@@ -48,7 +48,76 @@ export async function GET(req: Request) {
       data: formattedCustomers,
     });
   } catch (err) {
-    console.error("[mobile/customers]", err);
+    console.error("[mobile/customers GET]", err);
     return NextResponse.json({ success: false, error: "Server error" }, { status: 500 });
+  }
+}
+
+function fieldError(field: string, message: string, status = 400) {
+  return NextResponse.json({ success: false, error: { field, message } }, { status });
+}
+
+// POST /api/mobile/customers — officer creates a new customer (pending approval)
+export async function POST(req: Request) {
+  const user = getMobileUser(req);
+  if (!user) return unauthorized();
+
+  try {
+    const body = await req.json();
+    const {
+      name,
+      ownerName,
+      ownerPhone,
+      phone,
+      email,
+      address,
+      category,
+      customerType,
+      cityId,
+      latitude,
+      longitude,
+    } = body;
+
+    const trimmedName = String(name ?? "").trim();
+    const trimmedPhone = String(ownerPhone ?? phone ?? "").trim();
+
+    if (!trimmedName) return fieldError("name", "Name is required");
+    if (!trimmedPhone) return fieldError("phone", "Phone number is required");
+
+    let resolvedCityId = cityId ? parseInt(String(cityId), 10) : NaN;
+    if (Number.isNaN(resolvedCityId)) {
+      const booker = await prisma.booker.findUnique({
+        where: { id: user.id },
+        select: { cityId: true },
+      });
+      resolvedCityId = booker?.cityId ?? NaN;
+    }
+    if (Number.isNaN(resolvedCityId)) return fieldError("city", "City is required");
+
+    const lat = latitude != null && latitude !== 0 ? Number(latitude) : null;
+    const lng = longitude != null && longitude !== 0 ? Number(longitude) : null;
+
+    const customer = await prisma.customer.create({
+      data: {
+        name: trimmedName,
+        ownerName: ownerName?.trim() || null,
+        ownerPhone: trimmedPhone,
+        email: email?.trim() || null,
+        address: address?.trim() || null,
+        category: category?.trim() || null,
+        customerType: String(customerType ?? "OTHER").toUpperCase() as "SCHOOL" | "COLLEGE" | "SELF" | "RETAILER" | "OTHER",
+        cityId: resolvedCityId,
+        approvalStatus: "PENDING",
+        assignedBookerId: user.id,
+        ...(lat != null && !Number.isNaN(lat) ? { latitude: lat } : {}),
+        ...(lng != null && !Number.isNaN(lng) ? { longitude: lng } : {}),
+      },
+      select: { id: true, name: true, ownerPhone: true, approvalStatus: true },
+    });
+
+    return NextResponse.json({ success: true, data: customer }, { status: 201 });
+  } catch (err) {
+    console.error("[mobile/customers POST]", err);
+    return NextResponse.json({ success: false, error: { message: "Failed to create customer" } }, { status: 500 });
   }
 }
