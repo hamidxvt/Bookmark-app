@@ -565,6 +565,18 @@ model SampleRequest {
   @@map("sample_requests")
 }
 
+// ─── ADMIN REAL-TIME EVENTS (SSE) ────────────────────────────────────────────
+model Event {
+  id        Int      @id @default(autoincrement())
+  type      String   // leave-request | sample-request | visit-complete | visit-adhoc
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([type])
+  @@index([createdAt])
+  @@map("events")
+}
+
 // ─── APP RELEASES ────────────────────────────────────────────────────────────
 model AppRelease {
   id              Int       @id @default(autoincrement())

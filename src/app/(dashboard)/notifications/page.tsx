@@ -1,5 +1,7 @@
-import NotificationsClient from "@/components/notifications/NotificationsClient";
-export const metadata = { title: "Notifications — FFM" };
+import { redirect } from "next/navigation";
+
+export const metadata = { title: "Inbox — FFM" };
+
 export default function NotificationsPage() {
-  return <NotificationsClient />;
+  redirect("/inbox");
 }

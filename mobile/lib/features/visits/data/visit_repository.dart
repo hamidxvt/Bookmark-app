@@ -99,7 +99,7 @@ class VisitRepository {
           queuedAt: DateTime.now(),
         ));
       } else {
-        rethrow;
+        throw ApiException.fromDio(e);
       }
     }
   }

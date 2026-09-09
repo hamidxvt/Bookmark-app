@@ -7,9 +7,15 @@ export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [pendingLeaves, pendingMissedVisits, pendingRequests] = await Promise.all([
+  const [pendingLeaves, pendingSamples, pendingMissedVisits, pendingRequests] = await Promise.all([
     prisma.leaveRequest.findMany({
-      where: { status: "PENDING" },
+      where: { status: "pending" },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+      include: { booker: { select: { name: true } } },
+    }),
+    prisma.sampleRequest.findMany({
+      where: { status: "pending" },
       orderBy: { createdAt: "desc" },
       take: 10,
       include: { booker: { select: { name: true } } },
@@ -41,8 +47,18 @@ export async function GET() {
       type: "leave" as const,
       title: `Leave request from ${l.booker.name}`,
       subtitle: `${l.leaveType} · ${new Date(l.fromDate).toLocaleDateString("en-PK")}`,
-      href: "/leave-requests",
+      href: "/inbox",
       time: l.createdAt,
+      unread: true,
+    })),
+    ...pendingSamples.map((s) => ({
+      id: `sample-${s.id}`,
+      type: "request" as const,
+      title: `Sample request from ${s.booker.name}`,
+      subtitle: s.productName,
+      href: "/inbox",
+      time: s.createdAt,
+      unread: true,
     })),
     ...pendingMissedVisits.map((m) => ({
       id: `missed-${m.id}`,
@@ -51,6 +67,7 @@ export async function GET() {
       subtitle: `By ${m.visit.booker.name}`,
       href: "/missed-visits",
       time: m.createdAt,
+      unread: true,
     })),
     ...pendingRequests.map((r) => ({
       id: `req-${r.id}`,
@@ -59,12 +76,16 @@ export async function GET() {
       subtitle: `By ${r.booker.name} · ${r.category}`,
       href: "/requests",
       time: r.createdAt,
+      unread: true,
     })),
   ].sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
 
+  const unread =
+    pendingLeaves.length + pendingSamples.length + pendingMissedVisits.length + pendingRequests.length;
+
   return NextResponse.json({
     total: notifications.length,
-    unread: pendingLeaves.length + pendingMissedVisits.length + pendingRequests.length,
+    unread,
     notifications,
   });
 }

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/network/dio_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/mock_location_guard.dart';
 import '../data/visit_repository.dart';
@@ -131,11 +133,17 @@ class _CompleteVisitScreenState extends ConsumerState<CompleteVisitScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final message = e is ApiException
+            ? e.message
+            : e is DioException
+                ? ApiException.fromDio(e).message
+                : e.toString();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed: $e'),
+            content: Text(message),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 5),
           ),
         );
       }

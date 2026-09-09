@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
+import { createEvent } from "@/lib/events";
 
 type LeaveRecord = Awaited<ReturnType<typeof prisma.leaveRequest.findMany>>[number];
 
@@ -94,6 +95,19 @@ export async function POST(req: Request) {
         status: "pending",
       },
     });
+
+    const booker = await prisma.booker.findUnique({
+      where: { id: user.id },
+      select: { name: true },
+    });
+
+    await createEvent("leave-request", {
+      leaveId: leave.id,
+      bookerId: user.id,
+      bookerName: booker?.name ?? "Officer",
+      leaveType,
+      message: `${booker?.name ?? "Officer"} submitted a ${leaveType} leave request`,
+    }).catch(() => {});
 
     return NextResponse.json({ success: true, data: leave, message: "Leave request submitted" });
   } catch (err) {

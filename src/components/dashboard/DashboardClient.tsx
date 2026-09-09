@@ -125,7 +125,7 @@ export default function DashboardClient() {
   const quickActions = [
     { label: "Add Customer", icon: UserPlus,     action: () => router.push("/customers/add") },
     { label: "Add Officer",  icon: Users,         action: () => router.push("/bookers") },
-    { label: "Create Visit", icon: CalendarPlus,  action: () => router.push("/visits") },
+    { label: "Create Visit", icon: CalendarPlus,  action: () => router.push("/visits/add") },
     { label: "View Map",     icon: MapPinned,     action: () => router.push("/location") },
     { label: "Reports",      icon: FileText,      action: () => router.push("/reports") },
     { label: "Attendance",   icon: CalendarCheck, action: () => router.push("/attendance") },

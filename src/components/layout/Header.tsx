@@ -50,7 +50,7 @@ export default function Header({
       visits: "Visits", products: "Products", location: "Live Location",
       "live-activity": "Live Activity", attendance: "Attendance", payroll: "Payroll",
       "missed-visits": "Missed Visits", samples: "Samples", requests: "Support Tickets",
-      reports: "Export Data", "data-import": "Data Import", notifications: "Notifications",
+      reports: "Export Data", "data-import": "Data Import", inbox: "Inbox", notifications: "Inbox",
       scheduler: "Run Schedulers", profile: "Edit Profile", settings: "Settings", "live-shifts": "Live Shifts",
       "adhoc-visits": "Ad-hoc Visits", "locations": "City Management",
     };
@@ -68,21 +68,34 @@ export default function Header({
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Load notifications
-  useEffect(() => {
+  const loadNotifications = () => {
     fetch("/api/v1/notifications")
       .then(r => r.json())
       .then(d => { setNotifs(d.notifications ?? []); setUnread(d.unread ?? 0); })
       .catch(() => {});
+  };
+
+  // Load notifications + real-time SSE updates
+  useEffect(() => {
+    loadNotifications();
 
     let es: EventSource | null = null;
     try {
-      es = new EventSource("/api/v1/notifications/stream");
+      es = new EventSource("/api/v1/events/subscribe");
       es.onmessage = (e) => {
-        try { const c = JSON.parse(e.data); setUnread(c.total ?? 0); } catch {}
+        try {
+          const data = JSON.parse(e.data);
+          if (data.kind === "connected" && data.counts) {
+            setUnread((data.counts.leaves ?? 0) + (data.counts.samples ?? 0));
+            return;
+          }
+          if (data.type) {
+            loadNotifications();
+          }
+        } catch { /* ignore */ }
       };
       es.onerror = () => es?.close();
-    } catch {}
+    } catch { /* SSE not supported */ }
     return () => es?.close();
   }, []);
 
@@ -190,11 +203,11 @@ export default function Header({
               </div>
               <div className="border-t border-border px-4 py-3">
                 <Link
-                  href="/notifications"
+                  href="/inbox"
                   onClick={() => setNotifOpen(false)}
                   className="text-xs font-semibold text-primary hover:underline"
                 >
-                  View all notifications →
+                  Open inbox →
                 </Link>
               </div>
             </div>

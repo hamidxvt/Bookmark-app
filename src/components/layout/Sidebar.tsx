@@ -22,14 +22,15 @@ const groups: { title: string; items: Item[] }[] = [
       { label: "Dashboard",    href: "/dashboard",     icon: LayoutDashboard },
       { label: "Live Activity", href: "/live-activity", icon: Activity },
       { label: "Live Location", href: "/location",      icon: MapPin },
-      { label: "Notifications", href: "/notifications", icon: Bell },
+      { label: "Inbox", href: "/inbox", icon: Bell },
     ],
   },
   {
     title: "Sales",
     items: [
       { label: "Sales Team", href: "/bookers", icon: Users },
-      { label: "Visits",     href: "/visits",  icon: RouteIcon },
+      { label: "Visits",         href: "/visits",     icon: RouteIcon },
+      { label: "Schedule Visit", href: "/visits/add", icon: CalendarCheck },
     ],
   },
   {

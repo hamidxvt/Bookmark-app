@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
 import { prisma } from "@/lib/prisma";
+import { createEvent } from "@/lib/events";
 
 // GET /api/mobile/samples
 // Returns officer's sample requests + their budget summary
@@ -79,6 +80,20 @@ export async function POST(req: Request) {
         status: "pending",
       },
     });
+
+    const booker = await prisma.booker.findUnique({
+      where: { id: user.id },
+      select: { name: true },
+    });
+
+    await createEvent("sample-request", {
+      sampleId: request.id,
+      bookerId: user.id,
+      bookerName: booker?.name ?? "Officer",
+      productName: request.productName,
+      quantity: request.quantity,
+      message: `${booker?.name ?? "Officer"} requested samples: ${request.productName}`,
+    }).catch(() => {});
 
     return NextResponse.json({ success: true, data: request }, { status: 201 });
   } catch (err) {

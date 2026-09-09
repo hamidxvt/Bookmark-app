@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
+import { createEvent } from "@/lib/events";
 
 // POST /api/mobile/visits/[id]/complete
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -15,7 +16,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const visit = await prisma.visit.findUnique({
       where: { id: visitId },
-      select: { id: true, bookerId: true, status: true, isAdhoc: true, customerId: true },
+      select: {
+        id: true,
+        bookerId: true,
+        status: true,
+        isAdhoc: true,
+        customerId: true,
+        customer: { select: { name: true } },
+        booker: { select: { name: true } },
+      },
     });
 
     if (!visit) {
@@ -78,6 +87,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         console.error("[follow-up visit creation]", e);
       }
     }
+
+    await createEvent("visit-complete", {
+      visitId,
+      bookerId: user.id,
+      bookerName: visit.booker?.name ?? "Officer",
+      customerName: visit.customer?.name,
+      message: `${visit.booker?.name ?? "Officer"} completed visit at ${visit.customer?.name ?? "customer"}`,
+    }).catch(() => {});
 
     return NextResponse.json({
       success: true,

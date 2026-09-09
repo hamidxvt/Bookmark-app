@@ -8,6 +8,7 @@ import 'package:dio/dio.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/constants/api_constants.dart';
+import '../../../core/services/gps_service.dart';
 import '../data/visit_models.dart';
 import '../data/visit_repository.dart';
 
@@ -661,16 +662,25 @@ class _AdhocVisitSheetState extends ConsumerState<_AdhocVisitSheet> {
     setState(() { _creating = true; _error = ''; });
     try {
       final dio = ref.read(dioClientProvider);
+      final position = await ref.read(gpsServiceProvider).getCurrentPosition();
       final res = await dio.post(ApiConstants.adhocVisit, data: {
         'customerId': _selected!['id'],
         'notes': 'Ad-hoc visit',
+        if (position != null) 'latitude': position.latitude,
+        if (position != null) 'longitude': position.longitude,
       });
       final data = res.data as Map<String, dynamic>;
       if (data['success'] == true) {
-        if (mounted) context.pop();
+        final visitId = data['data']?['id'];
+        if (mounted) {
+          context.pop();
+          if (visitId != null) {
+            context.push('/visits/$visitId/complete');
+          }
+        }
         widget.onCreated();
       } else {
-        setState(() => _error = data['error'] ?? 'Failed to create visit');
+        setState(() => _error = data['error']?.toString() ?? 'Failed to create visit');
       }
     } on DioException catch (e) {
       setState(() => _error = ApiException.fromDio(e).message);

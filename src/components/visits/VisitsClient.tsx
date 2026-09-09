@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, Eye, Download, CalendarClock, CheckCircle2, Clock, XCircle, Timer } from "lucide-react";
+import { Search, Eye, Download, CalendarClock, CheckCircle2, Clock, XCircle, Timer, CalendarPlus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { EmptyState, SectionCard, StatCard, StatusPill, TableSkeleton } from "@/components/shared/ui-bits";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -82,6 +83,7 @@ function exportPDF(rows: Visit[]) {
 }
 
 export default function VisitsClient() {
+  const router = useRouter();
   const [rows, setRows] = useState<Visit[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -134,17 +136,22 @@ export default function VisitsClient() {
         title="Visit Register"
         description={`${filtered.length} of ${total} visits`}
         action={
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="rounded-xl">
-                <Download className="mr-2 h-4 w-4" /> Export
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => exportCSV(filtered)}>Export CSV</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => exportPDF(filtered)}>Export PDF</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex gap-2">
+            <Button className="rounded-xl" onClick={() => router.push("/visits/add")}>
+              <CalendarPlus className="mr-2 h-4 w-4" /> Schedule Visit
+            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="rounded-xl">
+                  <Download className="mr-2 h-4 w-4" /> Export
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => exportCSV(filtered)}>Export CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportPDF(filtered)}>Export PDF</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         }
       >
         <div className="mb-5 grid gap-3 md:grid-cols-3">

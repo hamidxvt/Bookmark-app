@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
+import { createEvent } from "@/lib/events";
 import { validateCityMatch } from "@/lib/visit-assignment";
 
 type Visit = {
@@ -109,7 +110,7 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json();
-    const { customerId, notes } = body;
+    const { customerId, notes, latitude, longitude } = body;
 
     if (!customerId) {
       return NextResponse.json({ success: false, error: "customerId is required" }, { status: 400 });
@@ -134,11 +135,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Customer not found" }, { status: 404 });
     }
 
-    const bookerCity = await prisma.booker.findUnique({
+    const booker = await prisma.booker.findUnique({
       where: { id: user.id },
       select: { cityId: true },
     });
-    const cityCheck = await validateCityMatch(bookerCity?.cityId, customer.cityId);
+    const cityCheck = await validateCityMatch(booker?.cityId, customer.cityId);
     if (!cityCheck.ok) {
       return NextResponse.json({ success: false, error: cityCheck.error }, { status: 400 });
     }
@@ -146,26 +147,55 @@ export async function POST(req: Request) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Prevent duplicate ad-hoc visit for same customer today
+    const lat = latitude != null ? Number(latitude) : null;
+    const lng = longitude != null ? Number(longitude) : null;
+
+    // If a visit already exists for today (e.g. pre-created by sudden-assignment
+    // from admin, or a scheduled plan), promote it to IN_PROGRESS instead of 409.
     const existing = await prisma.visit.findFirst({
       where: { bookerId: user.id, customerId: Number(customerId), visitDate: today },
     });
-    if (existing) {
-      return NextResponse.json({ success: false, error: "Visit already planned for this customer today" }, { status: 409 });
-    }
 
-    const visit = await prisma.visit.create({
-      data: {
+    const visit = existing
+      ? await prisma.visit.update({
+          where: { id: existing.id },
+          data: {
+            status: "IN_PROGRESS",
+            checkInAt: existing.checkInAt ?? new Date(),
+            checkInLat: lat ?? existing.checkInLat,
+            checkInLng: lng ?? existing.checkInLng,
+            notes: notes ?? existing.notes,
+          },
+        })
+      : await prisma.visit.create({
+          data: {
+            bookerId: user.id,
+            customerId: Number(customerId),
+            visitDate: today,
+            status: "IN_PROGRESS",
+            checkInAt: new Date(),
+            checkInLat: lat,
+            checkInLng: lng,
+            notes: notes ?? "",
+            priority: "normal",
+            isAdhoc: true,
+          },
+        });
+
+    if (!existing) {
+      const booker = await prisma.booker.findUnique({
+        where: { id: user.id },
+        select: { name: true },
+      });
+      await createEvent("visit-adhoc", {
+        visitId: visit.id,
         bookerId: user.id,
-        customerId: Number(customerId),
-        visitDate: today,
-        status: "IN_PROGRESS",
-        checkInAt: new Date(),
-        notes: notes ?? "",
-        priority: "normal",
-        isAdhoc: true,
-      },
-    });
+        bookerName: booker?.name ?? "Officer",
+        customerId: customer.id,
+        customerName: customer.name,
+        message: `${booker?.name ?? "Officer"} started an ad-hoc visit at ${customer.name}`,
+      }).catch(() => {});
+    }
 
     return NextResponse.json({
       success: true,
