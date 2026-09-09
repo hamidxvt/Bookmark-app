@@ -10,6 +10,26 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_MAX_ASSIGN_DISTANCE_KM } from "@/lib/geo";
+import {
+  checkDistanceWithinRange,
+  getOfficerLocation,
+} from "@/lib/visit-assignment";
+
+type CustomerCandidate = {
+  id: number;
+  category: string | null;
+  cityId: number;
+  latitude: { toNumber?: () => number } | number | null;
+  longitude: { toNumber?: () => number } | number | null;
+};
+
+type SkipLog = {
+  bookerId: number;
+  customerId?: number;
+  reason: string;
+  detail?: string;
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -38,12 +58,16 @@ export async function planNextDayVisits(forToday = false) {
 
   if (isWeekend(target)) {
     console.log("[scheduler] Weekend — skipping visit planning");
-    return { planned: 0, skipped: "weekend" };
+    return { planned: 0, skipped: "weekend", skipLog: [] as SkipLog[] };
   }
 
-  console.log(`[scheduler] Planning visits for ${target.toDateString()}`);
+  const maxDistanceKm = DEFAULT_MAX_ASSIGN_DISTANCE_KM;
+  const skipLog: SkipLog[] = [];
 
-  // Ensure all approved bookers are ACTIVE (fixes migrated bookers with null jobStatus)
+  console.log(
+    `[scheduler] Planning visits for ${target.toDateString()} (max distance ${maxDistanceKm}km)`,
+  );
+
   await prisma.booker.updateMany({
     where: { adminApproved: "APPROVED", deletedAt: null, jobStatus: { not: "ACTIVE" } },
     data: { jobStatus: "ACTIVE" },
@@ -51,15 +75,19 @@ export async function planNextDayVisits(forToday = false) {
 
   const activeBookers = await prisma.booker.findMany({
     where: { adminApproved: "APPROVED", deletedAt: null },
-    select: { id: true, cityId: true },
-    orderBy: { id: "asc" }, // Ensure consistent ordering for debugging
+    select: {
+      id: true,
+      cityId: true,
+      city: { select: { id: true, name: true } },
+    },
+    orderBy: { id: "asc" },
   });
 
   console.log(`[scheduler] Found ${activeBookers.length} approved bookers`);
 
   let planned = 0;
-  // Track customers assigned today to avoid duplicates across bookers
   const assignedTodayIds: Set<number> = new Set();
+  const assignedByBooker: Record<number, number> = {};
 
   for (const booker of activeBookers) {
     const existing = await prisma.visit.count({
@@ -76,39 +104,96 @@ export async function planNextDayVisits(forToday = false) {
     });
     const recentIds = recentlyVisited.map((v) => v.customerId);
 
-    // STRICT: only assign customers from the officer's own city WITH GPS coords
-    // This ensures route map shows correct nearby locations
     if (!booker.cityId) {
-      console.log(`[scheduler] Booker ${booker.id} has no city — skipping`);
+      const msg = `Booker ${booker.id} has no assigned city`;
+      console.log(`[scheduler] ${msg} — skipping`);
+      skipLog.push({ bookerId: booker.id, reason: "no_officer_city", detail: msg });
       continue;
     }
 
-    // Exclude recently visited AND customers already assigned today
+    const officerLoc = await getOfficerLocation(booker.id);
+    if (!officerLoc) {
+      const msg = `Booker ${booker.id} has no GPS location`;
+      console.log(`[scheduler] ${msg} — skipping`);
+      skipLog.push({ bookerId: booker.id, reason: "no_officer_gps", detail: msg });
+      continue;
+    }
+
     const allExcludeIds = [...recentIds, ...Array.from(assignedTodayIds)];
 
-    // ── 7-visit Distribution: 2 existing + 1 A+ + 2 A + 2 Bookseller ─────────
-    // Helper: fetch N customers matching optional category, excluding used ids
     const baseWhere = (extraExclude: number[], category?: string) => ({
       approvalStatus: "APPROVED" as const,
       deletedAt: null,
       cityId: booker.cityId!,
+      latitude: { not: null },
+      longitude: { not: null },
       ...((allExcludeIds.length + extraExclude.length) > 0
         ? { id: { notIn: [...allExcludeIds, ...extraExclude] } }
         : {}),
       ...(category !== undefined ? { category } : {}),
     });
 
-    const pickCustomers = async (n: number, category?: string, usedIds: number[] = []) => {
+    const pickCustomers = async (
+      n: number,
+      category?: string,
+      usedIds: number[] = [],
+    ): Promise<CustomerCandidate[]> => {
       if (n <= 0) return [];
       return prisma.customer.findMany({
         where: baseWhere(usedIds, category),
         orderBy: [{ workingPriority: "asc" }, { id: "asc" }],
-        take: n,
-        select: { id: true, category: true },
+        take: n * 3,
+        select: {
+          id: true,
+          category: true,
+          latitude: true,
+          longitude: true,
+          cityId: true,
+        },
       });
     };
 
-    // 1. 2 "existing customers" — customers this booker has previously completed visits with
+    const filterByCityAndDistance = (
+      candidates: CustomerCandidate[],
+    ): CustomerCandidate[] => {
+      const eligible: CustomerCandidate[] = [];
+      for (const c of candidates) {
+        if (c.cityId !== booker.cityId) {
+          skipLog.push({
+            bookerId: booker.id,
+            customerId: c.id,
+            reason: "city_mismatch",
+            detail: `Customer ${c.id} not in ${booker.city?.name ?? booker.cityId}`,
+          });
+          continue;
+        }
+
+        const distCheck = checkDistanceWithinRange(
+          officerLoc.lat,
+          officerLoc.lng,
+          c.latitude,
+          c.longitude,
+          maxDistanceKm,
+        );
+
+        if (!distCheck.ok) {
+          console.log(
+            `[scheduler] Skipping customer ${c.id} for booker ${booker.id}: ${distCheck.error}`,
+          );
+          skipLog.push({
+            bookerId: booker.id,
+            customerId: c.id,
+            reason: distCheck.reason,
+            detail: distCheck.error,
+          });
+          continue;
+        }
+
+        eligible.push(c);
+      }
+      return eligible;
+    };
+
     const previouslyVisited = await prisma.visit.findMany({
       where: {
         bookerId: booker.id,
@@ -121,53 +206,82 @@ export async function planNextDayVisits(forToday = false) {
       orderBy: { visitDate: "desc" },
       take: 2,
     });
-    const existingCustomers = previouslyVisited.map(v => ({ id: v.customerId, category: null as string | null }));
+    const existingRaw = await prisma.customer.findMany({
+      where: {
+        id: { in: previouslyVisited.map((v) => v.customerId) },
+        cityId: booker.cityId!,
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      select: {
+        id: true,
+        category: true,
+        latitude: true,
+        longitude: true,
+        cityId: true,
+      },
+    });
+    const existingCustomers = filterByCityAndDistance(existingRaw).slice(0, 2);
 
-    // 2. 1 A+ customer
-    const collectedIds = existingCustomers.map(c => c.id);
-    const aplusList = await pickCustomers(1, "A+", collectedIds);
+    const collectedIds = existingCustomers.map((c) => c.id);
+    const aplusList = filterByCityAndDistance(
+      await pickCustomers(1, "A+", collectedIds),
+    ).slice(0, 1);
 
-    // 3. 2 A customers
-    const collectedIds2 = [...collectedIds, ...aplusList.map(c => c.id)];
-    const aList = await pickCustomers(2, "A", collectedIds2);
+    const collectedIds2 = [...collectedIds, ...aplusList.map((c) => c.id)];
+    const aList = filterByCityAndDistance(
+      await pickCustomers(2, "A", collectedIds2),
+    ).slice(0, 2);
 
-    // 4. 2 Bookseller customers
-    const collectedIds3 = [...collectedIds2, ...aList.map(c => c.id)];
-    const booksellers = await pickCustomers(2, "BOOKSHOPS", collectedIds3);
+    const collectedIds3 = [...collectedIds2, ...aList.map((c) => c.id)];
+    const booksellers = filterByCityAndDistance(
+      await pickCustomers(2, "BOOKSHOPS", collectedIds3),
+    ).slice(0, 2);
 
-    let customers: { id: number; category: string | null }[] = [
+    let customers: CustomerCandidate[] = [
       ...existingCustomers,
       ...aplusList,
       ...aList,
       ...booksellers,
     ];
 
-    // 5. Fill remaining slots (up to 7) with any available city customer
-    const needed = (7 - existing) - customers.length;
+    const slotsRemaining = 7 - existing;
+    let needed = slotsRemaining - customers.length;
     if (needed > 0) {
-      const fillIds = customers.map(c => c.id);
-      const fillers = await prisma.customer.findMany({
-        where: {
-          ...baseWhere(fillIds),
-        },
-        orderBy: [{ workingPriority: "asc" }, { id: "asc" }],
-        take: needed,
-        select: { id: true, category: true },
-      });
-      customers = [...customers, ...fillers];
+      const fillIds = customers.map((c) => c.id);
+      const fillers = filterByCityAndDistance(
+        await prisma.customer.findMany({
+          where: baseWhere(fillIds),
+          orderBy: [{ workingPriority: "asc" }, { id: "asc" }],
+          take: needed * 3,
+          select: {
+            id: true,
+            category: true,
+            latitude: true,
+            longitude: true,
+            cityId: true,
+          },
+        }),
+      );
+      customers = [...customers, ...fillers.slice(0, needed)];
+      needed = slotsRemaining - customers.length;
     }
 
-    // Cap at how many slots remain
-    customers = customers.slice(0, 7 - existing);
+    customers = customers.slice(0, slotsRemaining);
 
-    // No customers in city — skip (don't assign random far-away customers)
     if (customers.length === 0) {
-      console.log(`[scheduler] No customers in city ${booker.cityId} for booker ${booker.id} — skipping`);
+      const msg = `No eligible customers within ${maxDistanceKm}km in ${booker.city?.name ?? booker.cityId}`;
+      console.log(`[scheduler] Booker ${booker.id}: ${msg} — skipping`);
+      skipLog.push({ bookerId: booker.id, reason: "no_eligible_customers", detail: msg });
       continue;
     }
 
-    console.log(`[scheduler] Booker ${booker.id}: ${customers.length} visits planned (${existingCustomers.length} existing, ${aplusList.length} A+, ${aList.length} A, ${booksellers.length} booksellers)`);
+    console.log(
+      `[scheduler] Booker ${booker.id} (${booker.city?.name}, GPS via ${officerLoc.source}): ` +
+        `${customers.length} visits planned`,
+    );
 
+    let bookerAssigned = 0;
     for (const c of customers) {
       try {
         await prisma.visit.create({
@@ -180,14 +294,35 @@ export async function planNextDayVisits(forToday = false) {
         });
         assignedTodayIds.add(c.id);
         planned++;
+        bookerAssigned++;
       } catch (err: any) {
-        console.error(`[scheduler] Error creating visit for booker ${booker.id}, customer ${c.id}: ${err.message}`);
+        console.error(
+          `[scheduler] Error creating visit for booker ${booker.id}, customer ${c.id}: ${err.message}`,
+        );
+        skipLog.push({
+          bookerId: booker.id,
+          customerId: c.id,
+          reason: "create_failed",
+          detail: err.message,
+        });
       }
+    }
+
+    if (bookerAssigned > 0) {
+      assignedByBooker[booker.id] = bookerAssigned;
     }
   }
 
-  console.log(`[scheduler] Planned ${planned} visits for ${target.toDateString()}`);
-  return { planned, date: target.toDateString() };
+  console.log(
+    `[scheduler] Planned ${planned} visits for ${target.toDateString()} (${skipLog.length} skips logged)`,
+  );
+  return {
+    planned,
+    date: target.toDateString(),
+    assignedByBooker,
+    skipLog,
+    maxDistanceKm,
+  };
 }
 
 // ─── 2. Auto Mark Absent — 11:00 PM ──────────────────────────────────────────

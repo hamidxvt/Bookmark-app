@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getMobileUser, unauthorized } from "@/lib/mobile-auth";
+import { validateCityMatch } from "@/lib/visit-assignment";
 
 type Visit = {
   id: number;
@@ -114,13 +115,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "customerId is required" }, { status: 400 });
     }
 
-    // Verify customer exists
     const customer = await prisma.customer.findFirst({
       where: { id: Number(customerId), deletedAt: null },
-      select: { id: true, name: true, customerType: true, ownerName: true, ownerPhone: true, address: true, latitude: true, longitude: true, workingPriority: true },
+      select: {
+        id: true,
+        name: true,
+        cityId: true,
+        customerType: true,
+        ownerName: true,
+        ownerPhone: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+        workingPriority: true,
+      },
     });
     if (!customer) {
       return NextResponse.json({ success: false, error: "Customer not found" }, { status: 404 });
+    }
+
+    const bookerCity = await prisma.booker.findUnique({
+      where: { id: user.id },
+      select: { cityId: true },
+    });
+    const cityCheck = await validateCityMatch(bookerCity?.cityId, customer.cityId);
+    if (!cityCheck.ok) {
+      return NextResponse.json({ success: false, error: cityCheck.error }, { status: 400 });
     }
 
     const today = new Date();
