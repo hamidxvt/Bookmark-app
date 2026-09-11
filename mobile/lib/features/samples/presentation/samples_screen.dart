@@ -6,7 +6,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
+import 'package:printing/printing.dart' as printing;
+import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
@@ -501,14 +502,40 @@ class _ErrorView extends StatelessWidget {
   );
 }
 
-Future<void> _viewPdf(String pdfBase64) async {
+Future<void> _viewPdf(String pdfBase64, BuildContext context) async {
   try {
     final bytes = base64Decode(pdfBase64.contains(',')
         ? pdfBase64.split(',').last
         : pdfBase64);
-    await Printing.layoutPdf(onLayout: (_) async => bytes);
+    
+    // Show PDF in dialog with Syncfusion viewer
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(10),
+        child: Stack(
+          children: [
+            SfPdfViewer.memory(bytes),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   } catch (e) {
     debugPrint('[PDF view error] $e');
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error viewing PDF: $e')),
+      );
+    }
   }
 }
 
@@ -583,7 +610,7 @@ class _SampleCard extends StatelessWidget {
             if (sample.status == 'delivered' && sample.pdfUrl != null) ...[
               const SizedBox(height: 6),
               GestureDetector(
-                onTap: () => _viewPdf(sample.pdfUrl!),
+                onTap: () => _viewPdf(sample.pdfUrl!, context),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(

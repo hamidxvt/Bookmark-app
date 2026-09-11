@@ -63,7 +63,7 @@ dependencies:
   # Signature + PDF (for sample delivery flow)
   signature: 5.4.0
   pdf: 3.11.1
-  printing: 5.12.0
+  syncfusion_flutter_pdfviewer: 24.1.41
   share_plus: 10.0.0
 
   # Utils
