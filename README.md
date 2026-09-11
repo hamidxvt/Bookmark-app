@@ -203,3 +203,4 @@ Proprietary — Bookmark Publishing
 ## Support
 
 For deployment issues, see Railway docs: https://docs.railway.app
+# Auto-build ready
