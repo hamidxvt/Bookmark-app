@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../core/theme/app_theme.dart';
@@ -125,8 +128,155 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
   bool _navigating = false;
   bool _mapFitted = false;
 
+  // ── Follow-me navigation state ────────────────────────────────────────────
+  RouteStop? _navDest;              // active destination (null = not navigating)
+  StreamSubscription<Position>? _navPosSub;
+  LatLng? _navMyPos;
+  double? _navBearing;              // degrees; camera + marker rotation
+  double _navSpeedMps = 0;
+  double _navDistanceM = 0;         // straight-line remaining, metres
+  DateTime? _navStartedAt;
+  int _navInitialDurationSec = 0;   // from Directions API, used for ETA decrement
+  int _navRemainingSec = 0;
+  bool _hasArrived = false;
+
+  bool get _isFollowing => _navDest != null;
+
   Set<Polyline> get _allPolylines =>
       _navPolylines.isNotEmpty ? _navPolylines : _overviewPolylines;
+
+  @override
+  void dispose() {
+    _navPosSub?.cancel();
+    super.dispose();
+  }
+
+  /// Great-circle distance in metres between two points.
+  double _haversineM(LatLng a, LatLng b) {
+    const r = 6371000.0;
+    final dLat = (b.latitude - a.latitude) * math.pi / 180;
+    final dLng = (b.longitude - a.longitude) * math.pi / 180;
+    final la1 = a.latitude * math.pi / 180;
+    final la2 = b.latitude * math.pi / 180;
+    final h = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(la1) * math.cos(la2) * math.sin(dLng / 2) * math.sin(dLng / 2);
+    return 2 * r * math.asin(math.sqrt(h));
+  }
+
+  /// Initial bearing (degrees, 0-360) from a -> b.
+  double _bearingDeg(LatLng a, LatLng b) {
+    final la1 = a.latitude * math.pi / 180;
+    final la2 = b.latitude * math.pi / 180;
+    final dLng = (b.longitude - a.longitude) * math.pi / 180;
+    final y = math.sin(dLng) * math.cos(la2);
+    final x =
+        math.cos(la1) * math.sin(la2) - math.sin(la1) * math.cos(la2) * math.cos(dLng);
+    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
+  }
+
+  Future<void> _startFollowMe(RouteStop dest, DirectionsResult dir) async {
+    await _navPosSub?.cancel();
+    _hasArrived = false;
+    _navDest = dest;
+    _navInitialDurationSec = dir.durationSec;
+    _navRemainingSec = dir.durationSec;
+    _navStartedAt = DateTime.now();
+
+    // Kick the camera into "driving view" immediately, before the first
+    // stream event arrives, so it feels responsive.
+    final gps = ref.read(gpsServiceProvider);
+    final first = await gps.getCurrentPosition();
+    if (first != null && _mapController != null) {
+      final start = LatLng(first.latitude, first.longitude);
+      final destLL = LatLng(dest.lat, dest.lng);
+      final bearing =
+          first.heading >= 0 ? first.heading : _bearingDeg(start, destLL);
+      await _mapController!.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: start, zoom: 17.5, tilt: 55, bearing: bearing),
+        ),
+      );
+    }
+
+    _navPosSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 5,   // metres — smooth but not jittery
+      ),
+    ).listen(
+      _onNavPosition,
+      onError: (Object e) => debugPrint('[nav] position stream error: $e'),
+      cancelOnError: false,
+    );
+
+    if (mounted) setState(() {});
+  }
+
+  void _onNavPosition(Position pos) {
+    final dest = _navDest;
+    if (dest == null || !mounted) return;
+
+    final now = LatLng(pos.latitude, pos.longitude);
+    final destLL = LatLng(dest.lat, dest.lng);
+    final distM = _haversineM(now, destLL);
+    // Prefer device heading (accurate while moving); fall back to bearing
+    // toward the destination when the device is stationary/heading unknown.
+    final bearing = (pos.heading >= 0 && pos.speed > 0.5)
+        ? pos.heading
+        : _bearingDeg(now, destLL);
+
+    // ETA decrement: keep original ETA linear vs remaining distance. Prefer
+    // measured speed when it's meaningful (> ~5 km/h).
+    int remaining = _navRemainingSec;
+    if (pos.speed > 1.4) {
+      remaining = (distM / pos.speed).round();
+    } else if (_navStartedAt != null && _navInitialDurationSec > 0) {
+      final elapsed = DateTime.now().difference(_navStartedAt!).inSeconds;
+      remaining = math.max(0, _navInitialDurationSec - elapsed);
+    }
+
+    setState(() {
+      _navMyPos = now;
+      _navBearing = bearing;
+      _navSpeedMps = pos.speed >= 0 ? pos.speed : 0;
+      _navDistanceM = distM;
+      _navRemainingSec = remaining;
+    });
+
+    _mapController?.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(target: now, zoom: 17.5, tilt: 55, bearing: bearing),
+      ),
+    );
+
+    // Arrival: 50 m is enough for a check-in from the customer entrance.
+    if (!_hasArrived && distM < 50) {
+      _hasArrived = true;
+      _showSnack('Arrived at ${dest.customerName}');
+      _stopFollowMe(fitBack: false);
+    }
+  }
+
+  Future<void> _stopFollowMe({bool fitBack = true}) async {
+    await _navPosSub?.cancel();
+    _navPosSub = null;
+    _navDest = null;
+    _navMyPos = null;
+    _navBearing = null;
+    _navSpeedMps = 0;
+    _navDistanceM = 0;
+    _navRemainingSec = 0;
+
+    if (fitBack && _mapController != null) {
+      // Level the camera and go back to route overview.
+      final routeAsync = ref.read(routeProvider);
+      routeAsync.whenData((stops) {
+        final valid = stops.where((s) => s.lat != 0 && s.lng != 0).toList();
+        _fitMapToStops(valid, null);
+      });
+    }
+    if (mounted) setState(() {});
+  }
 
   void _buildOverviewPolyline(List<RouteStop> stops, LatLng? myPos) {
     final valid = stops.where((s) => s.lat != 0 && s.lng != 0).toList();
@@ -321,6 +471,9 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
   }
 
   Future<void> _showETASheet(RouteStop stop, DirectionsResult dir) async {
+    // Capture the outer state's context so the pushed sheet route can
+    // still reach _startFollowMe after it's closed.
+    final rootContext = context;
     await showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -403,11 +556,26 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
           ),
           const SizedBox(height: 16),
 
-          // CTA
+          // CTA — closes the sheet AND kicks off in-app follow-me navigation.
           SizedBox(
             width: double.infinity, height: 52,
             child: ElevatedButton.icon(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                Navigator.pop(context);
+                // Fire after the sheet's pop animation so the camera
+                // animation doesn't get eaten by Navigator.
+                Future.delayed(const Duration(milliseconds: 160), () {
+                  if (!mounted) return;
+                  _startFollowMe(stop, dir);
+                  ScaffoldMessenger.of(rootContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Navigation started'),
+                      behavior: SnackBarBehavior.floating,
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
+                });
+              },
               icon: const Icon(Icons.navigation_rounded, size: 18),
               label: const Text('Start Navigation',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
@@ -426,15 +594,23 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
 
   Set<Marker> _buildMarkers(List<RouteStop> stops, int selected, LatLng? myPos, double? heading) {
     final ms = <Marker>{};
-    if (myPos != null) {
-      // Your location — blue marker rotates with heading
+    // While navigating, prefer the live stream position/bearing so the
+    // "me" arrow tracks in real time instead of using the stale one-shot
+    // fix _MapBody grabbed on load.
+    final effMyPos = _navMyPos ?? myPos;
+    final effHeading = _navBearing ?? heading;
+    if (effMyPos != null) {
       ms.add(Marker(
         markerId: const MarkerId('me'),
-        position: myPos,
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueBlue),
+        position: effMyPos,
+        icon: BitmapDescriptor.defaultMarkerWithHue(
+          _isFollowing ? BitmapDescriptor.hueAzure : BitmapDescriptor.hueBlue,
+        ),
         infoWindow: const InfoWindow(title: 'Your Location'),
-        rotation: heading ?? 0, // Marker rotates to show direction
+        rotation: effHeading ?? 0,
         zIndex: 10,
+        anchor: const Offset(0.5, 0.5),
+        flat: _isFollowing, // "car on the road" look while navigating
       ));
     }
     for (var i = 0; i < stops.length; i++) {
@@ -476,33 +652,57 @@ class _RouteMapScreenState extends ConsumerState<RouteMapScreen> {
         ),
         data: (stops) {
           final valid = stops.where((s) => s.lat != 0 && s.lng != 0).toList();
-          return _MapBody(
-            stops: valid,
-            selectedStop: _selectedStop,
-            polylines: _allPolylines,
-            navigating: _navigating,
-            onSelectStop: (i) {
-              setState(() => _selectedStop = i);
-              if (i < valid.length) {
-                _mapController?.animateCamera(
-                  CameraUpdate.newLatLngZoom(LatLng(valid[i].lat, valid[i].lng), 15),
-                );
-              }
-            },
-            onMapCreated: (ctrl) {
-              _mapController = ctrl;
-              _mapFitted = false;
-            },
-            onReady: (myPos) {
-              if (_mapFitted) return;
-              _buildOverviewPolyline(valid, myPos);
-              _mapFitted = true;
-              _fitMapToStops(valid, myPos);
-              if (mounted) setState(() {});
-            },
-            buildMarkers: (stops, myPos, heading) => _buildMarkers(stops, _selectedStop, myPos, heading),
-            onNavigate: _navigate,
-          );
+          return Stack(children: [
+            _MapBody(
+              stops: valid,
+              selectedStop: _selectedStop,
+              polylines: _allPolylines,
+              navigating: _navigating,
+              hideBottomPanel: _isFollowing,   // give the nav HUD full attention
+              onSelectStop: (i) {
+                setState(() => _selectedStop = i);
+                if (i < valid.length) {
+                  _mapController?.animateCamera(
+                    CameraUpdate.newLatLngZoom(LatLng(valid[i].lat, valid[i].lng), 15),
+                  );
+                }
+              },
+              onMapCreated: (ctrl) {
+                _mapController = ctrl;
+                _mapFitted = false;
+              },
+              onReady: (myPos) {
+                if (_mapFitted) return;
+                _buildOverviewPolyline(valid, myPos);
+                _mapFitted = true;
+                _fitMapToStops(valid, myPos);
+                if (mounted) setState(() {});
+              },
+              buildMarkers: (stops, myPos, heading) => _buildMarkers(stops, _selectedStop, myPos, heading),
+              onNavigate: _navigate,
+            ),
+            if (_isFollowing)
+              _NavigationHud(
+                destinationName: _navDest!.customerName,
+                distanceM: _navDistanceM,
+                etaSec: _navRemainingSec,
+                speedKmh: _navSpeedMps * 3.6,
+                onRecenter: () {
+                  if (_navMyPos == null) return;
+                  _mapController?.animateCamera(
+                    CameraUpdate.newCameraPosition(
+                      CameraPosition(
+                        target: _navMyPos!,
+                        zoom: 17.5,
+                        tilt: 55,
+                        bearing: _navBearing ?? 0,
+                      ),
+                    ),
+                  );
+                },
+                onExit: () => _stopFollowMe(),
+              ),
+          ]);
         },
       ),
     );
@@ -515,6 +715,7 @@ class _MapBody extends ConsumerStatefulWidget {
   final int selectedStop;
   final Set<Polyline> polylines;
   final bool navigating;
+  final bool hideBottomPanel;
   final ValueChanged<int> onSelectStop;
   final void Function(GoogleMapController) onMapCreated;
   final void Function(LatLng? myPos) onReady;
@@ -526,6 +727,7 @@ class _MapBody extends ConsumerStatefulWidget {
     required this.selectedStop,
     required this.polylines,
     required this.navigating,
+    this.hideBottomPanel = false,
     required this.onSelectStop,
     required this.onMapCreated,
     required this.onReady,
@@ -590,8 +792,8 @@ class _MapBodyState extends ConsumerState<_MapBody> {
         ),
       ),
 
-      // Top bar
-      Positioned(
+      // Top bar (hidden during follow-me navigation to give the HUD room)
+      if (!widget.hideBottomPanel) Positioned(
         top: 0, left: 0, right: 0,
         child: SafeArea(
           child: Padding(
@@ -648,8 +850,8 @@ class _MapBodyState extends ConsumerState<_MapBody> {
         ),
       ),
 
-      // Bottom panel
-      Positioned(
+      // Bottom panel (also hidden during follow-me navigation)
+      if (!widget.hideBottomPanel) Positioned(
         bottom: 0, left: 0, right: 0,
         child: SafeArea(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -916,5 +1118,217 @@ class _ErrorView extends StatelessWidget {
         ]),
       ),
     );
+  }
+}
+
+// ── Follow-me navigation HUD ─────────────────────────────────────────────────
+// Top: destination + big ETA + distance. Bottom: speed + Recenter + Exit.
+class _NavigationHud extends StatelessWidget {
+  final String destinationName;
+  final double distanceM;
+  final int etaSec;
+  final double speedKmh;
+  final VoidCallback onRecenter;
+  final VoidCallback onExit;
+
+  const _NavigationHud({
+    required this.destinationName,
+    required this.distanceM,
+    required this.etaSec,
+    required this.speedKmh,
+    required this.onRecenter,
+    required this.onExit,
+  });
+
+  String get _distanceText {
+    if (distanceM >= 1000) return '${(distanceM / 1000).toStringAsFixed(1)} km';
+    return '${distanceM.round()} m';
+  }
+
+  String get _etaText {
+    final m = (etaSec / 60).round();
+    if (m < 1) return '<1 min';
+    if (m >= 60) {
+      final h = m ~/ 60;
+      final rem = m % 60;
+      return rem == 0 ? '$h hr' : '$h hr $rem min';
+    }
+    return '$m min';
+  }
+
+  String get _arrivalTime {
+    final arr = DateTime.now().add(Duration(seconds: etaSec));
+    final h = arr.hour % 12 == 0 ? 12 : arr.hour % 12;
+    final m = arr.minute.toString().padLeft(2, '0');
+    final ampm = arr.hour < 12 ? 'AM' : 'PM';
+    return '$h:$m $ampm';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(children: [
+      // Top HUD — destination + ETA
+      Positioned(
+        top: 0, left: 0, right: 0,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.72),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(children: [
+                    Container(
+                      width: 44, height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.navigation_rounded,
+                          color: Colors.white, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('NAVIGATING TO',
+                              style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.2)),
+                          const SizedBox(height: 2),
+                          Text(destinationName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800)),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(_etaText,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900)),
+                        Text(_distanceText,
+                            style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+
+      // Bottom HUD — speed + arrival + controls
+      Positioned(
+        bottom: 0, left: 0, right: 0,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.96),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    Row(children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('${speedKmh.round()}',
+                                style: const TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0F172A),
+                                    height: 1)),
+                            const Text('km/h',
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      Container(width: 1, height: 32, color: const Color(0xFFE2E8F0)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_arrivalTime,
+                                style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF0F172A),
+                                    height: 1)),
+                            const Text('arrival',
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF64748B))),
+                          ],
+                        ),
+                      ),
+                      IconButton.filled(
+                        onPressed: onRecenter,
+                        icon: const Icon(Icons.my_location_rounded, size: 20),
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          foregroundColor: const Color(0xFF0F172A),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity, height: 46,
+                      child: ElevatedButton.icon(
+                        onPressed: onExit,
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                        label: const Text('Exit navigation',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w800, fontSize: 14)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F172A),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ]);
   }
 }
