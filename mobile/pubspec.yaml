@@ -64,8 +64,9 @@ dependencies:
   signature: ^5.4.0
   pdf: ^3.11.1
   # 24.x uses the removed Android v1 embedding (Registrar symbol) and
-  # will not compile on Flutter 3.29+. 30.x is the current stable line.
-  syncfusion_flutter_pdfviewer: ^30.0.0
+  # will not compile on Flutter 3.29+. Cap at 27.x because 28.x pulls in
+  # web ^1.0.0 which conflicts with share_plus ^9.x (web ^0.5.0).
+  syncfusion_flutter_pdfviewer: ^27.2.5
   share_plus: ^9.0.0
 
   # Utils
