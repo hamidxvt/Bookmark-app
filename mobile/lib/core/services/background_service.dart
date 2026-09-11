@@ -71,7 +71,12 @@ Future<void> stopBackgroundGps() async {
 Future<void> _backgroundMain(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
 
+  StreamSubscription<Position>? posSub;
+  Timer? heartbeat;
+
   service.on('stop').listen((_) {
+    posSub?.cancel();
+    heartbeat?.cancel();
     service.stopSelf();
   });
 
@@ -82,13 +87,38 @@ Future<void> _backgroundMain(ServiceInstance service) async {
     }
   });
 
-  // Ping GPS every 10 seconds for near-real-time tracking
-  Timer.periodic(const Duration(seconds: 10), (_) async {
+  // Stream-based tracking:
+  //   - emits when the phone actually moves 15m OR every ~30s (timeLimit)
+  //   - drastically lower battery + data cost than a 10s polling loop
+  //   - the OS coalesces GPS fixes for us, no jitter loop
+  try {
+    posSub = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 15,
+        timeLimit: Duration(seconds: 30),
+      ),
+    ).listen(
+      (pos) => _sendGpsPingWith(service, pos),
+      onError: (Object e) {
+        debugPrint('[BackgroundService] position stream error: $e');
+      },
+      cancelOnError: false,
+    );
+  } catch (e) {
+    debugPrint('[BackgroundService] failed to start position stream: $e');
+  }
+
+  // Immediate first ping so admin sees the officer as soon as day starts,
+  // even before the stream emits the first fix.
+  await _sendGpsPing(service);
+
+  // Heartbeat every 2 minutes: guarantees a ping when the officer is
+  // fully stationary (stream may not emit for a long time), and doubles
+  // as a self-heal — if the stream died silently, we still update lastSeenAt.
+  heartbeat = Timer.periodic(const Duration(minutes: 2), (_) async {
     await _sendGpsPing(service);
   });
-
-  // Immediate first ping
-  await _sendGpsPing(service);
 }
 
 @pragma('vm:entry-point')
@@ -98,39 +128,63 @@ Future<bool> _iosBackground(ServiceInstance service) async {
   return true;
 }
 
+/// One-shot ping using either the current fix or the last known position.
+/// Used for the very first ping after service start and for the heartbeat.
 Future<void> _sendGpsPing(ServiceInstance service) async {
   try {
     final perm = await Geolocator.checkPermission();
-    if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) return;
+    if (perm == LocationPermission.denied ||
+        perm == LocationPermission.deniedForever) {
+      return;
+    }
 
-    final pos = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-      timeLimit: const Duration(seconds: 10),
-    ).catchError((_) async => Geolocator.getLastKnownPosition());
+    Position? pos;
+    try {
+      pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+    } catch (e) {
+      debugPrint('[BackgroundService] getCurrentPosition failed: $e');
+      pos = await Geolocator.getLastKnownPosition();
+    }
 
     if (pos == null) return;
+    await _sendGpsPingWith(service, pos);
+  } catch (e) {
+    debugPrint('[BackgroundService] _sendGpsPing error: $e');
+  }
+}
 
+/// POST a specific Position to the backend. Called by both the stream
+/// listener and the heartbeat.
+Future<void> _sendGpsPingWith(ServiceInstance service, Position pos) async {
+  try {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_kTokenKey);
     if (token == null) return;
 
-    final res = await http.post(
-      Uri.parse('$_kBaseUrl/gps'),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'lat': pos.latitude,
-        'lng': pos.longitude,
-        'accuracy': pos.accuracy,
-        'isMock': pos.isMocked,
-        // Filter GPS jitter: speeds under 1 km/h are stationary noise
-        'speed_kmh': (pos.speed * 3.6) < 1.0 ? 0.0 : double.parse((pos.speed * 3.6).toStringAsFixed(2)),
-        'heading': pos.heading >= 0 ? pos.heading : null,
-        'altitude': pos.altitude,
-      }),
-    ).timeout(const Duration(seconds: 10));
+    final res = await http
+        .post(
+          Uri.parse('$_kBaseUrl/gps'),
+          headers: {
+            'Authorization': 'Bearer $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'lat': pos.latitude,
+            'lng': pos.longitude,
+            'accuracy': pos.accuracy,
+            'isMock': pos.isMocked,
+            // Filter GPS jitter: speeds under 1 km/h are stationary noise.
+            'speed_kmh': (pos.speed * 3.6) < 1.0
+                ? 0.0
+                : double.parse((pos.speed * 3.6).toStringAsFixed(2)),
+            'heading': pos.heading >= 0 ? pos.heading : null,
+            'altitude': pos.altitude,
+          }),
+        )
+        .timeout(const Duration(seconds: 10));
 
     service.invoke('gps_update', {
       'lat': pos.latitude,
@@ -138,7 +192,9 @@ Future<void> _sendGpsPing(ServiceInstance service) async {
       'time': DateTime.now().toIso8601String(),
       'ok': res.statusCode == 200,
     });
-  } catch (_) {
-    // Silently ignore — network may be unavailable
+  } catch (e) {
+    // Network may be unavailable; the next stream event or heartbeat
+    // will retry. Logged for diagnosability.
+    debugPrint('[BackgroundService] ping POST failed: $e');
   }
 }
