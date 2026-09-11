@@ -94,7 +94,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         // Notification bell
                         _IconBtn(
                           icon: Icons.notifications_outlined,
-                          onTap: () {},
+                          onTap: () => context.push('/notifications'),
                         ),
                         const SizedBox(width: 8),
                         // Avatar

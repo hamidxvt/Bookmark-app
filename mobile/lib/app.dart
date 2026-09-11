@@ -24,6 +24,7 @@ import 'features/workday/presentation/day_end_screen.dart';
 import 'features/payroll/presentation/payroll_screen.dart';
 import 'features/map/presentation/route_map_screen.dart';
 import 'features/profile/presentation/profile_screen.dart';
+import 'features/notifications/presentation/notifications_screen.dart';
 
 // Use FCM navigatorKey as the root so push notifications can navigate
 final _shellNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'shell');
@@ -54,6 +55,7 @@ final _routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/payroll',   builder: (_, __) => const PayrollScreen()),
       GoRoute(path: '/map',       builder: (_, __) => const RouteMapScreen()),
       GoRoute(path: '/leaves',    builder: (_, __) => const LeavesScreen()),
+      GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
       GoRoute(
         path: '/visits/:id/complete',
         builder: (_, state) => CompleteVisitScreen(
