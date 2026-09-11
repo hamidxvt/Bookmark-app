@@ -132,6 +132,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                         data: (s) => _ShiftCard(
                           started: s.dayStarted,
                           ended: s.dayEnded,
+                          workdayStatus: s,
                         ),
                       );
                     }),
@@ -246,7 +247,8 @@ class _IconBtn extends StatelessWidget {
 class _ShiftCard extends StatelessWidget {
   final bool started;
   final bool ended;
-  const _ShiftCard({required this.started, required this.ended});
+  final dynamic workdayStatus;
+  const _ShiftCard({required this.started, required this.ended, this.workdayStatus});
 
   @override
   Widget build(BuildContext context) {
@@ -276,7 +278,7 @@ class _ShiftCard extends StatelessWidget {
                           )),
                       const SizedBox(height: 2),
                       Text(
-                        DateFormat('h:mm a').format(DateTime.now()),
+                        DateFormat('h:mm a').format(workdayStatus?.startAt ?? DateTime.now()),
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
