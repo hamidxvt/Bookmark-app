@@ -63,7 +63,7 @@ dependencies:
   # Signature + PDF (for sample delivery flow)
   signature: 5.4.0
   pdf: 3.11.1
-  printing: 5.15.0
+  printing: 5.14.0
   share_plus: 9.0.0
 
   # Utils
