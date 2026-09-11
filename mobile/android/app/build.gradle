@@ -90,6 +90,7 @@ flutter {
 }
 
 dependencies {
-    // kotlin_version resolves via the applied kotlin-android plugin.
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    // The Kotlin Android plugin bundles the correct stdlib for its
+    // configured Kotlin version — no need to declare it explicitly, and
+    // hard-coding it here diverges when the plugin version is bumped.
 }
