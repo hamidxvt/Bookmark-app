@@ -32,7 +32,9 @@ if (flutterVersionName == null) {
 
 android {
     namespace "com.bookmark.sfa"
-    compileSdk 34
+    // 35 is required by flutter_plugin_android_lifecycle (transitive of
+    // several plugins) and by Google Play from Aug 2025 onward.
+    compileSdk 35
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -50,7 +52,9 @@ android {
     defaultConfig {
         applicationId "com.bookmark.sfa"
         minSdk 24
-        targetSdk 34
+        // Google Play required targetSdk 35 as of Aug 2025 for new APKs;
+        // matches compileSdk so app resources compile cleanly.
+        targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
