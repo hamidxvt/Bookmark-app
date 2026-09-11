@@ -24,7 +24,12 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.24.0'
+          # 3.24 had a broken dev.flutter.flutter-plugin-loader that failed
+          # to inject the `flutter { }` extension into plugin subprojects
+          # (geolocator_android, etc.), so their compileSdkVersion lookup
+          # blew up. 3.29.3 is the first version where the loader works
+          # reliably with our modern plugin set.
+          flutter-version: '3.29.3'
           channel: 'stable'
       
       - name: Get dependencies
