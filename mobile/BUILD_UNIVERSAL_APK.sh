@@ -40,7 +40,11 @@ echo "   Optimizations: Disabled minification for max compatibility"
 echo "   Target SDK: 34 (Android 14)"
 echo "   Min SDK: 24 (Android 7.0)"
 echo ""
-flutter build apk --release
+# --no-tree-shake-icons: keeps every Material Icons glyph in the font.
+# The tree-shaker occasionally strips glyphs it can't statically prove
+# are used, which shows up as tofu boxes on device. Disabling costs a
+# few hundred KB but guarantees icons render on every screen.
+flutter build apk --release --no-tree-shake-icons
 
 # Step 4: Show build result
 echo ""
