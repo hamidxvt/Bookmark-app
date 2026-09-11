@@ -1,18 +1,6 @@
-buildscript {
-    // Kotlin 2.0+ is required by package_info_plus 8.x and flutter_background_service 5.x
-    ext.kotlin_version = '2.0.0'
-    repositories {
-        google()
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.3.2'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-        classpath 'com.google.gms:google-services:4.4.2'
-    }
-}
-
+// All plugin versions and classpaths are declared in settings.gradle
+// via the declarative pluginManagement + plugins blocks. The old
+// buildscript { classpath ... } lines conflicted with that layout.
 allprojects {
     repositories {
         google()
