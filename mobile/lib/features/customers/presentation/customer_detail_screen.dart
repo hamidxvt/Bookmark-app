@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/error_messages.dart';
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 final customerDetailProvider =
@@ -104,7 +105,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed: $e'),
+            content: Text(friendlyError(e)),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),

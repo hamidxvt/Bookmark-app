@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/quotes.dart';
+import '../../../core/utils/error_messages.dart';
 import '../data/workday_status_provider.dart';
 import '../../visits/data/visit_repository.dart';
 
@@ -73,10 +74,9 @@ class _DayStartScreenState extends ConsumerState<DayStartScreen> {
       }
     } catch (e) {
       if (mounted) {
-        final msg = e is ApiException ? e.message : 'Could not start day. Please try again.';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(msg),
+            content: Text(friendlyError(e, fallback: 'Could not start day. Please try again.')),
             backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
@@ -112,7 +112,10 @@ class _DayStartScreenState extends ConsumerState<DayStartScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text(friendlyError(e, fallback: 'Could not submit — please try again.')),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {

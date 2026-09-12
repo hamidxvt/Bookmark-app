@@ -93,18 +93,77 @@ class ApiException implements Exception {
 
   const ApiException({required this.code, required this.message, required this.statusCode});
 
+  /// Convert any DioException into a user-facing message.
+  /// Preference order:
+  ///   1. Backend's own error text (string or `{code, message}`).
+  ///   2. Well-known HTTP status codes (401, 403, 404, 5xx).
+  ///   3. Dio's own connection/timeout categories.
+  ///   4. Generic fallback — never leaks Dio's internal text.
   factory ApiException.fromDio(DioException e) {
+    final code = e.response?.statusCode ?? 0;
     final data = e.response?.data;
-    // Support both { error: "string" } and { error: { code, message } } formats
-    final errField = data?['error'];
-    final msg = errField is String
-        ? errField
-        : (errField is Map ? errField['message'] : null) ?? e.message ?? 'Something went wrong';
+
+    // Backend contract: { success: false, error: "..." } or
+    //                   { success: false, error: { code, message } }
+    final errField = data is Map ? data['error'] : null;
+    String? backendMsg;
+    String? backendCode;
+    if (errField is String && errField.trim().isNotEmpty) {
+      backendMsg = errField.trim();
+    } else if (errField is Map) {
+      backendMsg = (errField['message'] as String?)?.trim();
+      backendCode = errField['code'] as String?;
+    }
+
+    String msg;
+    if (backendMsg != null && backendMsg.isNotEmpty) {
+      msg = backendMsg;
+    } else if (code == 401) {
+      // Auth failures land here for the login screen (wrong password)
+      // and for expired tokens on any protected endpoint.
+      msg = 'Wrong email or password';
+    } else if (code == 403) {
+      msg = 'Your account is not approved yet. Please contact your manager.';
+    } else if (code == 404) {
+      msg = 'Not found — the record may have been removed.';
+    } else if (code == 409) {
+      msg = 'Already exists or conflicts with an existing record.';
+    } else if (code == 429) {
+      msg = 'Too many attempts — please wait a minute and try again.';
+    } else if (code >= 500 && code < 600) {
+      msg = 'Server error — please try again in a moment.';
+    } else if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.sendTimeout ||
+        e.type == DioExceptionType.receiveTimeout) {
+      msg = 'Slow connection — please check your internet and try again.';
+    } else if (e.type == DioExceptionType.connectionError) {
+      msg = 'No internet — please check your connection and try again.';
+    } else if (e.type == DioExceptionType.cancel) {
+      msg = 'Cancelled.';
+    } else {
+      // Last-resort generic — never surface Dio's raw error string.
+      msg = 'Something went wrong. Please try again.';
+    }
+
     return ApiException(
-      statusCode: e.response?.statusCode ?? 0,
-      code: (errField is Map ? errField['code'] : null) ?? 'UNKNOWN_ERROR',
+      statusCode: code,
+      code: backendCode ?? _codeForStatus(code, e.type),
       message: msg,
     );
+  }
+
+  static String _codeForStatus(int status, DioExceptionType type) {
+    if (status == 401) return 'UNAUTHORIZED';
+    if (status == 403) return 'FORBIDDEN';
+    if (status == 404) return 'NOT_FOUND';
+    if (status == 409) return 'CONFLICT';
+    if (status == 429) return 'RATE_LIMITED';
+    if (status >= 500) return 'SERVER_ERROR';
+    if (type == DioExceptionType.connectionError) return 'NO_INTERNET';
+    if (type == DioExceptionType.connectionTimeout ||
+        type == DioExceptionType.sendTimeout ||
+        type == DioExceptionType.receiveTimeout) return 'TIMEOUT';
+    return 'ERROR';
   }
 
   @override

@@ -1,9 +1,11 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/auth_repository.dart';
 import '../domain/auth_models.dart';
 import '../../../core/network/dio_client.dart';
+import '../../../core/utils/error_messages.dart';
 
 class AuthNotifier extends Notifier<AuthState> {
   @override
@@ -36,11 +38,13 @@ class AuthNotifier extends Notifier<AuthState> {
       state = state.copyWith(user: user, isLoading: false);
     } on ApiException catch (e) {
       state = state.copyWith(isLoading: false, error: e.message);
-    } catch (_) {
-      state = state.copyWith(
-        isLoading: false,
-        error: 'Cannot reach server. Make sure the backend is running.',
-      );
+    } on DioException catch (e) {
+      // Raw Dio errors get routed through the same friendly-message pipeline
+      // as ApiException so wrong password shows "Wrong email or password"
+      // instead of "Cannot reach server".
+      state = state.copyWith(isLoading: false, error: ApiException.fromDio(e).message);
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: friendlyError(e));
     }
   }
 

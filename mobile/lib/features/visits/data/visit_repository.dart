@@ -29,10 +29,37 @@ class VisitRepository {
   VisitRepository(this._dio, this._gps, this._queue);
 
   Future<List<Visit>> getTodayVisits() async {
-    final res = await _dio.get(ApiConstants.todayVisits);
-    final raw = res.data['data'];
-    final list = raw is List ? raw : (raw is Map ? (raw['visits'] as List? ?? []) : []);
-    return list.map((e) => Visit.fromJson(e as Map<String, dynamic>)).toList();
+    try {
+      final res = await _dio.get(ApiConstants.todayVisits);
+      final body = res.data;
+      // Backend contract: { success: bool, data: [...] } — anything else
+      // is a bug on the server. Surface it so we don't silently show
+      // "No visits" when the API actually errored.
+      if (body is! Map) {
+        throw ApiException(
+          statusCode: res.statusCode ?? 0,
+          code: 'BAD_RESPONSE',
+          message: 'Could not load visits — unexpected server response.',
+        );
+      }
+      if (body['success'] == false) {
+        throw ApiException(
+          statusCode: res.statusCode ?? 0,
+          code: 'API_ERROR',
+          message: (body['error']?.toString() ?? 'Could not load visits.').trim(),
+        );
+      }
+      final raw = body['data'];
+      final list = raw is List
+          ? raw
+          : (raw is Map ? (raw['visits'] as List? ?? const []) : const []);
+      return list
+          .whereType<Map>()
+          .map((e) => Visit.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
   }
 
   /// Check if current GPS position is within 200m of the visit customer location.

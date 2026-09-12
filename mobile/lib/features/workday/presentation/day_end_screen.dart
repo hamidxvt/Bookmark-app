@@ -9,6 +9,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/constants/api_constants.dart';
 import '../../../core/utils/quotes.dart';
+import '../../../core/utils/error_messages.dart';
 import '../data/workday_status_provider.dart';
 import '../../visits/data/visit_repository.dart';
 
@@ -66,7 +67,7 @@ class _DayEndScreenState extends ConsumerState<DayEndScreen> {
       }
     } catch (e) {
       if (mounted) {
-        final msg = e is ApiException ? e.message : 'Could not end day. Try again.';
+        final msg = friendlyError(e, fallback: 'Could not end day. Try again.');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(msg),

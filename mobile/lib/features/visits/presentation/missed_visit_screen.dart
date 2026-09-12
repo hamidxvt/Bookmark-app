@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_theme.dart';
+import '../../../core/utils/error_messages.dart';
 import '../data/visit_repository.dart';
 
 class MissedVisitScreen extends ConsumerStatefulWidget {
@@ -83,7 +84,7 @@ class _MissedVisitScreenState extends ConsumerState<MissedVisitScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed: $e'),
+            content: Text(friendlyError(e, fallback: 'Could not mark visit missed. Please try again.')),
             backgroundColor: AppColors.error,
           ),
         );
